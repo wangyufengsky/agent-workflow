@@ -8,6 +8,7 @@ import type { AcceptanceService } from '../acceptance/index.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
+import type { DatabaseInvestigations } from '../database-investigations/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { DocumentProcessor } from '../document-processor/index.ts';
@@ -29,6 +30,7 @@ import { functionalTestMcpTools } from './tools/functional-tests.tool.ts';
 import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
+import { investigateDatabaseTool } from './tools/investigate-database.tool.ts';
 import { readOfficeFileTool } from './tools/office-file.tool.ts';
 import { processDocumentTool } from './tools/process-document.tool.ts';
 import { delegationTools } from './tools/readonly-delegation.tool.ts';
@@ -65,6 +67,7 @@ export type McpModuleDeps = {
   attachments: AttachmentsService;
   imageAnalysis: ImageAnalysis;
   documentProcessor: DocumentProcessor;
+  databaseInvestigations: DatabaseInvestigations;
   office: Office;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
@@ -89,6 +92,7 @@ export function createMcpModule({
   attachments,
   imageAnalysis,
   documentProcessor,
+  databaseInvestigations,
   office,
   browser,
   filesDirOf,
@@ -102,7 +106,7 @@ export function createMcpModule({
     getTaskDiffTool(tasks),
     ...delegationTools(tasks),
     ...attachmentTools(tasks, initiatives, attachments),
-    processDocumentTool(documentProcessor, tasks, initiatives),
+    processDocumentTool(documentProcessor, tasks, initiatives, attempts),
     imageAnalysisTool({ imageAnalysis, attachments, attempts, browser, tasks, initiatives }),
     readOfficeFileTool(office),
     ...taskArtifactTools(tasks, office, attachments),
@@ -116,6 +120,7 @@ export function createMcpModule({
     dbListConnectionsTool(tasks, knowledge),
     dbDescribeTool(tasks, knowledge),
     dbQueryTool(tasks, knowledge),
+    investigateDatabaseTool(databaseInvestigations, tasks, attempts),
     submitAnswerTool(knowledge),
     submitOutlineTool(decks),
     submitSlideTool(decks),

@@ -220,7 +220,7 @@ function Box({
               </p>
             )}
             {items.length === 0 && <p className="hint">{C.empty}</p>}
-            <StreamAttemptContext.Provider value={attempt.id}>
+            <StreamAttemptContext.Provider value={attempt}>
               {items.map((item) => (
                 <div key={item.key} className={styles.item} data-enter={!initial.has(item.key)}>
                   <Item item={item} pro={pro} expandActions={expandActions} />

@@ -1,6 +1,8 @@
 import { MCP_SESSION_ARG, OperationRisk, type TranscriptEntry, type TranscriptEntryKind } from '@aw/shared';
 import { Icon, type IconName } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
+import { isDatabaseInvestigationTool } from '../databases/database-investigation-evidence.tsx';
+import { DatabaseInvestigationPayload } from '../databases/database-investigation-payload.tsx';
 import styles from './cards.module.css';
 import { InputSummary } from './input-summary.tsx';
 import { describeTool } from './tool-label.ts';
@@ -22,11 +24,13 @@ const rawInput = (input: Record<string, unknown>) =>
  */
 export function ToolRow({
   call,
+  conversationId,
   result,
   busy,
   pro,
 }: {
   call: ToolCall;
+  conversationId?: string;
   result: ToolResult | undefined;
   /** The conversation is still working: a call without a result runs rather than was stopped. */
   busy: boolean;
@@ -36,6 +40,7 @@ export function ToolRow({
   const info = describeTool(tool, input);
   const state: RowState =
     result === undefined ? (busy ? 'running' : 'stopped') : result.data.status === 'error' ? 'failed' : 'done';
+  const investigates = isDatabaseInvestigationTool(tool);
   // Writes ran without a card only when always allowed; their input reads like the card's.
   const summarized =
     info.operation?.risk === OperationRisk.Write || info.operation?.risk === OperationRisk.Critical
@@ -52,7 +57,7 @@ export function ToolRow({
       {state === 'stopped' && <span className={styles.actionNote}>{C.toolStopped}</span>}
     </>
   );
-  if (!pro && summarized === undefined) {
+  if (!pro && summarized === undefined && !investigates) {
     return (
       <div className={styles.action} data-state={state} data-testid="assistant-action">
         <div className={styles.actionHead}>{head}</div>
@@ -69,7 +74,16 @@ export function ToolRow({
       </summary>
       <div className={styles.actionBody}>
         {summarized !== undefined && <InputSummary operation={summarized} input={input} />}
-        {pro && (
+        {investigates && (
+          <DatabaseInvestigationPayload
+            owner={conversationId === undefined ? undefined : { kind: 'assistant', id: conversationId }}
+            input={input}
+            startedAt={call.ts}
+            active={state === 'running'}
+            output={result?.data.status === 'completed' ? result.data.output : undefined}
+          />
+        )}
+        {pro && !investigates && (
           <>
             <p className={styles.actionMeta}>
               {C.toolName} <span className="mono">{tool}</span>

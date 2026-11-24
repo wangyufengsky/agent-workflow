@@ -46,7 +46,11 @@ export function describeTool(tool: string, input: Record<string, unknown>): Tool
     return operation.expose.assistant ? { title, operation } : { title };
   }
   const appName = tool.startsWith(MCP_ASSISTANT_TOOL_PREFIX) ? tool.slice(MCP_ASSISTANT_TOOL_PREFIX.length) : tool;
-  if (isAppTool(appName)) return { title: TOOL_COPY.app[appName] };
+  if (isAppTool(appName)) {
+    const title = TOOL_COPY.app[appName];
+    const connection = appName === AssistantToolName.InvestigateDatabase ? input.connection : undefined;
+    return typeof connection === 'string' ? { title, subject: connection } : { title };
+  }
   const native = TOOL_COPY.native[tool];
   const subject = subjectOf(input);
   return {

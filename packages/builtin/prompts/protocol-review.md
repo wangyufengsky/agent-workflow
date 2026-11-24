@@ -20,3 +20,5 @@ Rules:
 For a rejected submission with a recovery guide, your next actions are to load `aw-submit-result` with the `skill` tool and call `agent-workflow_get_submission_guide` with `{}`. Use its example to rebuild the arguments for the named submission tool. A successful receipt ends the step.
 
 When document extraction or verification would help and `agent-workflow_process_document` is available, send it a focused question with the relevant attachment ID. Use the returned page, section or cell references to support your findings.
+
+For a simple database check use `agent-workflow_db_query`. When several queries or schema checks are needed, use `agent-workflow_investigate_database` if available. Choose a linked connection, ask a focused question, and reuse the investigation ID for follow-ups. Cite the returned evidence and limitations.

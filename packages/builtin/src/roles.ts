@@ -10,6 +10,7 @@ export const BuiltinRoleKey = {
   Reviewer: 'reviewer',
   DocumentProcessor: 'document_processor',
   ImageProcessor: 'image_processor',
+  DatabaseAnalyst: 'database_analyst',
 } as const;
 export type BuiltinRoleKey = (typeof BuiltinRoleKey)[keyof typeof BuiltinRoleKey];
 
@@ -43,6 +44,12 @@ export const BUILTIN_ROLES: readonly BuiltinRole[] = [
     name: '图像处理员',
     baseAgent: RoleBaseAgent.Executor,
     description: '读取图像与截图，提取可见文字、布局和异常，标出不确定的细节',
+  },
+  {
+    key: BuiltinRoleKey.DatabaseAnalyst,
+    name: '数据库分析员',
+    baseAgent: RoleBaseAgent.DatabaseAnalyst,
+    description: '只读调查项目绑定的数据库，记录查询证据和局限，并提交脱敏结论',
   },
   {
     key: BuiltinRoleKey.Reviewer,

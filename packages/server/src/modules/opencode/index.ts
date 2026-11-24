@@ -17,6 +17,12 @@ export {
   sessionPermissionRules,
 } from './opencode.config.ts';
 export {
+  createSessionDispatcher,
+  type ObjectAttemptPurpose,
+  type SessionDispatcher,
+  SessionPurpose,
+} from './opencode.dispatch.ts';
+export {
   CONTEXT_OVERFLOW_ERROR,
   describeOpencodeError,
   MESSAGE_ABORTED_ERROR,

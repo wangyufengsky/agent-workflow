@@ -19,6 +19,7 @@ export const WORKFLOW_DELIVERABLE_LABEL: Record<WorkflowDeliverable, string> = {
 export const ROLE_BASE_AGENT_LABEL: Record<RoleBaseAgent, string> = {
   [RoleBaseAgent.Planner]: '规划（只读）',
   [RoleBaseAgent.Executor]: '执行（可改代码）',
+  [RoleBaseAgent.DatabaseAnalyst]: '数据库分析（只读）',
   [RoleBaseAgent.Reviewer]: '评审（只读）',
 };
 

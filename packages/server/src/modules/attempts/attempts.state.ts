@@ -31,6 +31,7 @@ import type { NewTranscriptEntry, TranscriptStore } from './attempts.transcript.
 /** In-memory state of a session we created, kept until it goes quiet so trailing events still reach the transcript. */
 export type LiveSession = {
   attemptId: string;
+  delegation: AbortController;
   taskId: string | null;
   sessionId: string;
   directory: string;
@@ -147,6 +148,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
   /** Owners react synchronously once the change committed; a failing reaction has no caller to report to. */
   function signal(type: AttemptSignal['type'], attempt: Attempt): void {
     unit.afterCommit(() => {
+      if (type === 'ended') sessionOf(attempt.id)?.delegation.abort();
       for (const listener of listeners) {
         try {
           listener({ type, attempt });
@@ -169,6 +171,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
       }
     }
     session.firstPrompt?.controller.abort();
+    session.delegation.abort();
     session.release();
   }
 

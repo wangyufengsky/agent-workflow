@@ -84,6 +84,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.hostingAccounts.remove': '删除全局令牌',
   'op.projects.setDbConnections': '关联数据库',
   'op.projects.removeAllowedBash': '撤销项目中总是允许的命令',
+  'op.databases.investigations': '查看数据库调查记录',
   'op.databases.list': '数据库连接',
   'op.databases.create': '添加数据库连接',
   'op.databases.update': '修改数据库连接',

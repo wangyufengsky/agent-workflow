@@ -5,6 +5,7 @@ import {
   AppError,
   ErrorCode,
   type ExternalMcpStatus,
+  OPENCODE_DATABASE_INVESTIGATOR_AGENT,
   OPENCODE_DOCUMENT_AGENT,
   OPENCODE_IMAGE_AGENT,
   type PermissionDecision,
@@ -89,7 +90,9 @@ export type OpencodeClient = {
   runCommand(input: SessionRequest & Pick<PromptInput, 'agent' | 'model' | 'text' | 'messageId'>): Promise<void>;
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
-  promptDocument(input: SessionRequest & Pick<PromptInput, 'system' | 'model' | 'text'>): Promise<string>;
+  promptDocument(
+    input: SessionRequest & Pick<PromptInput, 'system' | 'model' | 'text'> & { agent?: string },
+  ): Promise<string>;
   promptImage(input: ImagePromptInput): Promise<string>;
   abort(input: SessionRequest): Promise<void>;
   /** Already missing sessions count as deleted, so interrupted cleanup can be retried. */
@@ -181,6 +184,9 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         operation,
         error: err instanceof Error ? err.message : err,
         responseReceived: err instanceof Error && responseCauseSchema.safeParse(err.cause).success,
+        ...(err instanceof Error && sessionNotFoundCauseSchema.safeParse(err.cause).success
+          ? { sessionMissing: true }
+          : {}),
       });
     }
   }
@@ -189,7 +195,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
     isConnected: runtime.isReady,
     shutdown: runtime.shutdown,
     async createSession({ directory, title, agent, permission, signal }) {
-      if (agent === OPENCODE_IMAGE_AGENT) {
+      if (agent === OPENCODE_IMAGE_AGENT || agent === OPENCODE_DATABASE_INVESTIGATOR_AGENT) {
         // 独立会话绑定原图，覆盖用户全局配置中的自动分享。
         await writeFile(join(directory, 'opencode.json'), JSON.stringify({ share: 'disabled', autoshare: false }));
       }
@@ -293,13 +299,13 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         },
       };
     },
-    async promptDocument({ sessionId, directory, model, system, text, signal }) {
+    async promptDocument({ sessionId, directory, model, system, text, signal, agent = OPENCODE_DOCUMENT_AGENT }) {
       const { data } = await request('session.prompt', () =>
         runtime.sdk().session.prompt(
           {
             sessionID: sessionId,
             directory,
-            agent: OPENCODE_DOCUMENT_AGENT,
+            agent,
             ...(system === undefined ? {} : { system }),
             ...(model === undefined ? {} : { model: { providerID: model.providerId, modelID: model.modelId } }),
             parts: [{ type: 'text', text }],
@@ -308,7 +314,12 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         ),
       );
       if ('error' in data.info && data.info.error !== undefined)
-        throw new AppError(ErrorCode.OpencodeRequestFailed, 'The document model returned an error');
+        throw new AppError(
+          ErrorCode.OpencodeRequestFailed,
+          agent === OPENCODE_DATABASE_INVESTIGATOR_AGENT
+            ? 'The database investigator model returned an error'
+            : 'The document model returned an error',
+        );
       return data.parts
         .flatMap((p) => (p.type === 'text' ? [p.text] : []))
         .join('\n')

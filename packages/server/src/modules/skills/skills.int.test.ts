@@ -149,7 +149,7 @@ describe('我的 Skill', () => {
     expect(builtin.find(({ name }) => name === 'aw-submit-result')).toMatchObject({
       source: expect.stringContaining('agent-workflow_get_submission_guide'),
       assistantEnabled: false,
-      agents: ['planner', 'executor', 'reviewer'],
+      agents: ['planner', 'executor', 'reviewer', 'database_analyst'],
     });
     expect(builtin.find(({ name }) => name === 'aw-image-analysis')).toMatchObject({
       source: expect.stringContaining('agent-workflow_analyze_image'),
@@ -163,7 +163,7 @@ describe('我的 Skill', () => {
     });
     expect(builtin.find(({ name }) => name === 'aw-db-readonly')).toMatchObject({
       assistantEnabled: true,
-      agents: ['planner', 'executor', 'reviewer', 'researcher'],
+      agents: ['planner', 'executor', 'reviewer', 'database_analyst', 'researcher'],
     });
     expect(builtin.find(({ name }) => name === 'aw-code-review')).toMatchObject({
       source: expect.stringContaining('name: aw-code-review'),

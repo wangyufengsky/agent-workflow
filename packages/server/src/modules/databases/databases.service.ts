@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   AppError,
   type CreateDbConnectionRequest,
@@ -40,6 +40,10 @@ const toDto = ({ credentialId: _credential, ...connection }: DbConnection): DbCo
  */
 export function createDatabasesService({ db, clock, log, credentials, drivers, queryTimeoutMs }: DatabasesServiceDeps) {
   const repo = createDatabasesRepo(db);
+  const grantListeners = new Set<() => void>();
+  const grantChanged = () => {
+    for (const listener of grantListeners) listener();
+  };
 
   function get(id: string): DbConnection {
     const connection = repo.find(id);
@@ -91,6 +95,24 @@ export function createDatabasesService({ db, clock, log, credentials, drivers, q
     return { ...result, elapsedMs: clock.now() - started };
   }
 
+  function linkedById(projectId: string, id: string): DbConnection {
+    const connection = repo.listByProject(projectId).find((record) => record.id === id);
+    if (!connection) throw new AppError(ErrorCode.DbConnectionNotFound, 'Database is no longer linked to this project');
+    return connection;
+  }
+
+  async function describe(connection: DbConnection, table: string | undefined): Promise<DbDescribeOutput> {
+    const { driver, target } = await access(connection);
+    if (table === undefined) return { tables: await driver.tables(target) };
+    const [columns, indexes] = await Promise.all([driver.columns(target, table), driver.indexes(target, table)]);
+    if (columns.length === 0) {
+      throw new AppError(ErrorCode.ValidationFailed, `Table ${table} does not exist`, {
+        issues: [{ path: ['table'], message: 'no such table; call db_describe without table to list them' }],
+      });
+    }
+    return { columns: columns.map(({ table: _table, ...column }) => column), indexes };
+  }
+
   return {
     list: (): DbConnectionDTO[] => repo.list().map(toDto),
     get: (id: string): DbConnectionDTO => toDto(get(id)),
@@ -109,7 +131,8 @@ export function createDatabasesService({ db, clock, log, credentials, drivers, q
       const connection = get(id);
       if (changes.name !== undefined) assertNameFree(changes.name, id);
       if (password !== undefined) await credentials.replace(connection.credentialId, password);
-      repo.update(id, { ...changes, updatedAt: clock.now() });
+      repo.update(id, { ...changes, updatedAt: Math.max(clock.now(), connection.updatedAt + 1) });
+      grantChanged();
       return toDto(get(id));
     },
 
@@ -118,6 +141,7 @@ export function createDatabasesService({ db, clock, log, credentials, drivers, q
       const connection = get(id);
       db.transaction((tx) => createDatabasesRepo(tx).delete(id));
       credentials.remove(connection.credentialId);
+      grantChanged();
       log.info({ connectionId: id }, 'database connection deleted');
     },
 
@@ -151,24 +175,34 @@ export function createDatabasesService({ db, clock, log, credentials, drivers, q
     setProjectLinks(projectId: string, connectionIds: readonly string[]): void {
       for (const id of connectionIds) get(id);
       db.transaction((tx) => createDatabasesRepo(tx).setProjectLinks(projectId, connectionIds));
+      grantChanged();
+    },
+    onInvestigationGrantChanged(listener: () => void) {
+      grantListeners.add(listener);
+      return () => grantListeners.delete(listener);
+    },
+    investigationGrant(projectId: string, name: string) {
+      const match = repo.investigationGrant(projectId, name);
+      if (!match) return undefined;
+      const { c, grantId } = match;
+      const fingerprint = createHash('sha256')
+        .update(JSON.stringify([projectId, c.id, grantId, c.updatedAt]))
+        .digest('hex');
+      return { id: c.id, name: c.name, type: c.type, fingerprint };
     },
 
     /** `db_describe` (12 §6.10): the tables, or one table's columns and indexes. */
-    async describe(projectId: string, name: string, table: string | undefined): Promise<DbDescribeOutput> {
-      const { driver, target } = await access(linked(projectId, name));
-      if (table === undefined) return { tables: await driver.tables(target) };
-      const [columns, indexes] = await Promise.all([driver.columns(target, table), driver.indexes(target, table)]);
-      if (columns.length === 0) {
-        throw new AppError(ErrorCode.ValidationFailed, `Table ${table} does not exist`, {
-          issues: [{ path: ['table'], message: 'no such table; call db_describe without table to list them' }],
-        });
-      }
-      return { columns: columns.map(({ table: _table, ...column }) => column), indexes };
-    },
+    describe: (projectId: string, name: string, table: string | undefined): Promise<DbDescribeOutput> =>
+      describe(linked(projectId, name), table),
+    describeByLink: (projectId: string, id: string, table: string | undefined): Promise<DbDescribeOutput> =>
+      describe(linkedById(projectId, id), table),
 
     /** `db_query` (12 §6.11): one read-only statement, row and time limited. */
     query: (projectId: string, name: string, sql: string, limit: number | undefined): Promise<DbQueryOutput> =>
       readOnlyQuery(linked(projectId, name), sql, limit),
+
+    queryByLink: (projectId: string, id: string, sql: string, limit: number | undefined): Promise<DbQueryOutput> =>
+      readOnlyQuery(linkedById(projectId, id), sql, limit),
 
     /** The same read-only query on any connection, for the user's assistant (`databases.query`, 15 §3). */
     queryById: (id: string, sql: string, limit: number | undefined): Promise<DbQueryOutput> =>

@@ -1,23 +1,28 @@
 import {
   askKnowledgeOp,
+  createConversationOp,
   createDbConnectionOp,
   DbTlsMode,
   DbType,
+  databaseInvestigationSchema,
   dbSchemaOp,
   deleteDbConnectionOp,
   ErrorCode,
   getKnowledgeOp,
   getProjectOp,
   knowledgeCitationOp,
+  listDatabaseInvestigationsOp,
   listDbConnectionsOp,
   queryDbOp,
   ServerEventType,
+  sendAssistantMessageOp,
   setProjectDbConnectionsOp,
   testDbConnectionOp,
   updateDbConnectionOp,
+  updateSettingsOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
@@ -25,6 +30,7 @@ import { startMysql, type TestDatabase } from '../../../test/helpers/db-containe
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
+import type { OpencodeClient } from '../opencode/index.ts';
 
 /** Short enough for a test, long enough for the small queries that must pass. */
 const QUERY_TIMEOUT_MS = 1500;
@@ -149,6 +155,8 @@ describe('数据库连接（11 §9）', () => {
 describe('数据库工具（12 §6.9–6.11）', () => {
   let mcp: Client;
   let session: string;
+  let taskId: string;
+  let projectId: string;
 
   /** An execute attempt of a task whose project is linked to `shop-db` (not to `other-db`). */
   beforeEach(async () => {
@@ -158,7 +166,8 @@ describe('数据库工具（12 §6.9–6.11）', () => {
     await t.call(setProjectDbConnectionsOp, { id: project.id, connectionIds: [shop.id] });
     t.fake.enqueue(script().hang(), { title: '· 定位根因' });
     const running = nodeReaches(t, 'locate', 'running');
-    await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    projectId = project.id;
+    taskId = (await createTask(t, { projectId, workflow: 'bugfix' })).id;
     await running;
     const [first] = t.fake.sessions;
     if (first === undefined) throw new Error('No session');
@@ -179,6 +188,76 @@ describe('数据库工具（12 §6.9–6.11）', () => {
       isError: true,
       body: { code: ErrorCode.DbConnectionNotFound, hint: expect.stringContaining('db_list_connections') },
     });
+  });
+
+  it('节点委派只读调查并追问，助手会话在同一项目仍有独立调查记录', async () => {
+    await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 1 });
+    const runtime: OpencodeClient = t.fake;
+    const prompt = vi.spyOn(runtime, 'promptDocument');
+    prompt.mockResolvedValueOnce(JSON.stringify({ action: 'query', sql: 'SELECT COUNT(*) AS total FROM items' }));
+    prompt.mockImplementationOnce(async ({ text }) => {
+      const { rows, evidenceId } = JSON.parse(text);
+      return JSON.stringify({ action: 'finish', answer: `商品总数为 ${rows[0][0]}，依据 ${evidenceId}` });
+    });
+    const question = { connection: 'shop-db', question: '商品总数是多少？' };
+    const first = databaseInvestigationSchema.parse((await call('investigate_database', question)).body);
+    expect(first).toMatchObject({
+      status: 'completed',
+      answer: expect.stringContaining('商品总数为 5'),
+      evidence: [{ kind: 'query', rowCount: 1 }],
+    });
+    prompt.mockResolvedValue(JSON.stringify({ action: 'finish', answer: '上一轮查到五件商品' }));
+    const follow = databaseInvestigationSchema.parse(
+      (
+        await call('investigate_database', {
+          ...question,
+          question: '刚才的结果呢？',
+          investigation_id: first.investigationId,
+        })
+      ).body,
+    );
+    expect(follow.turns).toHaveLength(2);
+    expect(new Set(prompt.mock.calls.map(([input]) => input.sessionId)).size).toBe(1);
+    expect((await t.call(listDatabaseInvestigationsOp, { kind: 'task', id: taskId })).body.items).toEqual([follow]);
+
+    const assistant = await connectMcp(t.assistantMcpUrl, t.app.assistantMcpToken);
+    try {
+      await t.call(updateSettingsOp, { 'ui.mode': 'pro', 'scheduler.maxConcurrentAttempts': 2 });
+      const { body: conversation } = await t.call(createConversationOp, { projectId });
+      const idle = waitForEvent(
+        t.app.events,
+        ServerEventType.AssistantUpdated,
+        (c) => c.id === conversation.id && !c.busy,
+      );
+      await t.call(sendAssistantMessageOp, {
+        id: conversation.id,
+        text: '查看项目数据',
+        context: { page: 'home', params: {} },
+      });
+      await idle;
+      const assistantSession = t.fake.sessions.at(-1)?.id;
+      if (!assistantSession) throw new Error('No assistant session');
+      const ask = (args: Record<string, unknown>) =>
+        callTool(assistant, 'investigate_database', { ...args, __aw_session: assistantSession });
+      expect(await ask({ ...question, investigation_id: first.investigationId })).toMatchObject({
+        isError: true,
+        body: { code: ErrorCode.NotFound },
+      });
+      expect(await ask({ ...question, connection: 'other-db' })).toMatchObject({
+        isError: true,
+        body: { code: ErrorCode.DbConnectionNotFound },
+      });
+      prompt.mockResolvedValueOnce(JSON.stringify({ action: 'query', sql: 'SELECT COUNT(*) FROM items' }));
+      const own = databaseInvestigationSchema.parse((await ask(question)).body);
+      expect(own.status).toBe('completed');
+      expect(own.investigationId).not.toBe(first.investigationId);
+      expect(prompt.mock.calls.at(-1)?.[0].sessionId).not.toBe(prompt.mock.calls[0]?.[0].sessionId);
+      expect(
+        (await t.call(listDatabaseInvestigationsOp, { kind: 'assistant', id: conversation.id })).body.items,
+      ).toEqual([own]);
+    } finally {
+      await assistant.close();
+    }
   });
 
   it('查看表与表结构；表不存在时 VALIDATION_FAILED', async () => {

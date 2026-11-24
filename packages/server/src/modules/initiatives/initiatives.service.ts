@@ -54,6 +54,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -538,7 +539,6 @@ export function createInitiativesService({
     assertIdle(initiative.id);
     const runs = repo.runs(initiative.id);
     const previous = runs.at(-1);
-    const session = previous === undefined ? null : attempts.get(previous.attemptId).opencodeSessionId;
     const planner = roles.getByKey(BuiltinRoleKey.Planner);
     const model = planner.model ?? settings.get('ai.defaultModel');
     const attemptId = randomUUID();
@@ -551,29 +551,31 @@ export function createInitiativesService({
         attachments: attachments.promptSection(attachments.listByOwner(owner(initiative.id)), MCP_TOOL_PREFIX),
         workflows: allowedWorkflowsOf(initiative),
       });
-    const started =
-      previous !== undefined && session !== null
-        ? attempts.continueSession(previous.attemptId, {
-            id: attemptId,
-            kind: AttemptKind.Breakdown,
-            prompt: step,
-            model,
-            agent: SessionAgent.CodeReviewer,
-            system: undefined,
-          })
-        : attempts.start({
-            id: attemptId,
-            kind: AttemptKind.Breakdown,
-            agent: SessionAgent.CodeReviewer,
-            taskId: null,
-            projectId: initiative.projectId,
-            nodeId: null,
-            roleId: planner.id,
-            directory: project.repoPath,
-            title: `${SESSION_TITLE_PREFIX} · ${INITIATIVE_KEY_PREFIX}${initiative.seq}`,
-            model,
-            prompt: step === '' ? first() : `${first()}\n\n${step}`,
-          });
+    const started = attempts.dispatchObjectAttempt({
+      purpose: SessionPurpose.Initiative,
+      previousId: previous?.attemptId,
+      followUp: () => ({
+        id: attemptId,
+        kind: AttemptKind.Breakdown,
+        prompt: step,
+        model,
+        agent: SessionAgent.CodeReviewer,
+        system: undefined,
+      }),
+      first: () => ({
+        id: attemptId,
+        kind: AttemptKind.Breakdown,
+        agent: SessionAgent.CodeReviewer,
+        taskId: null,
+        projectId: initiative.projectId,
+        nodeId: null,
+        roleId: planner.id,
+        directory: project.repoPath,
+        title: `${SESSION_TITLE_PREFIX} · ${INITIATIVE_KEY_PREFIX}${initiative.seq}`,
+        model,
+        prompt: step === '' ? first() : `${first()}\n\n${step}`,
+      }),
+    });
     const now = clock.now();
     unit.transact(() => {
       repo.insertRun({

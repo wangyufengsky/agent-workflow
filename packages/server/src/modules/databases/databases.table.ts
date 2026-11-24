@@ -28,6 +28,7 @@ export const projectDbConnectionsTable = sqliteTable(
     projectId: text('project_id')
       .notNull()
       .references(() => projectsTable.id, { onDelete: 'cascade' }),
+    grantId: text('grant_id').notNull().default(''),
     dbConnectionId: text('db_connection_id')
       .notNull()
       .references(() => dbConnectionsTable.id, { onDelete: 'cascade' }),

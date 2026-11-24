@@ -27,6 +27,7 @@ export const RoleBaseAgent = {
   Planner: 'planner',
   Executor: 'executor',
   Reviewer: 'reviewer',
+  DatabaseAnalyst: 'database_analyst',
 } as const;
 export type RoleBaseAgent = (typeof RoleBaseAgent)[keyof typeof RoleBaseAgent];
 export const roleBaseAgentSchema = z.enum(RoleBaseAgent);

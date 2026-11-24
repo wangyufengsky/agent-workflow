@@ -115,7 +115,7 @@ export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; descri
   },
   'aw-db-readonly': {
     title: '只读数据库查询',
-    description: '查看表结构和数据，控制查询范围。',
+    description: '查看表结构、发起只读调查并引用脱敏的查询证据。',
     trigger: '对话、任务步骤或知识问答涉及项目数据库时。',
   },
   'aw-offline-network': {

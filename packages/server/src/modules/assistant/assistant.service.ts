@@ -57,6 +57,8 @@ import {
   type OpencodeEvent,
   OpencodeEventType,
   parseModelRef,
+  type SessionDispatcher,
+  SessionPurpose,
   ToolCallStatus,
 } from '../opencode/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -77,9 +79,11 @@ export type AssistantServiceDeps = {
   clock: Clock;
   log: Logger;
   opencode: OpencodeClient;
+  sessions: SessionDispatcher;
   settings: SettingsService;
   attachments: AttachmentsService;
   context: ContextRenderer;
+  cleanupDatabaseInvestigations(): Promise<void>;
   memory: AssistantMemory;
   projects: import('../projects/index.ts').ProjectsService;
   slots: ModelSlots;
@@ -90,6 +94,7 @@ export type AssistantServiceDeps = {
 
 type TurnOutcome = { error: OpencodeError | undefined } | { requestError: unknown };
 type Turn = {
+  delegation: AbortController;
   source: 'user' | 'app';
   confirmedStop: typeof AssistantTurnEvent.Abort | typeof AssistantTurnEvent.Timeout | null;
   abortPending: Promise<void> | null;
@@ -136,7 +141,7 @@ const titleOf = (text: string) =>
  * Messages go out with the per-turn context; the session's events become the conversation's message stream.
  */
 export function createAssistantService(deps: AssistantServiceDeps) {
-  const { db, unit, events, clock, log, opencode, settings, attachments, context, slots } = deps;
+  const { db, unit, events, clock, log, opencode, settings, attachments, context, slots, sessions: dispatch } = deps;
   const repo = createAssistantRepo(db);
   // opencode 使用真实路径判断目录边界，macOS 的 /var 等别名也必须先规范化。
   const directory = join(realpathSync(deps.dataDir), ASSISTANT_DIR);
@@ -271,20 +276,25 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       await opencode.deleteSession({ sessionId: current.retiredSessionId, directory });
       repo.updateConversation(c.id, { retiredSessionId: null });
     }
-    if (current.opencodeSessionId !== null) {
-      sessions.set(current.opencodeSessionId, c.id);
-      return current.opencodeSessionId;
-    }
-    mkdirSync(filesDir(c.id), { recursive: true });
-    const sessionId = await opencode.createSession({
-      directory: filesDir(c.id),
-      title: `Assistant · ${c.title}`,
-      agent: OPENCODE_ASSISTANT_AGENT,
-      permission: assistantPermissionRules(),
+    const previousSessionId = current.opencodeSessionId;
+    if (previousSessionId === null) mkdirSync(filesDir(c.id), { recursive: true });
+    const binding = dispatch.bind({
+      purpose: SessionPurpose.Assistant,
+      ownerId: c.id,
+      ...(previousSessionId === null ? {} : { existing: previousSessionId }),
+      input: {
+        directory: filesDir(c.id),
+        title: `Assistant · ${c.title}`,
+        agent: OPENCODE_ASSISTANT_AGENT,
+        permission: assistantPermissionRules(),
+      },
     });
-    repo.updateConversation(c.id, { opencodeSessionId: sessionId });
+    const sessionId = typeof binding === 'string' ? binding : await binding;
+    if (previousSessionId === null) {
+      repo.updateConversation(c.id, { opencodeSessionId: sessionId });
+      log.info({ conversationId: c.id, sessionId }, 'assistant session created');
+    }
     sessions.set(sessionId, c.id);
-    log.info({ conversationId: c.id, sessionId }, 'assistant session created');
     return sessionId;
   }
 
@@ -333,6 +343,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const started = usage.start(c.id, source, messageId);
     const turn: Turn = {
       source,
+      delegation: new AbortController(),
       confirmedStop: null,
       abortPending: null,
       request: null,
@@ -348,6 +359,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     } catch (err) {
       if (state.turn === turn && !state.stopping && !state.deleting && turn.request === null) {
         state.busy = false;
+        state.turn?.delegation.abort();
         state.turn = null;
         usage.finish(c.id, AssistantTurnEvent.Error);
         // Queued: nobody waits for the request; the failure belongs in the conversation.
@@ -436,6 +448,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       return;
     }
     usage.finish(c.id, turn.confirmedStop ?? (failed ? AssistantTurnEvent.Error : AssistantTurnEvent.Idle));
+    state.turn?.delegation.abort();
     state.turn = null;
     state.busy = false;
     state.permissions.clear();
@@ -493,6 +506,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       state.queued = false;
       state.busy = false;
       usage.finish(id, AssistantTurnEvent.RuntimeLost);
+      state.turn?.delegation.abort();
       state.turn = null;
       record(get(id), [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.RuntimeLost } }]);
       publish(id);
@@ -651,12 +665,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const turn = state.turn;
     state.stopping = true;
     state.aborting = true;
+    turn?.delegation.abort();
     usage.pause(id);
     publish(id);
     try {
       await stopRequest(c, turn, reason);
       if (state.turn !== turn) return;
       usage.finish(id, reason);
+      state.turn?.delegation.abort();
       state.turn = null;
       record(c, [
         {
@@ -691,6 +707,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   }
 
   return {
+    delegationSignal(id: string, sessionId: string): AbortSignal | undefined {
+      const state = live.get(id);
+      const signal = state?.turn?.delegation.signal;
+      if (sessions.get(sessionId) !== id || state?.busy !== true || signal?.aborted !== false) return undefined;
+      return signal;
+    },
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
     /** The MCP servers the user added to opencode themself (28 §4); the app's own two are not theirs to manage. */
     async externalMcp(): Promise<ExternalMcpServerDTO[]> {
@@ -866,6 +888,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         state.busy = false;
       }
       state.deleting = true;
+      turn?.delegation.abort();
       usage.pause(id);
       try {
         if (c.opencodeSessionId !== null) {
@@ -873,6 +896,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
             state.aborting = true;
             await stopRequest(c, turn, AssistantTurnEvent.Abort);
             usage.finish(id, AssistantTurnEvent.Abort);
+            state.turn?.delegation.abort();
             state.turn = null;
             state.busy = false;
             state.permissions.clear();
@@ -889,6 +913,9 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
           repo.deleteConversation(id);
         });
+        await deps
+          .cleanupDatabaseInvestigations()
+          .catch((err: unknown) => log.warn({ err, conversationId: id }, 'database investigation cleanup failed'));
         for (const continuation of repo.listContinuations()) {
           if (continuation.sourceConversationId === id) publish(continuation.conversationId);
         }

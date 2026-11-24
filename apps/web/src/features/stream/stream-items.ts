@@ -28,6 +28,7 @@ export type ActionState = 'running' | 'ok' | 'failed' | 'stopped';
 export type StreamAction = {
   kind: 'action';
   key: string;
+  startedAt: number;
   action: ToolAction;
   state: ActionState;
   /** The raw call, shown in pro mode and, for a failed call, its error. */
@@ -111,6 +112,7 @@ export function toolAction(
 /** What a call of our tool works on, shown after its label:「打开页面 /orders」「输入 R-1001」. */
 const APP_TOOL_DETAIL: Partial<Record<McpToolName, (input: Record<string, unknown>) => string>> = {
   [McpToolName.ReportProgress]: (input) => text(input.message),
+  [McpToolName.InvestigateDatabase]: (input) => text(input.connection),
   [McpToolName.DbQuery]: (input) => text(input.sql),
   [McpToolName.BrowserOpen]: (input) => text(input.url),
   [McpToolName.BrowserType]: (input) => text(input.text),
@@ -221,6 +223,7 @@ export function streamItems(
         items.push({
           kind: 'action',
           key,
+          startedAt: e.ts,
           action: toolAction(tool, input, relative),
           state,
           tool,

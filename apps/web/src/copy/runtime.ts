@@ -78,6 +78,7 @@ export const TOOLS_COPY = {
     [McpToolName.DbListConnections]: '列出项目关联的数据库连接。',
     [McpToolName.DbDescribe]: '查看数据库的表结构。',
     // The allowed statements depend on the connection's database (24 §4).
+    [McpToolName.InvestigateDatabase]: '在已绑定的数据库上开展多轮只读调查，返回脱敏结论、调查编号与查询证据。',
     [McpToolName.DbQuery]: `只读查询数据库：每次一条只读语句（${readOnlyStatementGroups()
       .map((g) => `${g.types.map((t) => DATABASES_COPY.typeLabel[t]).join('、')} 允许 ${g.statements.join(' / ')}`)
       .join('；')}），限制行数与时间。`,

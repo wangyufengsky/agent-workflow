@@ -5,7 +5,9 @@ import {
   FUNCTIONAL_TEST_NODE,
   MCP_TOOL_PREFIX,
   McpToolName,
+  OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
+  OPENCODE_DATABASE_INVESTIGATOR_AGENT,
   RoleBaseAgent,
   readonlyBashRules,
   SessionAgent,
@@ -51,7 +53,7 @@ const agentSkillRules = z.record(
 );
 
 describe('opencode 配置生成', () => {
-  it('注入两套 MCP、三个基础 agent、知识研究员、PPT 写作者、Git 审查员、助手 agent 与 bridge 插件', () => {
+  it('注入两套 MCP、基础与临时 agent 与 bridge 插件', () => {
     // The plugin URL depends on the platform's absolute paths (a drive letter on Windows).
     const { plugin, ...rest } = config(undefined);
     expect(plugin).toEqual([pathToFileURL(PLUGIN_FILE).href]);
@@ -115,6 +117,36 @@ describe('opencode 配置生成', () => {
       Object.values(RoleBaseAgent).map((base) => [base, sessionPermissionRules(base, policy)]),
     );
     expect(rules).toMatchSnapshot();
+  });
+
+  it('数据库分析员是专职只读节点，委派调查会话禁止直接工具访问', () => {
+    const { agent } = config(undefined);
+    expect(agent[OPENCODE_DATABASE_INVESTIGATOR_AGENT].permission).toEqual({ '*': 'deny' });
+    expect(agent[OPENCODE_AGENT_NAME[SessionAgent.DatabaseAnalyst]]).toMatchObject({
+      prompt: '<protocol-database-analyst.md>',
+      permission: { '*': 'deny', [`${MCP_TOOL_PREFIX}investigate_database`]: 'allow' },
+    });
+    const rules = sessionPermissionRules(SessionAgent.DatabaseAnalyst, BashPolicy.Auto, {
+      allowedBash: ['mysql *'],
+      checkCommands: ['psql'],
+    });
+    expect(rules[0]).toMatchObject({ permission: '*', action: 'deny' });
+    expect(rules.filter(({ action }) => action === 'allow').map(({ permission }) => permission)).toEqual([
+      ...[
+        McpToolName.GetTaskContext,
+        McpToolName.GetSubmissionGuide,
+        McpToolName.DbListConnections,
+        McpToolName.DbDescribe,
+        McpToolName.DbQuery,
+        McpToolName.InvestigateDatabase,
+        McpToolName.ReadAttachment,
+        McpToolName.AskUser,
+        McpToolName.ReportProgress,
+        McpToolName.SubmitResult,
+      ].map((tool) => `${MCP_TOOL_PREFIX}${tool}`),
+      'skill',
+      'skill',
+    ]);
   });
 
   it('知识研究员只有在打开网络检索时才放行 webfetch 与 websearch，且排在最后', () => {

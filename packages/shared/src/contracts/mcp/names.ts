@@ -13,6 +13,7 @@ export const McpToolName = {
   ReadAttachment: 'read_attachment',
   AnalyzeImage: 'analyze_image',
   ProcessDocument: 'process_document',
+  InvestigateDatabase: 'investigate_database',
   ReadSheet: 'read_sheet',
   QuerySheet: 'query_sheet',
   ReadOfficeFile: 'read_office_file',

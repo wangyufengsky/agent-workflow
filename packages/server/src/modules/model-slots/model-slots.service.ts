@@ -25,13 +25,14 @@ export function createModelSlots({ settings, events, log }: ModelSlotsDeps) {
   const counters: Array<() => number> = [];
   /** Task planning and steps at work, as the scheduler last counted them. */
   let backgroundBusy = 0;
+  let immediateBusy = 0;
   const queue: SlotWaiter[] = [];
   let pendingDrain: NodeJS.Immediate | undefined;
   let disposed = false;
   let published: ModelSlotsDTO | undefined;
 
   const limit = () => settings.get('scheduler.maxConcurrentAttempts');
-  const interactive = () => counters.reduce((sum, count) => sum + count(), 0);
+  const interactive = () => counters.reduce((sum, count) => sum + count(), immediateBusy);
   const hasRoom = () => interactive() + backgroundBusy < limit();
 
   function usage(): ModelSlotsDTO {
@@ -110,6 +111,19 @@ export function createModelSlots({ settings, events, log }: ModelSlotsDeps) {
       if (count === backgroundBusy) return;
       backgroundBusy = count;
       changed();
+    },
+    /** Reserves a fail-fast slot until the call and its cleanup have completely ended. */
+    holdImmediate(): (() => void) | undefined {
+      if (disposed || queue.length > 0 || !hasRoom()) return undefined;
+      immediateBusy++;
+      changed();
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        immediateBusy--;
+        changed();
+      };
     },
     /** Optional work (the companion's whisper) runs only when nothing waits and a slot is free. */
     isFree: (): boolean => queue.length === 0 && hasRoom(),

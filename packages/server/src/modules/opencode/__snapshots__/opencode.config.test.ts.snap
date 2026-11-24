@@ -2,6 +2,98 @@
 
 exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash 规则 1`] = `
 {
+  "database_analyst": [
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "*",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "edit",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "question",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "webfetch",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "external_directory",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "agent-workflow-app_*",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_get_task_context",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_get_submission_guide",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_db_list_connections",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_db_describe",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_db_query",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_investigate_database",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_read_attachment",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_ask_user",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_report_progress",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_submit_result",
+    },
+    {
+      "action": "allow",
+      "pattern": "aw-db-readonly",
+      "permission": "skill",
+    },
+    {
+      "action": "allow",
+      "pattern": "aw-submit-result",
+      "permission": "skill",
+    },
+  ],
   "executor": [
     {
       "action": "ask",
@@ -5788,6 +5880,98 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
 
 exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bash 规则 1`] = `
 {
+  "database_analyst": [
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "*",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "edit",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "question",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "webfetch",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "external_directory",
+    },
+    {
+      "action": "deny",
+      "pattern": "*",
+      "permission": "agent-workflow-app_*",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_get_task_context",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_get_submission_guide",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_db_list_connections",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_db_describe",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_db_query",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_investigate_database",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_read_attachment",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_ask_user",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_report_progress",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "agent-workflow_submit_result",
+    },
+    {
+      "action": "allow",
+      "pattern": "aw-db-readonly",
+      "permission": "skill",
+    },
+    {
+      "action": "allow",
+      "pattern": "aw-submit-result",
+      "permission": "skill",
+    },
+  ],
   "executor": [
     {
       "action": "allow",
@@ -9737,7 +9921,7 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
 }
 `;
 
-exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识研究员、PPT 写作者、Git 审查员、助手 agent 与 bridge 插件 1`] = `
+exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 bridge 插件 1`] = `
 {
   "agent": {
     "aw-assistant": {
@@ -9793,6 +9977,43 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "*": "deny",
       },
       "prompt": "<protocol-companion.md>",
+    },
+    "aw-database-analyst": {
+      "description": "agent-workflow database_analyst",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+        "agent-workflow-app_*": "deny",
+        "agent-workflow_ask_user": "allow",
+        "agent-workflow_browser_submit_report": "deny",
+        "agent-workflow_db_describe": "allow",
+        "agent-workflow_db_list_connections": "allow",
+        "agent-workflow_db_query": "allow",
+        "agent-workflow_get_submission_guide": "allow",
+        "agent-workflow_get_task_context": "allow",
+        "agent-workflow_investigate_database": "allow",
+        "agent-workflow_read_attachment": "allow",
+        "agent-workflow_report_progress": "allow",
+        "agent-workflow_submit_result": "allow",
+        "edit": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "skill": {
+          "*": "deny",
+          "aw-db-readonly": "allow",
+          "aw-submit-result": "allow",
+        },
+        "webfetch": "deny",
+      },
+      "prompt": "<protocol-database-analyst.md>",
+    },
+    "aw-database-investigator": {
+      "description": "read-only database protocol worker; the parent application executes authorized queries",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+      },
+      "prompt": "<protocol-database-investigator.md>",
     },
     "aw-document-processor": {
       "description": "document processor",

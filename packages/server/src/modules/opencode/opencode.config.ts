@@ -5,6 +5,7 @@ import {
   BashPolicy,
   BROWSER_TEST_TOOLS,
   type BrowserTestSubmitTool,
+  DATABASE_ANALYST_TOOLS,
   FUNCTIONAL_TEST_NODE,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
   type FunctionalTestNode,
@@ -17,6 +18,7 @@ import {
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_COMPANION_AGENT,
+  OPENCODE_DATABASE_INVESTIGATOR_AGENT,
   OPENCODE_DOCUMENT_AGENT,
   OPENCODE_FUNCTIONAL_TEST_AGENT,
   OPENCODE_IMAGE_AGENT,
@@ -55,6 +57,16 @@ type AgentPermission = {
 /** opencode removes the tools a rule denies outright, so each agent only sees its own MCP server's tools. */
 const EXEC_TOOLS = `${MCP_TOOL_PREFIX}*`;
 const ASSISTANT_TOOLS = `${MCP_ASSISTANT_TOOL_PREFIX}*`;
+
+const DATABASE_ANALYST_PERMISSION = {
+  '*': 'deny',
+  edit: 'deny',
+  question: 'deny',
+  webfetch: 'deny',
+  external_directory: 'deny',
+  [ASSISTANT_TOOLS]: 'deny',
+  ...Object.fromEntries(DATABASE_ANALYST_TOOLS.map((tool) => [`${MCP_TOOL_PREFIX}${tool}`, 'allow' as const])),
+} as const;
 
 const DELEGATE_PERMISSION = {
   '*': 'deny',
@@ -109,6 +121,7 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
     external_directory: 'deny',
     [ASSISTANT_TOOLS]: 'deny',
   },
+  [SessionAgent.DatabaseAnalyst]: DATABASE_ANALYST_PERMISSION,
   [SessionAgent.Researcher]: READ_ONLY_WRITER,
   // The PPT writer reads like the researcher and never uses the web (23 §7.1).
   [SessionAgent.SlidesWriter]: READ_ONLY_WRITER,
@@ -144,6 +157,7 @@ const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.Planner]: PromptName.ProtocolPlan,
   [SessionAgent.Executor]: PromptName.ProtocolExecute,
   [SessionAgent.Reviewer]: PromptName.ProtocolReview,
+  [SessionAgent.DatabaseAnalyst]: PromptName.ProtocolDatabaseAnalyst,
   [SessionAgent.Researcher]: PromptName.ProtocolResearch,
   [SessionAgent.SlidesWriter]: PromptName.ProtocolSlides,
   [SessionAgent.CodeReviewer]: PromptName.ProtocolCodeReview,
@@ -216,6 +230,12 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
           ...READ_ONLY_WRITER,
           skill: skillPermission(WORKFLOW_SKILLS[FUNCTIONAL_TEST_WORKFLOW_KEY]),
         },
+      },
+      [OPENCODE_DATABASE_INVESTIGATOR_AGENT]: {
+        mode: 'primary',
+        description: 'read-only database protocol worker; the parent application executes authorized queries',
+        prompt: input.prompts[PromptName.ProtocolDatabaseInvestigator],
+        permission: { '*': 'deny' },
       },
       [OPENCODE_DOCUMENT_AGENT]: {
         mode: 'primary',
@@ -326,6 +346,20 @@ export function sessionPermissionRules(
         permission: `${MCP_TOOL_PREFIX}${tool}`,
         action: 'allow' as const,
         pattern: '*',
+      })),
+    ];
+  }
+  if (base === SessionAgent.DatabaseAnalyst) {
+    return [
+      ...Object.entries(DATABASE_ANALYST_PERMISSION).map(([permission, action]) => ({
+        permission,
+        action,
+        pattern: '*',
+      })),
+      ...AGENT_SKILLS[SessionAgent.DatabaseAnalyst].map((pattern) => ({
+        permission: 'skill',
+        action: 'allow' as const,
+        pattern,
       })),
     ];
   }

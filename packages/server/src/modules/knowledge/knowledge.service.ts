@@ -37,6 +37,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import type { InboxService } from '../inbox/index.ts';
+import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { readCitedFile, validateCitations } from './knowledge.citations.ts';
@@ -207,35 +208,36 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     const project = projects.getRecord(conversation.projectId);
     const turns = repo.listTurns(conversation.id);
     const previous = turns.at(-1);
-    const previousSession = previous === undefined ? null : attempts.get(previous.attemptId).opencodeSessionId;
     const attemptId = randomUUID();
-    const started =
-      previous !== undefined && previousSession !== null
-        ? attempts.continueSession(previous.attemptId, {
-            id: attemptId,
-            prompt: renderTemplate(prompts[PromptName.ResearchFollowUp], { question }),
-            model,
-            agent: SessionAgent.Researcher,
-            system: undefined,
-          })
-        : attempts.start({
-            id: attemptId,
-            kind: AttemptKind.Research,
-            agent: SessionAgent.Researcher,
-            taskId: null,
-            projectId: project.id,
-            nodeId: null,
-            roleId: null,
-            directory: project.repoPath,
-            title: `${SESSION_TITLE_PREFIX} · ${conversation.title}`,
-            model,
-            prompt: renderTemplate(prompts[PromptName.StartResearch], {
-              projectName: project.name,
-              question,
-              sources: describeSources(conversation),
-            }),
-            web: conversation.sources.web,
-          });
+    const started = attempts.dispatchObjectAttempt({
+      purpose: SessionPurpose.Knowledge,
+      previousId: previous?.attemptId,
+      followUp: () => ({
+        id: attemptId,
+        prompt: renderTemplate(prompts[PromptName.ResearchFollowUp], { question }),
+        model,
+        agent: SessionAgent.Researcher,
+        system: undefined,
+      }),
+      first: () => ({
+        id: attemptId,
+        kind: AttemptKind.Research,
+        agent: SessionAgent.Researcher,
+        taskId: null,
+        projectId: project.id,
+        nodeId: null,
+        roleId: null,
+        directory: project.repoPath,
+        title: `${SESSION_TITLE_PREFIX} · ${conversation.title}`,
+        model,
+        prompt: renderTemplate(prompts[PromptName.StartResearch], {
+          projectName: project.name,
+          question,
+          sources: describeSources(conversation),
+        }),
+        web: conversation.sources.web,
+      }),
+    });
     const now = clock.now();
     unit.transact(() => {
       repo.insertTurn({

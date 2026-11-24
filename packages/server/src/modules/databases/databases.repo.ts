@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import type { DbConnectionDTO } from '@aw/shared';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { dbConnectionsTable, projectDbConnectionsTable } from './databases.table.ts';
 
@@ -46,9 +47,25 @@ export function createDatabasesRepo(db: DbExecutor) {
         .all()
         .map((r) => r.c);
     },
+    investigationGrant(projectId: string, name: string) {
+      return db
+        .select({ c: t, grantId: links.grantId })
+        .from(links)
+        .innerJoin(t, eq(t.id, links.dbConnectionId))
+        .where(and(eq(links.projectId, projectId), eq(t.name, name)))
+        .get();
+    },
     setProjectLinks(projectId: string, connectionIds: readonly string[]): void {
-      db.delete(links).where(eq(links.projectId, projectId)).run();
-      for (const dbConnectionId of new Set(connectionIds)) db.insert(links).values({ projectId, dbConnectionId }).run();
+      const requested = new Set(connectionIds);
+      const previous = db.select({ id: links.dbConnectionId }).from(links).where(eq(links.projectId, projectId)).all();
+      for (const { id } of previous) {
+        if (requested.delete(id)) continue;
+        db.delete(links)
+          .where(and(eq(links.projectId, projectId), eq(links.dbConnectionId, id)))
+          .run();
+      }
+      for (const dbConnectionId of requested)
+        db.insert(links).values({ projectId, dbConnectionId, grantId: randomUUID() }).run();
     },
   };
 }
