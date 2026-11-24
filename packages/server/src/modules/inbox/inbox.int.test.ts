@@ -137,33 +137,99 @@ describe('ask_user（12 §6.7）', () => {
 });
 
 describe('权限的「总是允许」记到项目（D101）', () => {
-  it('bash 的总是允许把命令与开头的选项记到项目（Git 除外），之后的会话带上；在项目中撤销后列表清空', async () => {
-    // Under `ask` executors use the read-only rules, which take the project's patterns.
+  it('本任务记住的包脚本仅在相同目录与入口上复用，其他任务独立询问', async () => {
     await t.call(updateSettingsOp, { 'ai.bashPolicy': 'ask' });
-    const { project } = await addProject(t, { checkCommand: null });
+    const command = 'npm test';
+    const manifest = JSON.stringify({ scripts: { test: 'node test.js' } });
+    const { project } = await addProject(t, {
+      checkCommand: null,
+      files: {
+        'package.json': manifest,
+        'test.js': 'console.log(1)',
+        'sub/package.json': manifest,
+        'sub/test.js': 'console.log(1)',
+      },
+    });
     t.fake.enqueue(
       script()
-        .requestPermission('bash', ['./scripts/mvn.sh -q test 2>&1', 'git push origin'])
-        .callTool('submit_result', { summary: 'Located' }),
+        .requestPermission('bash', [command], { command })
+        .requestPermission('bash', [command], { command })
+        .requestPermission('bash', [command], { command, workdir: 'sub' })
+        .edit('package.json', JSON.stringify({ scripts: { test: 'node test.js --changed' } }))
+        .requestPermission('bash', [command], { command })
+        .hang(),
       locate,
     );
-    t.fake.enqueue(script().hang(), { title: '修复' });
-    const permission = inboxOpens(t, 'permission');
+    const first = inboxOpens(t, 'permission');
     await createTask(t, { projectId: project.id, workflow: 'bugfix' });
-    const asked = (await permission).item;
-    if (asked.kind !== 'permission') throw new Error('expected a permission item');
+    const { item } = await first;
+    const sub = inboxOpens(t, 'permission');
+    const answered = await t.call(resolveInboxOp, { id: item.id, response: { decision: 'always', scope: 'task' } });
+    expect(answered.body.response).toEqual({ decision: 'always', scope: 'task' });
+    const subdir = (await sub).item;
+    expect(subdir).toMatchObject({ payload: { bashGrant: { relativeDirectory: 'sub' } } });
+    const changed = inboxOpens(t, 'permission');
+    await t.call(resolveInboxOp, { id: subdir.id, response: { decision: 'once' } });
+    expect((await changed).item).toMatchObject({ payload: { bashGrant: { relativeDirectory: '.' } } });
+    expect((await t.call(getProjectOp, { id: project.id })).body.exactBash).toEqual([]);
+    t.fake.enqueue(script().requestPermission('bash', [command], { command }).hang(), locate);
+    const independent = inboxOpens(t, 'permission');
+    const other = await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    expect((await independent).item).toMatchObject({ taskId: other.id, payload: { bashGrant: { command } } });
+  });
 
-    const fixing = nodeReaches(t, 'fix', 'running');
-    await t.call(resolveInboxOp, { id: asked.id, response: { decision: 'always' } });
-    await fixing;
-    expect(t.fake.permissionReplies).toEqual([{ permissionId: asked.payload.opencodePermissionId, reply: 'once' }]);
-    expect((await t.call(getProjectOp, { id: project.id })).body.allowedBash).toEqual(['./scripts/mvn.sh -q *']);
-    const fix = t.fake.sessions.find((s) => s.title.includes('· 修复'));
-    expect(fix?.permission).toContainEqual({ permission: 'bash', pattern: './scripts/mvn.sh -q *', action: 'allow' });
-    expect(fix?.permission).not.toContainEqual({ permission: 'bash', pattern: 'git push *', action: 'allow' });
-
-    const revoked = await t.call(removeProjectAllowedBashOp, { id: project.id, pattern: './scripts/mvn.sh -q *' });
-    expect(revoked.body.allowedBash).toEqual([]);
+  it('项目精确授权可撤销，换参数或更改脚本都再次询问', async () => {
+    await t.call(updateSettingsOp, { 'ai.bashPolicy': 'ask' });
+    const { project } = await addProject(t, { checkCommand: null, files: { 'build.sh': 'echo start' } });
+    const cmd = './build.sh --clean';
+    t.fake.enqueue(
+      script()
+        .requestPermission('bash', [cmd], { command: cmd })
+        .requestPermission('bash', [cmd], { command: cmd })
+        .requestPermission('bash', ['./build.sh --all'], { command: './build.sh --all' })
+        .edit('build.sh', 'echo changed')
+        .requestPermission('bash', [cmd], { command: cmd })
+        .hang(),
+      locate,
+    );
+    const next = () => inboxOpens(t, 'permission');
+    const first = next();
+    await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    const asked = (await first).item;
+    const second = next();
+    expect(
+      (await t.call(resolveInboxOp, { id: asked.id, response: { decision: 'always', scope: 'project' } })).status,
+    ).toBe(200);
+    const changedArgs = (await second).item;
+    expect(changedArgs.title).toContain('--all');
+    const third = next();
+    await t.call(resolveInboxOp, { id: changedArgs.id, response: { decision: 'once' } });
+    expect((await third).item.title).toContain('--clean');
+    const detail = (await t.call(getProjectOp, { id: project.id })).body;
+    expect(detail.allowedBash).toEqual([]);
+    expect(detail.exactBash).toMatchObject([{ command: cmd, directory: '.' }]);
+    // 新任务使用独立工作区。同一项目、同一入口可以复用，撤销后立即重新询问。
+    const otherCommand = './build.sh --inspect';
+    t.fake.enqueue(
+      script()
+        .requestPermission('bash', [cmd], { command: cmd })
+        .requestPermission('bash', [otherCommand], { command: otherCommand })
+        .requestPermission('bash', [cmd], { command: cmd })
+        .hang(),
+      locate,
+    );
+    const waiting = next();
+    const other = await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    const inspection = (await waiting).item;
+    expect(inspection).toMatchObject({ taskId: other.id, payload: { bashGrant: { command: otherCommand } } });
+    const revoked = await t.call(removeProjectAllowedBashOp, {
+      id: project.id,
+      pattern: 'exact:' + detail.exactBash[0]?.id,
+    });
+    expect(revoked.body.exactBash).toEqual([]);
+    const afterRevoke = next();
+    await t.call(resolveInboxOp, { id: inspection.id, response: { decision: 'once' } });
+    expect((await afterRevoke).item).toMatchObject({ taskId: other.id, payload: { bashGrant: { command: cmd } } });
   });
 });
 

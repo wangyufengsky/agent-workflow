@@ -94,14 +94,17 @@ function PermissionCard({
         </span>
       </header>
       {open.reason && <p>{open.reason}</p>}
-      <pre className={cards.json}>{text}</pre>
+      <pre className={cards.json}>{open.bashGrant?.command ?? text}</pre>
+      {open.bashGrant && <p className="hint">{open.bashGrant.directory}</p>}
       <div className={cards.actions}>
         <Button size="sm" variant="primary" disabled={reply.isPending} onClick={() => answer(PermissionDecision.Once)}>
           {C.permissionAllowOnce}
         </Button>
-        <Button size="sm" disabled={reply.isPending} onClick={() => answer(PermissionDecision.Always)}>
-          {C.permissionAlways}
-        </Button>
+        {open.bashGrant !== null && (
+          <Button size="sm" disabled={reply.isPending} onClick={() => answer(PermissionDecision.Always)}>
+            {open.bashGrant ? C.permissionConversation : C.permissionAlways}
+          </Button>
+        )}
         <Button size="sm" variant="ghost" disabled={reply.isPending} onClick={() => answer(PermissionDecision.Reject)}>
           {C.permissionReject}
         </Button>

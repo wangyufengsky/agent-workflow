@@ -70,7 +70,7 @@ export type FakeStep =
   | { type: 'tool'; tool: string; input: Record<string, unknown>; output?: string }
   /** `server: 'assistant'` calls the assistant MCP (15 §3); the execution MCP otherwise. */
   | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
-  | { type: 'permission'; permission: string; patterns: string[] }
+  | { type: 'permission'; permission: string; patterns: string[]; input?: Record<string, unknown> }
   /** Keeps working until the session is aborted. */
   | { type: 'hang' }
   /** The model provider fails the turn; `idle: false` leaves the session without an idle event. */

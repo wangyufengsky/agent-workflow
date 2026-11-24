@@ -94,6 +94,7 @@ export const ASSISTANT_COPY = {
   reveal: REVEAL[UI_PLATFORM],
   permissionTitle: '助手请求权限',
   permissionAllowOnce: '允许一次',
+  permissionConversation: '本对话内允许',
   permissionAlways: '总是允许',
   permissionReject: '拒绝',
   home: {

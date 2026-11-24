@@ -1,4 +1,5 @@
 import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
+import type { BashGrant } from '@aw/shared';
 import {
   ACTIVE_ATTEMPT_STATUSES,
   AppError,
@@ -11,7 +12,6 @@ import {
   InboxKind,
   MCP_TOOL_PREFIX,
   McpToolName,
-  PermissionDecision,
   PermissionMode,
   TranscriptSystemEvent,
 } from '@aw/shared';
@@ -158,7 +158,7 @@ export function watchSessions(
     }
     const taskId = attempt.taskId,
       policy = deps.taskPolicy(taskId);
-    if (policy.mode === PermissionMode.Ask && attempt.permissionBaseline === null) {
+    if (policy.mode === PermissionMode.Ask && attempt.permissionBaseline === null && event.permission !== 'bash') {
       onPermission(attempt, event);
       return;
     }
@@ -167,24 +167,23 @@ export function watchSessions(
     outstanding.set(event.permissionId, ticket);
     const signal = AbortSignal.any([ticket.signal, session.permissionStop.signal]);
     const decide = async () => {
-      const result =
-        policy.mode === PermissionMode.Ask && session.grants.has(grantKey(event))
-          ? { reply: PermissionDecision.Once, reason: undefined }
-          : await deps.permissionReviewer.native({
-              event,
-              call:
-                policy.mode === PermissionMode.Assisted
-                  ? await session.view.permissionCall(event.callId, deps.clock, signal)
-                  : undefined,
-              directory: session.directory,
-              intent: policy.intent,
-              checkCommand: policy.checkCommand,
-              mode: policy.mode,
-              mutable: attempt.permissionBaseline !== null,
-              parentSignal: session.permissionStop.signal,
-              baselineRules: attempt.permissionBaseline ?? [],
-              signal,
-            });
+      const result = await deps.permissionReviewer.native({
+        owner: { taskId, projectId: attempt.projectId },
+        sessionAllowed: session.grants.has(grantKey(event)),
+        event,
+        call:
+          policy.mode === PermissionMode.Assisted || (event.permission === 'bash' && policy.mode === PermissionMode.Ask)
+            ? await session.view.permissionCall(event.callId, deps.clock, signal)
+            : undefined,
+        directory: session.directory,
+        intent: policy.intent,
+        checkCommand: policy.checkCommand,
+        mode: policy.mode,
+        mutable: attempt.permissionBaseline !== null,
+        parentSignal: session.permissionStop.signal,
+        baselineRules: attempt.permissionBaseline ?? [],
+        signal,
+      });
       if (signal.aborted) return;
       if (result.reason)
         record(attempt, [
@@ -198,7 +197,7 @@ export function watchSessions(
           ),
         ]);
       if (result.reply === undefined || deps.taskPolicy(taskId).mode !== policy.mode) {
-        onPermission(attempt, event, result.reason);
+        onPermission(attempt, event, result.reason, result.bashGrant);
         return;
       }
       await deps.opencode.replyPermission({
@@ -218,7 +217,7 @@ export function watchSessions(
         if (!session.permissionStop.signal.aborted) resume(session);
       });
   }
-  function onPermission(attempt: Attempt, event: PermissionEvent, reason?: string): void {
+  function onPermission(attempt: Attempt, event: PermissionEvent, reason?: string, bashGrant?: BashGrant | null): void {
     state.inbox.create({
       kind: InboxKind.Permission,
       taskId: attempt.taskId,
@@ -231,6 +230,9 @@ export function watchSessions(
         directory: event.directory,
         permission: event.permission,
         patterns: event.patterns,
+        ...(event.permission === 'bash' && attempt.taskId !== null
+          ? { bashGrant: bashGrant ?? null, projectGrantAvailable: attempt.projectId !== null }
+          : {}),
         ...(reason ? { reason } : {}),
       },
     });
@@ -361,6 +363,10 @@ export function watchSessions(
       case OpencodeEventType.PermissionReplied:
         session.deciding.get(event.permissionId)?.abort();
         session.deciding.delete(event.permissionId);
+        if (session.replyingPermissions.has(event.permissionId)) {
+          session.replyingPermissions.set(event.permissionId, event.reply);
+          return;
+        }
         state.inbox.completePermission(attempt.id, event.permissionId, event.reply);
         if (running) resume(session);
         return;

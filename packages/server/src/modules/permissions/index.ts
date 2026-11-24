@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   APPROVER_ROLE_KEY,
   AppError,
+  type BashGrant,
   ErrorCode,
   modelEfforts,
   OPENCODE_APPROVER_AGENT,
@@ -13,7 +15,9 @@ import {
 } from '@aw/shared';
 import { z } from 'zod';
 import type { Clock } from '../../core/clock.ts';
+import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
+import { bashGrants } from '../bash-grants/index.ts';
 import {
   type OpencodeClient,
   type OpencodeEvent,
@@ -81,7 +85,8 @@ async function localFile(root: string, file: string) {
 
 async function source(root: string, file: string) {
   const ref = await localFile(root, file);
-  if (ref?.stat && ref.stat.size <= 8192) return readFile(ref.target, 'utf8');
+  if (ref?.stat && ref.stat.size <= 8192)
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await readFile(ref.target));
 }
 
 /** 向审批员提供已配置的检查命令及其可定位的测试入口。未知脚本交给用户。 */
@@ -101,6 +106,60 @@ async function testEvidence(root: string, command: string, configured: string | 
   if (contents) return { testCommand: entry, file: path, contents };
 }
 
+const simpleQuery = /^(?:pwd|ls(?: -[alh]{1,3})?|node --version|git (?:status(?: --short)?|rev-parse HEAD))$/u;
+
+/** 授权卡记录请求出现时的证据。再次调用时重新读取入口，用户点击期间改过文件也不会放宽下一次授权。 */
+async function bashGrantFor(event: Asked, call: Call | undefined, root: string): Promise<BashGrant | null> {
+  if (
+    event.permission !== 'bash' ||
+    !event.patterns.length ||
+    !call ||
+    call.tool !== 'bash' ||
+    !event.callId ||
+    !event.messageId ||
+    call.callId !== event.callId ||
+    call.messageId !== event.messageId ||
+    call.sessionId !== event.sessionId
+  )
+    return null;
+  const { command, workdir } = call.input;
+  if (typeof command !== 'string' || (workdir !== undefined && typeof workdir !== 'string')) return null;
+  if (Object.keys(call.input).some((k) => !['command', 'workdir', 'description', 'timeout'].includes(k))) return null;
+  const base = await realpath(root);
+  const directory = await realpath(resolve(root, workdir ?? '.'));
+  const sub = relative(base, directory);
+  if (isAbsolute(sub) || sub.split(sep).includes('..')) return null;
+  let entry = command;
+  let manifest: string | undefined;
+  const [program, ...args] = command.split(' ');
+  if (program === 'npm' || program === 'pnpm') {
+    const explicit = args[0] === 'run';
+    if (explicit) args.shift();
+    const name = args.shift();
+    const shorthand = program === 'npm' ? ['test'] : ['test', 'dev', 'build', 'lint'];
+    if (!name || !/^[a-zA-Z0-9:_-]+$/u.test(name) || (!explicit && !shorthand.includes(name))) return null;
+    manifest = await source(directory, 'package.json');
+    if (!manifest) return null;
+    const scripts = JSON.parse(manifest)?.scripts;
+    if (typeof scripts?.[name] !== 'string' || scripts[`pre${name}`] || scripts[`post${name}`]) return null;
+    entry = [scripts[name], ...args].join(' ');
+  }
+  let contents: string | undefined;
+  if (!simpleQuery.test(entry) && !/^(?:echo|ls|wc|stat)(?: [a-zA-Z0-9_./:-]+)*$/u.test(entry)) {
+    const file =
+      /^(?:(?:node(?: --test)?|bash|sh|python3) )?((?:[./a-zA-Z0-9_-]+\/)?[a-zA-Z0-9_-]+\.(?:[cm]?js|sh|py))(?: [a-zA-Z0-9_./:-]+)*$/u.exec(
+        entry,
+      )?.[1];
+    if (!file || file.startsWith('-') || (entry.startsWith(file) && !entry.startsWith('./'))) return null;
+    contents = await source(directory, file);
+    if (contents === undefined) return null;
+  }
+  const fingerprint = createHash('sha256')
+    .update(JSON.stringify([manifest, entry, contents, event.patterns, call.input.timeout ?? null]))
+    .digest('hex');
+  return { directory, relativeDirectory: sub || '.', command, fingerprint };
+}
+
 async function reviewable(
   event: Asked,
   call: Call | undefined,
@@ -115,10 +174,7 @@ async function reviewable(
     if (typeof args.workdir === 'string' && resolve(directory, args.workdir) !== resolve(directory)) return false;
     // 只交给模型已明确副作用边界的完整命令；项目脚本和解释器可执行任意代码。
     if (typeof args.command !== 'string') return false;
-    return (
-      /^(?:pwd|ls(?: -[alh]{1,3})?|node --version|git (?:status(?: --short)?|rev-parse HEAD))$/u.test(args.command) ||
-      (await testEvidence(directory, args.command, checkCommand))
-    );
+    return simpleQuery.test(args.command) || (await testEvidence(directory, args.command, checkCommand));
   }
   if (event.permission === 'webfetch' && call.tool === 'webfetch' && typeof args.url === 'string') {
     const url = URL.canParse(args.url) ? new URL(args.url) : undefined;
@@ -145,6 +201,7 @@ async function reviewable(
 }
 
 export function createPermissionReviewer(deps: {
+  db: Db;
   sessions: SessionDispatcher;
   roles: RolesService;
   settings: SettingsService;
@@ -152,6 +209,7 @@ export function createPermissionReviewer(deps: {
   clock: Clock;
   log: Logger;
 }) {
+  const grants = bashGrants(deps.db);
   async function review(
     intent: string,
     operation: unknown,
@@ -194,6 +252,7 @@ export function createPermissionReviewer(deps: {
   }
   return {
     review,
+    remember: grants.remember,
     async native(input: {
       event: Asked;
       call: Call | undefined;
@@ -202,6 +261,8 @@ export function createPermissionReviewer(deps: {
       mode: PermissionMode;
       mutable: boolean;
       checkCommand?: string | null;
+      owner: { taskId: string; projectId: string | null } | { conversationId: string };
+      sessionAllowed: boolean;
       baselineRules: PermissionRule[];
       signal: AbortSignal;
       parentSignal: AbortSignal;
@@ -211,16 +272,31 @@ export function createPermissionReviewer(deps: {
       const regular = mutable && mutableTools.some((tool) => tool === event.permission);
       const legacy = regular ? baseline(event, input.baselineRules) : 'ask';
       if (mode === PermissionMode.Full && regular) return { reply: PermissionDecision.Once };
-      if (mode === PermissionMode.Ask || legacy === 'deny') {
-        if (legacy === 'deny') return { reply: PermissionDecision.Reject };
-        if (legacy === 'allow' && event.callId !== undefined) return { reply: PermissionDecision.Once };
-        return {};
+      if (legacy === 'deny') return { reply: PermissionDecision.Reject };
+      const bashGrant =
+        event.permission === 'bash' &&
+        (mutable || (typeof input.call?.input.command === 'string' && simpleQuery.test(input.call.input.command)))
+          ? await bashGrantFor(event, input.call, input.directory).catch(() => null)
+          : null;
+      if (bashGrant) {
+        const owner = input.owner;
+        const permitted =
+          'conversationId' in owner
+            ? grants.permits('conversationId', owner.conversationId, bashGrant)
+            : grants.permits('taskId', owner.taskId, bashGrant) ||
+              (owner.projectId !== null && grants.permits('projectId', owner.projectId, bashGrant));
+        if (permitted) return { reply: PermissionDecision.Once, reason: '命中你已记住的 Bash 授权。' };
       }
-      if (mode !== PermissionMode.Assisted) return {};
+      if (mode === PermissionMode.Ask) {
+        if (input.sessionAllowed && event.permission !== 'bash') return { reply: PermissionDecision.Once };
+        if (legacy === 'allow' && event.callId !== undefined) return { reply: PermissionDecision.Once };
+        return { bashGrant };
+      }
+      if (mode !== PermissionMode.Assisted) return { bashGrant };
       const evidence =
         mutable &&
         (await reviewable(event, input.call, input.directory, input.intent, input.checkCommand).catch(() => false));
-      if (!evidence) return { reason: '操作影响需要用户确认。' };
+      if (!evidence) return { bashGrant, reason: '操作影响需要用户确认。' };
       const result = await review(
         input.intent,
         {
@@ -236,7 +312,7 @@ export function createPermissionReviewer(deps: {
       );
       return result.decision === 'once'
         ? { reply: PermissionDecision.Once, reason: result.reason }
-        : { reason: result.reason };
+        : { bashGrant, reason: result.reason };
     },
   };
 }

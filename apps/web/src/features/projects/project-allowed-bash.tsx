@@ -8,16 +8,20 @@ import { useRemoveAllowedBash } from './projects.queries.ts';
 /** Pro section of a project (14 §3.7): the bash patterns its AI sessions run without asking, and revoking them (D101). */
 export function ProjectAllowedBash({ project }: { project: ProjectDetailDTO }) {
   const remove = useRemoveAllowedBash();
+  const rules = [
+    ...project.allowedBash.map((pattern) => ({ key: pattern, label: pattern })),
+    ...project.exactBash.map((g) => ({ key: `exact:${g.id}`, label: `${g.directory} · ${g.command}` })),
+  ];
   return (
     <div className="col">
       <p className="hint">{C.allowedBashHint}</p>
-      {project.allowedBash.length === 0 ? (
+      {rules.length === 0 ? (
         <p className="hint">{C.allowedBashNone}</p>
       ) : (
         <ul className="col" aria-label={C.allowedBash}>
-          {project.allowedBash.map((pattern) => (
+          {rules.map(({ key: pattern, label }) => (
             <li key={pattern} className="row">
-              <code className="grow mono">{pattern}</code>
+              <code className="grow mono">{label}</code>
               <Button
                 size="sm"
                 variant="ghost"

@@ -21,7 +21,12 @@ const stepSchema = z.discriminatedUnion('type', [
     name: z.string(),
     args: z.record(z.string(), z.unknown()),
   }),
-  z.object({ type: z.literal('permission'), permission: z.string(), patterns: z.array(z.string()) }),
+  z.object({
+    type: z.literal('permission'),
+    permission: z.string(),
+    patterns: z.array(z.string()),
+    input: z.record(z.string(), z.unknown()).optional(),
+  }),
   z.object({ type: z.literal('hang') }),
   z.object({ type: z.literal('usage'), input: z.number(), output: z.number(), cost: z.number().default(0) }),
   z.object({ type: z.literal('error'), name: z.string(), message: z.string(), idle: z.boolean().default(true) }),

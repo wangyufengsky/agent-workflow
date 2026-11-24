@@ -159,7 +159,11 @@ it('@opencode 续接在新模型会话发送绑定项目和旧决定，下一轮
   expect(JSON.stringify(continuationRequests.at(-1)?.at(-1))).not.toContain('T-931');
 });
 
-async function say(id: string, instruction: z.infer<typeof callSchema>) {
+async function say(
+  id: string,
+  instruction: z.infer<typeof callSchema>,
+  decision: PermissionDecision = PermissionDecision.Reject,
+) {
   const previous = t.app.services.assistant.get(id).usage.latest?.id;
   const completion = waitForEvent(
     t.app.events,
@@ -174,8 +178,8 @@ async function say(id: string, instruction: z.infer<typeof callSchema>) {
     for (const permission of event.data.pendingPermissions) {
       if (seen.has(permission.permissionId)) continue;
       seen.add(permission.permissionId);
-      rejectedPermissions.push(permission.permission);
-      replies.push(t.app.services.assistant.replyPermission(id, permission.permissionId, PermissionDecision.Reject));
+      if (decision === PermissionDecision.Reject) rejectedPermissions.push(permission.permission);
+      replies.push(t.app.services.assistant.replyPermission(id, permission.permissionId, decision));
     }
   });
   const idle = waitForEvent(
@@ -370,4 +374,18 @@ it('@opencode 同一对话从帮我批准切到完全访问再切回始终询问
   const fallback = await say(c.id, { name: 'bash', arguments: { command: 'pwd', description: 'MALFORMED_REVIEW' } });
   expect(fallback).toMatchObject({ data: { status: 'error' } });
   expect(rejectedPermissions.slice(cards)).toEqual(['bash', 'bash']);
+});
+
+it('@opencode 用户记住的 Bash 命令切到帮我批准后跳过模型，相似命令仍送审', async () => {
+  const { body: c } = await t.call(createConversationOp, { permissionMode: 'ask' });
+  const op = { name: 'bash' as const, arguments: { command: 'pwd', description: '查看当前目录' } };
+  expect(await say(c.id, op, PermissionDecision.Always)).toMatchObject({ data: { status: 'completed' } });
+  await t.call(setConversationPermissionModeOp, { id: c.id, permissionMode: 'assisted' });
+  const before = reviewerTools.length;
+  expect(await say(c.id, op)).toMatchObject({ data: { status: 'completed' } });
+  expect(reviewerTools).toHaveLength(before);
+  expect(await say(c.id, { name: 'bash', arguments: { command: 'ls -l', description: '列出文件' } })).toMatchObject({
+    data: { status: 'completed' },
+  });
+  expect(reviewerTools).toHaveLength(before + 1);
 });

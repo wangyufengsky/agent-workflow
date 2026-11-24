@@ -80,15 +80,18 @@ function QuestionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Que
 }
 
 function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Permission>) {
-  // What「总是允许」remembers for the project (D101); other permissions stay with the session.
-  const remembered = item.payload.permission === BASH_PERMISSION ? projectBashPatterns(item.payload.patterns) : [];
+  // 旧卡和知识问答等会话仍需展示旧式通配授权的实际范围。
+  const remembered =
+    item.payload.bashGrant === undefined && item.payload.permission === BASH_PERMISSION
+      ? projectBashPatterns(item.payload.patterns)
+      : [];
   return (
     <>
       <span className="sub">
         {C.wantsTo}（{item.payload.permission}）
       </span>
       {item.payload.reason && <p>{item.payload.reason}</p>}
-      <code className={styles.command}>{item.payload.patterns.join('\n')}</code>
+      <code className={styles.command}>{item.payload.bashGrant?.command ?? item.payload.patterns.join('\n')}</code>
       <div className={styles.actions}>
         <Button
           variant="primary"
@@ -98,9 +101,32 @@ function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.P
         >
           {C.allowOnce}
         </Button>
-        <Button size="sm" disabled={pending} onClick={() => resolve({ decision: PermissionDecision.Always })}>
-          {C.allowAlways}
-        </Button>
+        {item.payload.bashGrant ? (
+          <>
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() => resolve({ decision: PermissionDecision.Always, scope: 'task' })}
+            >
+              {C.allowTask}
+            </Button>
+            {item.payload.projectGrantAvailable && (
+              <Button
+                size="sm"
+                disabled={pending}
+                onClick={() => resolve({ decision: PermissionDecision.Always, scope: 'project' })}
+              >
+                {C.allowProject}
+              </Button>
+            )}
+          </>
+        ) : (
+          item.payload.bashGrant === undefined && (
+            <Button size="sm" disabled={pending} onClick={() => resolve({ decision: PermissionDecision.Always })}>
+              {remembered.length ? C.allowProject : C.allowSession}
+            </Button>
+          )
+        )}
         <Button
           variant="danger"
           size="sm"
@@ -110,6 +136,7 @@ function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.P
           {C.reject}
         </Button>
       </div>
+      {item.payload.bashGrant && <p className="hint">{C.grantDirectory(item.payload.bashGrant.relativeDirectory)}</p>}
       {remembered.length > 0 && <p className="hint">{C.alwaysRemembers(remembered.join('、'))}</p>}
     </>
   );
