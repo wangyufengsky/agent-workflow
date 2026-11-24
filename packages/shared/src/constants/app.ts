@@ -57,6 +57,7 @@ function compareVersions(a: readonly number[], b: readonly number[]): number {
 export const OPENCODE_AGENT_NAME = {
   [SessionAgent.Planner]: 'aw-planner',
   [SessionAgent.Executor]: 'aw-executor',
+  [SessionAgent.DatabaseAnalyst]: 'aw-database-analyst',
   [SessionAgent.Reviewer]: 'aw-reviewer',
   [SessionAgent.Researcher]: 'aw-researcher',
   [SessionAgent.SlidesWriter]: 'aw-slides',
@@ -67,6 +68,7 @@ export const OPENCODE_AGENT_NAME = {
 export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
 export const OPENCODE_FUNCTIONAL_TEST_AGENT = 'aw-functional-tester';
 export const OPENCODE_DOCUMENT_AGENT = 'aw-document-processor';
+export const OPENCODE_DATABASE_INVESTIGATOR_AGENT = 'aw-database-investigator';
 export const OPENCODE_IMAGE_AGENT = 'aw-image-reader';
 export const OPENCODE_COMPANION_AGENT = 'aw-companion';
 export const COMPANION_WHISPER_TIMEOUT_MS = 60_000;

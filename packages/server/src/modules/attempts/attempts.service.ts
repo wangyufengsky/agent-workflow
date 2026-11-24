@@ -29,7 +29,14 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { ModelSlots } from '../model-slots/index.ts';
-import { createMessageId, parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
+import {
+  createMessageId,
+  type ObjectAttemptPurpose,
+  parseModelRef,
+  type SessionDispatcher,
+  SessionPurpose,
+  sessionPermissionRules,
+} from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { withUserSkills } from '../skills/index.ts';
@@ -55,6 +62,7 @@ export type AttemptsServiceDeps = AttemptStateDeps & {
   prompts: Prompts;
   projects: Pick<ProjectsService, 'allowedBash' | 'rememberBash'>;
   slots: ModelSlots;
+  sessions: SessionDispatcher;
 };
 
 export type StartAttemptInput = {
@@ -98,7 +106,7 @@ type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
-  const { clock, opencode, settings, transcripts, projects, slots, unit, db, log } = deps;
+  const { clock, opencode, settings, transcripts, projects, slots, unit, db, log, sessions } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
   const local = new Map<
@@ -206,6 +214,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       stall: null,
       released,
       release,
+      delegation: new AbortController(),
     };
     state.live.set(session.sessionId, tracked);
     return tracked;
@@ -276,18 +285,22 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       input.functionalTestNode === undefined ? OPENCODE_AGENT_NAME[input.agent] : OPENCODE_FUNCTIONAL_TEST_AGENT;
     let sessionId: string;
     try {
-      sessionId = await opencode.createSession({
-        directory: input.directory,
-        title: input.title,
-        agent,
-        permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
-          checkCommands: input.checkCommands,
-          web: input.web,
-          browserTestSubmit: input.browserTestSubmit,
-          functionalTestNode: input.functionalTestNode,
-          offline: settings.get('network.offline'),
-          allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
-        }),
+      sessionId = await sessions.bind({
+        purpose: SessionPurpose.Attempt,
+        ownerId: id,
+        input: {
+          directory: input.directory,
+          title: input.title,
+          agent,
+          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
+            checkCommands: input.checkCommands,
+            web: input.web,
+            browserTestSubmit: input.browserTestSubmit,
+            functionalTestNode: input.functionalTestNode,
+            offline: settings.get('network.offline'),
+            allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
+          }),
+        },
       });
     } catch (err) {
       const current = mustFind(id);
@@ -334,7 +347,13 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     // The previous turn on this session may still be winding down (the abort after its submit); its last events
     // must not reach the new attempt.
     const winding = state.live.get(sessionId);
-    if (winding !== undefined) await winding.released;
+    const binding = sessions.bind({
+      purpose: SessionPurpose.Attempt,
+      ownerId: id,
+      existing: sessionId,
+      ...(winding === undefined ? {} : { after: winding.released }),
+    });
+    sessionId = typeof binding === 'string' ? binding : await binding;
     const attempt = mustFind(id);
     // Cancelled while waiting.
     if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
@@ -356,6 +375,83 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     return toDto(mustFind(id));
   }
 
+  /**
+   * Creates the session and sends the first message (12 §4.1); the attempt is then `running`. The attempt row is
+   * written before the first await, so a caller that does not wait still sees it as active. An attempt of no task
+   * that finds every model slot taken returns `queued` at once and starts once it gets one (D186).
+   */
+  async function start(input: StartAttemptInput): Promise<AttemptDTO> {
+    requireReady();
+    const id = input.id ?? randomUUID();
+    const queued = waitsForSlot(id, input.taskId, () => launch(id, input));
+    unit.transact(() => {
+      repo.insert({
+        id,
+        taskId: input.taskId,
+        nodeId: input.nodeId,
+        roleId: input.roleId,
+        projectId: input.projectId,
+        kind: input.kind,
+        seq: repo.nextSeq(input),
+        status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
+        model: input.model,
+        directory: input.directory,
+        opencodeSessionId: null,
+        nudges: 0,
+        startedAt: clock.now(),
+      });
+      if (input.delegation !== undefined && input.taskId !== null) {
+        recordTaskEvent(db, {
+          taskId: input.taskId,
+          entity: TaskEventEntity.Attempt,
+          entityId: id,
+          type: 'note',
+          payload: input.delegation,
+          createdAt: clock.now(),
+        });
+      }
+    });
+    state.publish(mustFind(id));
+    if (input.kind === AttemptKind.Delegation) slots.changed();
+    return queued ? toDto(mustFind(id)) : launch(id, input);
+  }
+
+  /**
+   * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3; PPT work,
+   * 23 §4.1): the model keeps what it read and receives `prompt` as the next message, with the previous attempt's
+   * model and kind unless `model` / `kind` give others. Synchronous up to sending, like `start`, and queued like it.
+   */
+  async function continueSession(previousId: string, input: ContinueInput): Promise<AttemptDTO> {
+    requireReady();
+    const previous = mustFind(previousId);
+    if (previous.opencodeSessionId === null) {
+      throw new AppError(ErrorCode.AttemptNotFound, `Attempt ${previousId} has no session`, { id: previousId });
+    }
+    const model = input.model === undefined ? previous.model : input.model;
+    // A PPT's outline and pages are different kinds of work on one session (23 §7.1).
+    const kind = input.kind ?? previous.kind;
+    const id = input.id ?? randomUUID();
+    const sessionId = previous.opencodeSessionId;
+    const queued = waitsForSlot(id, previous.taskId, () => relaunch(id, previous, sessionId, model, input));
+    repo.insert({
+      id,
+      taskId: previous.taskId,
+      nodeId: previous.nodeId,
+      roleId: previous.roleId,
+      projectId: previous.projectId,
+      kind,
+      seq: repo.nextSeq({ ...previous, kind }),
+      status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
+      model,
+      directory: previous.directory,
+      opencodeSessionId: previous.opencodeSessionId,
+      nudges: 0,
+      startedAt: clock.now(),
+    });
+    state.publish(mustFind(id));
+    return queued ? toDto(mustFind(id)) : relaunch(id, previous, sessionId, model, input);
+  }
+
   return {
     get: (id: string): AttemptDTO => toDto(mustFind(id)),
     /** The project the attempt's session works in (none for debug attempts and PPTs without a project). */
@@ -366,6 +462,16 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     isReady: (): boolean => opencode.isConnected(),
     requireReady,
     canStartDelegation: slots.isFree,
+    delegationSignal(id: string, sessionId: string): AbortSignal | undefined {
+      const session = state.live.get(sessionId);
+      if (
+        session?.attemptId !== id ||
+        mustFind(id).status !== AttemptStatus.Running ||
+        session.delegation.signal.aborted
+      )
+        return undefined;
+      return session.delegation.signal;
+    },
     onSignal: state.onSignal,
 
     /** A node’s execution, review and delegation attempts, oldest first. */
@@ -380,49 +486,11 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       const attempt = repo.findLatestPlan(taskId);
       return attempt === undefined ? undefined : toDto(attempt);
     },
+    liveAgentOf: (attemptId: string): string | undefined => state.sessionOf(attemptId)?.agent,
     roleIdOf: (attemptId: string): string | null => mustFind(attemptId).roleId,
     usesRole: (roleId: string): boolean => repo.hasRole(roleId),
 
-    /**
-     * Creates the session and sends the first message (12 §4.1); the attempt is then `running`. The attempt row is
-     * written before the first await, so a caller that does not wait still sees it as active. An attempt of no task
-     * that finds every model slot taken returns `queued` at once and starts once it gets one (D186).
-     */
-    async start(input: StartAttemptInput): Promise<AttemptDTO> {
-      requireReady();
-      const id = input.id ?? randomUUID();
-      const queued = waitsForSlot(id, input.taskId, () => launch(id, input));
-      unit.transact(() => {
-        repo.insert({
-          id,
-          taskId: input.taskId,
-          nodeId: input.nodeId,
-          roleId: input.roleId,
-          projectId: input.projectId,
-          kind: input.kind,
-          seq: repo.nextSeq(input),
-          status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
-          model: input.model,
-          directory: input.directory,
-          opencodeSessionId: null,
-          nudges: 0,
-          startedAt: clock.now(),
-        });
-        if (input.delegation !== undefined && input.taskId !== null) {
-          recordTaskEvent(db, {
-            taskId: input.taskId,
-            entity: TaskEventEntity.Attempt,
-            entityId: id,
-            type: 'note',
-            payload: input.delegation,
-            createdAt: clock.now(),
-          });
-        }
-      });
-      state.publish(mustFind(id));
-      if (input.kind === AttemptKind.Delegation) slots.changed();
-      return queued ? toDto(mustFind(id)) : launch(id, input);
-    },
+    start,
 
     /** 本地浏览器用例复用尝试的状态、取消、超时和证据目录。 */
     async runLocal(
@@ -500,40 +568,23 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       }
     },
 
-    /**
-     * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3; PPT work,
-     * 23 §4.1): the model keeps what it read and receives `prompt` as the next message, with the previous attempt's
-     * model and kind unless `model` / `kind` give others. Synchronous up to sending, like `start`, and queued like it.
-     */
-    async continueSession(previousId: string, input: ContinueInput): Promise<AttemptDTO> {
-      requireReady();
-      const previous = mustFind(previousId);
-      if (previous.opencodeSessionId === null) {
-        throw new AppError(ErrorCode.AttemptNotFound, `Attempt ${previousId} has no session`, { id: previousId });
-      }
-      const model = input.model === undefined ? previous.model : input.model;
-      // A PPT's outline and pages are different kinds of work on one session (23 §7.1).
-      const kind = input.kind ?? previous.kind;
-      const id = input.id ?? randomUUID();
-      const sessionId = previous.opencodeSessionId;
-      const queued = waitsForSlot(id, previous.taskId, () => relaunch(id, previous, sessionId, model, input));
-      repo.insert({
-        id,
-        taskId: previous.taskId,
-        nodeId: previous.nodeId,
-        roleId: previous.roleId,
-        projectId: previous.projectId,
-        kind,
-        seq: repo.nextSeq({ ...previous, kind }),
-        status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
-        model,
-        directory: previous.directory,
-        opencodeSessionId: previous.opencodeSessionId,
-        nudges: 0,
-        startedAt: clock.now(),
-      });
-      state.publish(mustFind(id));
-      return queued ? toDto(mustFind(id)) : relaunch(id, previous, sessionId, model, input);
+    async dispatchObjectAttempt(
+      input: {
+        previousId: string | undefined;
+        followUp: () => ContinueInput;
+      } & (
+        | {
+            purpose: Exclude<ObjectAttemptPurpose, typeof SessionPurpose.PlanningRevision>;
+            first: () => StartAttemptInput;
+          }
+        | { purpose: typeof SessionPurpose.PlanningRevision; previousId: string }
+      ),
+    ): Promise<AttemptDTO> {
+      const previousSession = input.previousId === undefined ? null : mustFind(input.previousId).opencodeSessionId;
+      if (input.previousId !== undefined && sessions.shouldContinueAttempt(input.purpose, previousSession))
+        return continueSession(input.previousId, input.followUp());
+      if ('first' in input) return start(input.first());
+      throw new AppError(ErrorCode.AttemptNotFound, 'The planning attempt has no retained session');
     },
 
     /** The latest attempt on an opencode session; MCP calls are attributed by it (12 §3). */

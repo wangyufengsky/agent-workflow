@@ -2,12 +2,14 @@ import { MCP_SESSION_ARG } from '@aw/shared';
 import { createContext, useContext, useState } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { actionGroupSummary, STREAM_COPY as C, toolActionDelta, toolActionText } from '../../copy/attempts.ts';
+import { isDatabaseInvestigationTool } from '../databases/database-investigation-evidence.tsx';
+import { DatabaseInvestigationPayload } from '../databases/database-investigation-payload.tsx';
 import { attemptFileUrl, useImage } from '../preview/preview.queries.ts';
 import styles from './stream.module.css';
 import type { StreamAction } from './stream-items.ts';
 
 /** The attempt whose stream this is: its browser actions' frames are read from it (29 §8.3). */
-export const StreamAttemptContext = createContext<string | null>(null);
+export const StreamAttemptContext = createContext<{ id: string; taskId: string | null } | null>(null);
 
 function Frame({ attemptId, file, alt }: { attemptId: string; file: string; alt: string }) {
   const src = useImage(attemptFileUrl(attemptId, file));
@@ -38,10 +40,12 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
   const [open, setOpen] = useState(false);
   const { verb, subject } = toolActionText(item.action);
   const delta = toolActionDelta(item.action);
-  const attemptId = useContext(StreamAttemptContext);
+  const attempt = useContext(StreamAttemptContext);
+  const attemptId = attempt?.id ?? null;
   const frame = attemptId === null ? undefined : item.frame;
   // A browser action opens to what the page showed after it (29 §8.3).
-  const expandable = pro || item.state === 'failed' || frame !== undefined;
+  const investigates = isDatabaseInvestigationTool(item.tool);
+  const expandable = pro || item.state === 'failed' || frame !== undefined || investigates;
   const head = (
     <>
       <Mark state={item.state} />
@@ -78,7 +82,17 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
           {frame !== undefined && attemptId !== null && (
             <Frame attemptId={attemptId} file={frame} alt={`${C.frame} · ${verb} ${subject}`} />
           )}
-          {pro && (
+          {investigates && (
+            <DatabaseInvestigationPayload
+              owner={attempt?.taskId == null ? undefined : { kind: 'task', id: attempt.taskId, attemptId: attempt.id }}
+              input={item.input}
+              startedAt={item.startedAt}
+              active={item.state === 'running'}
+              output={item.state === 'ok' ? item.output : undefined}
+              error={item.state === 'failed' ? item.output : undefined}
+            />
+          )}
+          {pro && !investigates && (
             <>
               <span className={styles.rawLabel}>
                 {C.toolName} <span className="mono">{item.tool}</span> · {C.input}
@@ -87,7 +101,7 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
               {item.output !== undefined && item.output !== '' && <span className={styles.rawLabel}>{C.output}</span>}
             </>
           )}
-          {item.output !== undefined && item.output !== '' && (pro || item.state === 'failed') && (
+          {item.output !== undefined && item.output !== '' && !investigates && (pro || item.state === 'failed') && (
             <pre className={styles.raw} data-failed={item.state === 'failed'}>
               {item.output}
             </pre>

@@ -18,6 +18,8 @@ import {
   type GetAppStatusOutput,
   getAppStatusInputSchema,
   getCurrentTimeInputSchema,
+  investigateDatabaseDescription,
+  investigateDatabaseInputSchema,
   listFilesInputSchema,
   openFormInputSchema,
   openPageInputSchema,
@@ -38,6 +40,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { BrowserService } from '../browser/index.ts';
+import type { DatabaseInvestigations } from '../database-investigations/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { DocumentProcessor } from '../document-processor/index.ts';
 import type { ImageAnalysis } from '../image-analysis/index.ts';
@@ -54,6 +57,7 @@ export type HelperToolDeps = {
   attachments: AttachmentsService;
   imageAnalysis: ImageAnalysis;
   documentProcessor: DocumentProcessor;
+  databaseInvestigations: DatabaseInvestigations;
   browser: BrowserService;
   decks: DecksService;
 };
@@ -103,6 +107,26 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
       handler: () => deps.appStatus(),
     },
     {
+      name: AssistantToolName.InvestigateDatabase,
+      description: investigateDatabaseDescription,
+      input: investigateDatabaseInputSchema,
+      mode: UiMode.Pro,
+      handler(input, { conversation, signal }) {
+        if (conversation.projectId === null)
+          throw new AppError(ErrorCode.DbConnectionNotFound, 'Select a project with linked database connections first');
+        const parentSignal = conversation.opencodeSessionId
+          ? conversations.delegationSignal(conversation.id, conversation.opencodeSessionId)
+          : undefined;
+        return deps.databaseInvestigations.investigate({
+          owner: { kind: 'assistant', id: conversation.id },
+          projectId: conversation.projectId,
+          input: investigateDatabaseInputSchema.parse(input),
+          ...(signal && { signal }),
+          ...(parentSignal && { parentSignal }),
+        });
+      },
+    },
+    {
       name: AssistantToolName.ProcessDocument,
       description: processDocumentDescription,
       input: processDocumentInputSchema,
@@ -112,6 +136,9 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
           processDocumentInputSchema.parse(input),
           (id) => assertOwn(conversation.id, id),
           signal,
+          conversation.opencodeSessionId
+            ? conversations.delegationSignal(conversation.id, conversation.opencodeSessionId)
+            : undefined,
         );
       },
     },
@@ -124,7 +151,14 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
         const { source, question } = analyzeAttachmentImageInputSchema.parse(input);
         assertOwn(conversation.id, source.attachment_id);
         const { name, mime, path } = deps.attachments.image(source.attachment_id);
-        return deps.imageAnalysis.analyze({ path, mime, reference: { ...source, name } }, question, signal);
+        return deps.imageAnalysis.analyze(
+          { path, mime, reference: { ...source, name } },
+          question,
+          signal,
+          conversation.opencodeSessionId
+            ? conversations.delegationSignal(conversation.id, conversation.opencodeSessionId)
+            : undefined,
+        );
       },
     },
     {

@@ -1,0 +1,44 @@
+.evidence {
+  display: grid;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.metadata {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--s-1) var(--s-3);
+  margin: 0;
+}
+
+.metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.queries {
+  display: grid;
+  gap: var(--s-3);
+  margin-block: 0;
+  padding-inline-start: var(--s-5);
+}
+
+.queries li {
+  padding: var(--s-3);
+  border-inline-start: 1px solid var(--line-2);
+}
+
+.answer {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.sql {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

@@ -72,7 +72,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `WorkflowKind` | `builtin` · `custom` · `system` | 内置流程只读，可复制为自定义；`system` 只由应用自己发起（Git 工作台的合并任务 `system.merge_branch`，27 §3.6；项目的 AGENTS.md 任务 `system.agents_md`，40），不列出、不能复制、不能用于新建任务 |
 | `WorkflowPlanning` | `fixed` · `ai` | 固定 DAG / AI 在约束内规划 |
 | `WorkflowDeliverable` | `code_changes` · `report` | 代码审查等只读流程产出报告，不合并 |
-| `RoleBaseAgent` | `planner` · `executor` · `reviewer` | 对应注入 opencode 的 agent `aw-planner` / `aw-executor` / `aw-reviewer`，决定权限基线 |
+| `RoleBaseAgent` | `planner` · `executor` · `reviewer` · `database_analyst` | 对应注入 opencode 的 agent `aw-planner` / `aw-executor` / `aw-reviewer` / `aw-database-analyst`，决定权限基线 |
 | `RoleKind` | `builtin` · `custom` | |
 | `NodeKind` | `normal` · `revise` | `revise` 为「再改改」/「解决冲突」追加的节点 |
 | `RequiredStepPosition` | `first` · `last` | 流程必经步骤在 AI 计划中的位置约束（5.3 `REQUIRED_STEP_ORDER`） |
@@ -148,7 +148,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KnowledgeTurnStatus` | `researching` · `answered` · `stopped` · `failed` | 一轮的状态，由其 `research` 尝试的状态推导（`knowledgeTurnStatusOf`，18 §3），不存储 |
 | `KnowledgeSourceKind` | `code` · `docs` · `database` · `web` | 资料范围与引用的来源类别；文件按 `classifySource(path)` 分为代码或文档（`KNOWLEDGE_DOC_DIRS`、`KNOWLEDGE_DOC_EXTENSIONS`） |
 | `CitationType` | `file` · `database` · `web` | `submit_answer` 的引用类型（18 §6.1） |
-| `SessionAgent` | `planner` · `executor` · `reviewer` · `researcher` · `slides_writer` · `code_reviewer` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型 `RoleBaseAgent` 只有前三个；`slides_writer` 为 PPT 写作者（23 §7.1）；`code_reviewer` 为 Git 工作台的只读审查与草拟提交信息（27 §4.3） |
+| `SessionAgent` | `planner` · `executor` · `reviewer` · `database_analyst` · `researcher` · `slides_writer` · `code_reviewer` · `delegate` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型包括规划、执行、审查与数据库分析；`slides_writer` 为 PPT 写作者（23 §7.1）；`code_reviewer` 为 Git 工作台的只读审查与草拟提交信息（27 §4.3） |
 
 ### 2.9 质量与用量（v1.1，`enums/insights.ts`）
 

@@ -37,11 +37,14 @@ export function imageAnalysisTool({
     input: analyzeImageInputSchema,
     output: analyzeImageOutputSchema,
     handler({ source, question }, { attempt, signal }) {
+      const parent = attempt.opencodeSessionId
+        ? attempts.delegationSignal(attempt.id, attempt.opencodeSessionId)
+        : undefined;
       if ('attachment_id' in source) {
         if (attempt.kind === AttemptKind.Breakdown) initiatives.assertAttachment(attempt, source.attachment_id);
         else tasks.assertAttachment(attempt, source.attachment_id);
         const { name, mime, path } = attachments.image(source.attachment_id);
-        return imageAnalysis.analyze({ path, mime, reference: { ...source, name } }, question, signal);
+        return imageAnalysis.analyze({ path, mime, reference: { ...source, name } }, question, signal, parent);
       }
       const origin = source.attempt_id === undefined ? attempt : attempts.get(source.attempt_id);
       if (attempt.taskId === null || origin.taskId !== attempt.taskId) {
@@ -56,6 +59,7 @@ export function imageAnalysisTool({
         },
         question,
         signal,
+        parent,
       );
     },
   });

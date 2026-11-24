@@ -6,6 +6,7 @@ import {
   dbTestResultSchema,
   updateDbConnectionRequestSchema,
 } from '../contracts/api/databases.ts';
+import { databaseInvestigationSchema } from '../contracts/mcp/database-investigation.ts';
 import { dbQueryInputSchema, dbQueryOutputSchema } from '../contracts/mcp/db-tools.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
@@ -101,5 +102,19 @@ export const queryDbOp = defineOperationContract({
   output: dbQueryOutputSchema,
   risk: OperationRisk.Read,
   http: { method: 'POST', path: '/db-connections/:id/query' },
+  credentialFields: [],
+});
+
+/** 读取当前任务或助手会话的调查记录，供活动详情展示。 */
+export const listDatabaseInvestigationsOp = defineOperationContract({
+  id: 'databases.investigations',
+  title: 'op.databases.investigations',
+  description: 'Read database investigation activity for a task or assistant conversation',
+  input: z.object({ kind: z.enum(['task', 'assistant']), id: z.string() }),
+  output: z.object({ items: z.array(databaseInvestigationSchema) }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/database-investigations/:kind/:id' },
+  expose: { palette: false, assistant: false },
+  mode: UiMode.Simple,
   credentialFields: [],
 });

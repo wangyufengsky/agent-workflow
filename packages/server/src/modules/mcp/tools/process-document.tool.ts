@@ -5,6 +5,7 @@ import {
   processDocumentInputSchema,
   processDocumentOutputSchema,
 } from '@aw/shared';
+import type { AttemptsService } from '../../attempts/index.ts';
 import type { DocumentProcessor } from '../../document-processor/index.ts';
 import type { InitiativesService } from '../../initiatives/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
@@ -14,6 +15,7 @@ export function processDocumentTool(
   processor: DocumentProcessor,
   tasks: TasksService,
   initiatives: InitiativesService,
+  attempts: AttemptsService,
 ) {
   return defineMcpTool({
     name: McpToolName.ProcessDocument,
@@ -29,6 +31,7 @@ export function processDocumentTool(
           else tasks.assertAttachment(attempt, id);
         },
         signal,
+        attempt.opencodeSessionId ? attempts.delegationSignal(attempt.id, attempt.opencodeSessionId) : undefined,
       );
     },
   });

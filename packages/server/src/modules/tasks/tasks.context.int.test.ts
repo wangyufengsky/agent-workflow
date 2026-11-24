@@ -73,6 +73,7 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
         allowedRoles: [
           { key: 'developer', name: '开发工程师' },
           { key: 'tester', name: '测试工程师' },
+          { key: 'database_analyst', name: '数据库分析员' },
         ],
         requiredSteps: [{ key: 'final_verify', roleKey: 'developer' }],
         maxNodes: 20,

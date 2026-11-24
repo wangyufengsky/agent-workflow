@@ -6,6 +6,8 @@ import {
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
+  RuntimeStatus,
+  ServerEventType,
   TASK_STATUSES,
   taskMachine,
 } from '@aw/shared';
@@ -41,7 +43,8 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
-import { createDatabasesModule, DB_DRIVERS } from './modules/databases/index.ts';
+import { createDatabaseInvestigations, type DatabaseInvestigations } from './modules/database-investigations/index.ts';
+import { createDatabasesModule, DB_DRIVERS, type DbDriver } from './modules/databases/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
@@ -63,6 +66,7 @@ import { createOffice } from './modules/office/index.ts';
 import {
   createOpencodeRuntime,
   createRuntimeClient,
+  createSessionDispatcher,
   type OpencodeClient,
   type OpencodeRuntime,
   opencodeLaunchEnv,
@@ -108,6 +112,7 @@ export type AppDeps = {
   hosting?: HostingEndpoints;
   /** Time limit of the AI's database queries; tests shorten `DB_QUERY_TIMEOUT_MS`. */
   dbQueryTimeoutMs?: number;
+  dbDrivers?: Readonly<Record<keyof typeof DB_DRIVERS, DbDriver>>;
   /** IANA time zone the assistant tells the time in and insights count days in; the system's by default. */
   timeZone?: string;
   /** Where browser tabs live (29 §5.2): Electron main, or a Chromium in development and tests; none otherwise. */
@@ -120,6 +125,7 @@ export type App = {
   log: Logger;
   services: {
     credentials: CredentialsService;
+    databaseInvestigations: DatabaseInvestigations;
     runtime: OpencodeRuntime;
     opencode: OpencodeClient;
     attempts: AttemptsService;
@@ -228,7 +234,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     clock,
     log,
     credentials: credentials.service,
-    drivers: DB_DRIVERS,
+    drivers: deps.dbDrivers ?? DB_DRIVERS,
     queryTimeoutMs: deps.dbQueryTimeoutMs ?? DB_QUERY_TIMEOUT_MS,
   });
   const hostingEndpoints = deps.hosting ?? PUBLIC_HOSTING;
@@ -271,15 +277,44 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const modelSlots = createModelSlotsModule({ settings: settings.service, events, log });
+  const sessions = createSessionDispatcher({ opencode, slots: modelSlots.service, clock, log });
+  server.addHook('preClose', () => sessions.close());
+  const databaseInvestigations = createDatabaseInvestigations({
+    db: database.db,
+    clock,
+    databases: databases.service,
+    sessions,
+    opencode,
+    model: () => settings.service.get('ai.defaultModel'),
+    dataDir: config.dataDir,
+    log,
+  });
+  databaseInvestigations.recover();
+  const unsubscribeDatabaseInvestigations = events.subscribe((event) => {
+    if (
+      event.type === ServerEventType.TaskDeleted ||
+      (event.type === ServerEventType.RuntimeUpdated && event.data.status === RuntimeStatus.Ready)
+    ) {
+      void databaseInvestigations
+        .cleanup()
+        .catch((error) => log.warn({ err: error }, 'database investigation cleanup failed'));
+    }
+  });
+  server.addHook('preClose', async () => {
+    unsubscribeDatabaseInvestigations();
+    await databaseInvestigations.dispose();
+  });
+
   const imageAnalysis = createImageAnalysis({
     roles: roles.service,
     clock,
     settings: settings.service,
-    slots: modelSlots.service,
+    sessions,
     opencode,
   });
   server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
+    sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,
     unit,
@@ -332,7 +367,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const documentProcessor = createDocumentProcessor({
     attachments: attachments.service,
     roles: roles.service,
-    slots: modelSlots.service,
+    sessions,
     settings: settings.service,
     opencode,
   });
@@ -508,6 +543,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   tasks.service.onProjectDeleted((id) => {
     projectRuntime.abortProject(id);
     projectModules.abortProject(id);
+    queueMicrotask(() => {
+      void databaseInvestigations
+        .cleanup()
+        .catch((error) => log.warn({ err: error }, 'database investigation cleanup failed'));
+    });
   });
   const batches = createBatchesModule({
     db: database.db,
@@ -606,6 +646,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
   const mcp = createMcpModule({
+    databaseInvestigations,
     events,
     token: mcpToken,
     functionalTests: functionalTests.service,
@@ -670,6 +711,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   ];
   const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
   const assistant = createAssistantModule({
+    databaseInvestigations,
+    sessions,
     skills: skills.service,
     browser: browser.service,
     db: database.db,
@@ -728,6 +771,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
     services: {
       credentials: credentials.service,
+      databaseInvestigations,
       runtime,
       opencode,
       attempts: attempts.service,
@@ -758,6 +802,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       schedules.timer.start();
       await attachments.service.startCleanup();
       await startHostedRuntime();
+      await databaseInvestigations.cleanup();
       await assistant.start();
     },
     close: () => server.close(),

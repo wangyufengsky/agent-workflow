@@ -103,7 +103,12 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(simple).toEqual(
       expect.arrayContaining(['projects_list', 'tasks_create', 'tasks_deliver', 'settings_update', 'inbox_resolve']),
     );
-    expect(simple).toEqual(expect.arrayContaining(Object.values(AssistantToolName)));
+    expect(simple).toEqual(
+      expect.arrayContaining(
+        Object.values(AssistantToolName).filter((name) => name !== AssistantToolName.InvestigateDatabase),
+      ),
+    );
+    expect(simple).not.toContain(AssistantToolName.InvestigateDatabase);
     expect(simple).not.toEqual(expect.arrayContaining(['git_status']));
     expect(simple).toContain('assistant_actBrowser');
     for (const name of simple.filter((tool) => tool !== 'assistant_actBrowser'))
@@ -113,7 +118,9 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
 
     await t.call(updateSettingsOp, { 'ui.mode': 'pro' });
     const { tools } = await mcp.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['git_status', 'databases_update']));
+    expect(tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['git_status', 'databases_update', AssistantToolName.InvestigateDatabase]),
+    );
     const schemas = JSON.stringify(tools.map((tool) => tool.inputSchema));
     expect(schemas).not.toMatch(/"(password|token)"/);
     const settings = Object.keys(tools.find((tool) => tool.name === 'settings_update')?.inputSchema.properties ?? {});

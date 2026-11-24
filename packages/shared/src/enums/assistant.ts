@@ -56,6 +56,7 @@ export const AssistantToolName = {
   ReadAttachment: 'read_attachment',
   AnalyzeImage: 'analyze_image',
   ProcessDocument: 'process_document',
+  InvestigateDatabase: 'investigate_database',
   /** Rows of an Excel attachment (39 §6.2). */
   ReadSheet: 'read_sheet',
   /** Filtered, grouped or totalled rows of an Excel attachment (39 §6.2). */

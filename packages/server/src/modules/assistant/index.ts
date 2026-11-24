@@ -21,6 +21,7 @@ import {
   functionalTestRerunOp,
   type GetAppStatusOutput,
   initGitOp,
+  listDatabaseInvestigationsOp,
   MCP_ASSISTANT_PATH,
   MCP_ASSISTANT_SERVER_NAME,
   UiMode,
@@ -28,9 +29,10 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
-import type { OperationImpl } from '../../core/operations/operations.ts';
+import { implement, type OperationImpl } from '../../core/operations/operations.ts';
 import type { BatchesService } from '../batches/index.ts';
 import type { BrowserService } from '../browser/index.ts';
+import type { DatabaseInvestigations } from '../database-investigations/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { DocumentProcessor } from '../document-processor/index.ts';
 import type { GitReviewsService } from '../git-reviews/index.ts';
@@ -63,7 +65,7 @@ import { createWhisperService } from './assistant.whisper.ts';
 
 export type { AssistantService } from './assistant.service.ts';
 
-export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context' | 'memory'> & {
+export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context' | 'memory' | 'cleanupDatabaseInvestigations'> & {
   /** Bearer token of `/mcp/assistant`, separate from the execution MCP's (D25). */
   token: string;
   prompts: Prompts;
@@ -80,6 +82,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context' | 'memory
   browser: BrowserService;
   imageAnalysis: ImageAnalysis;
   documentProcessor: DocumentProcessor;
+  databaseInvestigations: DatabaseInvestigations;
   /** Word and Excel files: writing them, and the previews of the files cards (39 §7.2, §8.2). */
   office: Office;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
@@ -93,7 +96,12 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const context = createContextRenderer(deps);
   const memory = createAssistantMemory(deps);
   const memoryOperations = assistantMemoryOperations(memory);
-  const conversations = createAssistantService({ ...deps, context, memory });
+  const conversations = createAssistantService({
+    ...deps,
+    context,
+    memory,
+    cleanupDatabaseInvestigations: deps.databaseInvestigations.cleanup,
+  });
   const taskRelay = createTaskRelay({ ...deps, conversations });
   const analysisRelay = createAnalysisRelay({ ...deps, conversations });
   const breakdownRelay = createBreakdownRelay({ ...deps, conversations });
@@ -249,6 +257,12 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     },
     registry,
     operations: [
+      implement(listDatabaseInvestigationsOp, ({ kind, id }) => {
+        const projectId = kind === 'task' ? deps.tasks.projectIdOf(id) : conversations.get(id).projectId;
+        if (projectId === null || (kind === 'assistant' && deps.settings.get('ui.mode') !== UiMode.Pro))
+          return { items: [] };
+        return { items: deps.databaseInvestigations.list({ owner: { kind, id }, projectId }) };
+      }),
       ...memoryOperations,
       ...assistantOperations(
         conversations,

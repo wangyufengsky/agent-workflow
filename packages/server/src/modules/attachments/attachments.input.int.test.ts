@@ -239,6 +239,7 @@ describe('助手消息的附件（30 §5）', () => {
   }
 
   it('助手委派文档处理员修订已绑定的原文，保留附件并隔离其他对话', async () => {
+    await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 1 });
     const attachment = await uploaded('验收：刷新后保持已完成', 'cases.md');
     const mine = (await t.call(createConversationOp, {})).body;
     const other = (await t.call(createConversationOp, {})).body;
@@ -263,6 +264,7 @@ describe('助手消息的附件（30 §5）', () => {
   });
 
   it('助手从当前对话委派 PNG 给单独配置的模型，其他对话不能读图', async () => {
+    await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 1 });
     const model = { providerId: 'local', modelId: 'vision' };
     t.fake.models.push({ ...model, name: 'Vision', contextLimit: null, supportsImage: true });
     const png = Buffer.from(WHITE_PNG_BASE64, 'base64');
@@ -323,7 +325,7 @@ describe('助手消息的附件（30 §5）', () => {
       contextLimit: null,
       supportsImage: true,
     });
-    await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision' });
+    await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision', 'scheduler.maxConcurrentAttempts': 1 });
     const image = await uploaded(Buffer.from(WHITE_PNG_BASE64, 'base64'), 'screen.png');
     const { body: conversation } = await t.call(createConversationOp, {});
     const started = Promise.withResolvers<string>();
@@ -350,7 +352,7 @@ describe('助手消息的附件（30 §5）', () => {
 
     const result = say(conversation.id, '请读图', [image.id]);
     const reader = await started.promise;
-    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(2);
+    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(1);
     clock.advance(IMAGE_ANALYSIS_TIMEOUT_MS);
     if (stalled !== null) {
       await cleaning.promise;

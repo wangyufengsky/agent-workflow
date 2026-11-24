@@ -1,9 +1,11 @@
 import {
   AttemptKind,
+  createWorkflowOp,
   ErrorCode,
   listMcpToolsOp,
   MCP_SESSION_ARG,
   McpToolName,
+  OPENCODE_AGENT_NAME,
   RoleBaseAgent,
   requestChangesOp,
 } from '@aw/shared';
@@ -93,6 +95,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.DbListConnections,
       McpToolName.DbDescribe,
       McpToolName.DbQuery,
+      McpToolName.InvestigateDatabase,
       McpToolName.SubmitAnswer,
       McpToolName.SubmitOutline,
       McpToolName.SubmitSlide,
@@ -240,4 +243,36 @@ it('T-11 前端修改的首次拒绝列出所有无关字段，读取指引后�
   const revised = taskReaches(t, 'review');
   expect((await callTool(mcp, 'submit_result', { ...fixed, ...auth })).body).toMatchObject({ accepted: true });
   await revised;
+});
+
+it('数据库分析节点通过 MCP 直连也只允许其已声明工具', async () => {
+  const { project } = await addProject(t);
+  const role = RoleBaseAgent.DatabaseAnalyst;
+  const key = 'db_analyst_permissions';
+  const workflow = await t.call(createWorkflowOp, {
+    key,
+    name: '数据库分析权限',
+    planning: 'fixed',
+    deliverable: 'report',
+    definition: {
+      allowedRoles: [role],
+      checkpoints: { confirm_plan: false, accept_each_node: false },
+      defaultAcceptance: { checks: [], manual: false },
+      template: {
+        nodes: [{ key: 'analyze', title: '调查数据', roleKey: role, instructions: '只读分析', dependsOn: [] }],
+      },
+    },
+  });
+  expect(workflow.status).toBe(201);
+  const agent = OPENCODE_AGENT_NAME[role];
+  t.fake.enqueue(script().hang(), { agent });
+  const task = await createTask(t, { projectId: project.id, workflow: key });
+  await expect.poll(() => t.fake.prompts.some((prompt) => prompt.agent === agent)).toBe(true);
+  const session = t.fake.sessions.find((entry) => entry.agent === agent);
+  if (session === undefined) throw new Error('The database analysis role did not start');
+  const context = { [MCP_SESSION_ARG]: session.id };
+  const denied = await callTool(mcp, McpToolName.GetTaskDiff, context);
+  expect(denied).toMatchObject({ isError: true, body: { code: ErrorCode.McpToolNotAllowed } });
+  const allowed = await callTool(mcp, McpToolName.GetTaskContext, context);
+  expect(allowed).toMatchObject({ isError: false, body: { task: { key: task.key } } });
 });

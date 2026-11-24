@@ -118,7 +118,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
     planning: WorkflowPlanning.Ai,
     deliverable: WorkflowDeliverable.CodeChanges,
     definition: {
-      allowedRoles: [BuiltinRoleKey.Developer, BuiltinRoleKey.Tester],
+      allowedRoles: [BuiltinRoleKey.Developer, BuiltinRoleKey.Tester, BuiltinRoleKey.DatabaseAnalyst],
       plannerRole: BuiltinRoleKey.Planner,
       requiredSteps: [
         finalVerify(
@@ -286,7 +286,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
     planning: WorkflowPlanning.Ai,
     deliverable: WorkflowDeliverable.CodeChanges,
     definition: {
-      allowedRoles: [BuiltinRoleKey.Developer, BuiltinRoleKey.Tester],
+      allowedRoles: [BuiltinRoleKey.Developer, BuiltinRoleKey.Tester, BuiltinRoleKey.DatabaseAnalyst],
       plannerRole: BuiltinRoleKey.Planner,
       requiredSteps: [
         {

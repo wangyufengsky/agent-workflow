@@ -91,6 +91,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.ReportProgress]: '进展',
   [McpToolName.DbListConnections]: '查看可用的数据库',
   [McpToolName.DbDescribe]: '查看表结构',
+  [McpToolName.InvestigateDatabase]: '调查数据库',
   [McpToolName.DbQuery]: '查询数据库',
   [McpToolName.SubmitAnswer]: '提交回答',
   [McpToolName.SubmitOutline]: '提交大纲',

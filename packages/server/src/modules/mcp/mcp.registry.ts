@@ -5,6 +5,7 @@ import {
   AttemptStatus,
   BROWSER_TEST_TOOLS,
   type BrowserTestSubmitTool,
+  DATABASE_ANALYST_TOOLS,
   ErrorCode,
   type ErrorInfo,
   functionalTestTools,
@@ -13,6 +14,8 @@ import {
   MCP_SESSION_ARG,
   type McpToolInfo,
   McpToolName,
+  OPENCODE_AGENT_NAME,
+  SessionAgent,
 } from '@aw/shared';
 import { type CallToolResult, type Tool, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -63,7 +66,10 @@ export type ToolRegistry = {
   call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<CallToolResult>;
 };
 
-export type AttemptLookup = { findLatestBySession(sessionId: string): AttemptDTO | undefined };
+export type AttemptLookup = {
+  findLatestBySession(sessionId: string): AttemptDTO | undefined;
+  liveAgentOf(attemptId: string): string | undefined;
+};
 
 /**
  * Turns tool definitions into the MCP `tools/list` and `tools/call` behaviour (12 §7): attribution through the
@@ -96,6 +102,11 @@ export function createToolRegistry(
         attemptId: attempt.id,
       });
     }
+    if (
+      attempts.liveAgentOf(attempt.id) === OPENCODE_AGENT_NAME[SessionAgent.DatabaseAnalyst] &&
+      !DATABASE_ANALYST_TOOLS.includes(tool.name)
+    )
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'This database analysis step can only use its declared tools');
     const phase = functionalPhase(attempt);
     if (phase !== undefined && isFunctionalTestNode(phase) && !functionalTestTools(phase).includes(tool.name)) {
       throw new AppError(ErrorCode.McpToolNotAllowed, 'This functional test step can only use its declared tools');

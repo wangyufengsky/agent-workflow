@@ -124,7 +124,13 @@ it('@opencode 纯文本助手加载识图 Skill，经 MCP 发送原图给视觉�
     t = await createTestApp({ realOpencode: true, env: { ...process.env, OPENCODE_CONFIG: config } });
     await t.app.start(t.port);
     expect(
-      (await t.call(updateSettingsOp, { 'ai.imageModel': VISION_MODEL, 'ai.defaultModel': TEXT_MODEL })).status,
+      (
+        await t.call(updateSettingsOp, {
+          'ai.imageModel': VISION_MODEL,
+          'ai.defaultModel': TEXT_MODEL,
+          'scheduler.maxConcurrentAttempts': 1,
+        })
+      ).status,
     ).toBe(200);
     const uploaded = await t.request({
       method: 'POST',

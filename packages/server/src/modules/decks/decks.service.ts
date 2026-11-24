@@ -38,6 +38,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
+import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { TasksService } from '../tasks/index.ts';
@@ -238,31 +239,32 @@ export function createDecksService(deps: DecksServiceDeps) {
     const model = work.model === undefined ? settings.get('ai.defaultModel') : work.model;
     const runs = repo.listRuns(deck.id);
     const previous = runs.at(-1);
-    const previousSession = previous === undefined ? null : attempts.get(previous.attemptId).opencodeSessionId;
     const attemptId = randomUUID();
-    const started =
-      previous !== undefined && previousSession !== null
-        ? attempts.continueSession(previous.attemptId, {
-            id: attemptId,
-            kind: work.kind,
-            prompt: work.step,
-            model,
-            agent: SessionAgent.SlidesWriter,
-            system: undefined,
-          })
-        : attempts.start({
-            id: attemptId,
-            kind: work.kind,
-            agent: SessionAgent.SlidesWriter,
-            taskId: null,
-            projectId: deck.projectId,
-            nodeId: null,
-            roleId: null,
-            directory: deck.projectId === null ? blankDir : projects.getRecord(deck.projectId).repoPath,
-            title: `${SESSION_TITLE_PREFIX} · ${deck.title}`,
-            model,
-            prompt: `${context(deck)}\n\n${work.step}`,
-          });
+    const started = attempts.dispatchObjectAttempt({
+      purpose: SessionPurpose.Deck,
+      previousId: previous?.attemptId,
+      followUp: () => ({
+        id: attemptId,
+        kind: work.kind,
+        prompt: work.step,
+        model,
+        agent: SessionAgent.SlidesWriter,
+        system: undefined,
+      }),
+      first: () => ({
+        id: attemptId,
+        kind: work.kind,
+        agent: SessionAgent.SlidesWriter,
+        taskId: null,
+        projectId: deck.projectId,
+        nodeId: null,
+        roleId: null,
+        directory: deck.projectId === null ? blankDir : projects.getRecord(deck.projectId).repoPath,
+        title: `${SESSION_TITLE_PREFIX} · ${deck.title}`,
+        model,
+        prompt: `${context(deck)}\n\n${work.step}`,
+      }),
+    });
     const now = clock.now();
     unit.transact(() => {
       work.also?.();

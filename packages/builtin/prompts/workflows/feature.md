@@ -6,3 +6,5 @@ This workflow implements a new feature.
 - Use the developer role for implementation and the tester role for test-only steps.
 - Give steps that change pages `acceptance.pages` with the paths they change (when the project has a page preview), together with `command: "$PROJECT_CHECK"`. The required `final_verify` step already checks the project's key pages.
 - Keep the required `final_verify` step last: it runs the full project check and confirms that every point of the requirement is implemented.
+
+仅当任务需要验证项目数据库里的事实时，才安排 database_analyst 只读步骤。把调查口径和预期证据写进步骤，后续修改由开发角色处理。

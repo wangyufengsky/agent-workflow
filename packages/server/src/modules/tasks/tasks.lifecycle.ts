@@ -40,6 +40,7 @@ import {
 } from '@aw/shared';
 import { branchExists, hasMergeHead } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
+import { SessionPurpose } from '../opencode/index.ts';
 import { planGraphFromSubmission, validateSubmission } from '../plans/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
 import { mergeIntoWorktree } from './tasks.changes.ts';
@@ -557,10 +558,14 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         move(task, TaskEvent.ReplanRequested);
       });
       // Synchronous up to the attempt record, so the scheduler sees planning already under way.
-      const continued = attempts.continueSession(previous.id, {
-        prompt: renderTemplate(prompts[PromptName.Replan], { feedback }),
-        agent: planner.baseAgent,
-        system: planner.prompt,
+      const continued = attempts.dispatchObjectAttempt({
+        purpose: SessionPurpose.PlanningRevision,
+        previousId: previous.id,
+        followUp: () => ({
+          prompt: renderTemplate(prompts[PromptName.Replan], { feedback }),
+          agent: planner.baseAgent,
+          system: planner.prompt,
+        }),
       });
       inBackground(taskId, async () => {
         await continued;

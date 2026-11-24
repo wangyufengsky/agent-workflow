@@ -48,6 +48,8 @@ export * from './contracts/mcp/analyze-image.ts';
 export * from './contracts/mcp/ask-user.ts';
 export * from './contracts/mcp/assistant-tools.ts';
 export * from './contracts/mcp/browser.ts';
+export * from './contracts/mcp/database-analyst-tools.ts';
+export * from './contracts/mcp/database-investigation.ts';
 export * from './contracts/mcp/db-tools.ts';
 export * from './contracts/mcp/functional-test-tools.ts';
 export * from './contracts/mcp/get-node-output.ts';

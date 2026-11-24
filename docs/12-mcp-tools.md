@@ -555,3 +555,9 @@ export const submitPlanTool = defineMcpTool({
 IDEA 联调组可由应用助手通过 `projects_modules` 读取，`tasks_create` 传入 `functionalTest.compoundSelection {compoundId,fingerprint,targetServiceId?}`。准备节点从任务上下文读取服务 ID，并以 `test_environment_prepare` 启动固定计划。HTTP 用例步骤、清理和就绪探测均可指定 `serviceId`。写入规则默认仅授权主入口，其他成员需按其 ID 单独授权。浏览器使用主入口。
 
 `test_run_read` 返回各成员观察值和失败步骤的服务、模块及脱敏日志。项目试启动与测试环境有各自的进程生命周期。`functionalTest_repair` 依据选定失败执行生成带证据的修复任务，`functionalTest_rerun` 在给定修复提交上重启同一组合并重复运行原版本的用例。
+
+## 数据库调查委派
+
+执行 MCP 和专业模式的助手 MCP 都提供 `investigate_database`。传入项目已关联连接的名称 `connection` 和调查问题 `question`。返回的 `investigationId` 可作为下一次调用的 `investigation_id`，在同一调查继续追问。每轮返回答案、限制、实际执行的 SQL 或结构查询证据。节点的任务归属和助手的会话归属由调用方会话确定。
+
+简单查询继续使用节点的 `db_query` 或专业助手的 `databases_query`。需要多次查结构、验证假设或综合查询结果时，可以交给数据库分析员。功能测试的执行阶段可以用数据库工具核对结果。

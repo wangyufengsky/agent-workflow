@@ -70,3 +70,25 @@ export const DATABASES_COPY = {
   projectNone: '还没有数据库连接，先到「数据库」页面添加。',
   projectSaved: '已更新关联的数据库',
 } as const;
+
+export const DATABASE_INVESTIGATION_COPY = {
+  evidence: '数据库调查证据',
+  id: '调查编号',
+  connection: '数据库连接',
+  queryId: '证据编号',
+  sql: '只读 SQL',
+  rows: (count: number) => `返回 ${count} 行`,
+  rowsUnknown: '未记录返回行数',
+  duration: (ms: number) => `${ms} 毫秒`,
+  truncated: '结果已截断',
+  limitations: '调查局限',
+  unavailable: '当前操作未返回可展示的调查证据。',
+  kind: { describe: '查看表结构', query: '执行只读查询' },
+  status: {
+    running: '调查中',
+    completed: '调查已完成',
+    cancelled: '调查已取消',
+    failed: '调查失败',
+    interrupted: '调查已中断',
+  },
+} as const;

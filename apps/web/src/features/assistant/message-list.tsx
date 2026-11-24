@@ -157,7 +157,7 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
       if (!ctx.pro && drewChart(entry.data.tool, result)) return null;
       // Only a call of the turn in progress can still run; one left without a result earlier was stopped.
       const running = ctx.conversation.busy && entry.seq > ctx.turnStart;
-      return <ToolRow call={entry} result={result} busy={running} pro={ctx.pro} />;
+      return <ToolRow call={entry} conversationId={ctx.conversation.id} result={result} busy={running} pro={ctx.pro} />;
     }
     case TranscriptEntryKind.ToolResult:
       // Shown with its call.

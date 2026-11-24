@@ -340,6 +340,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       if (attempt.taskId === null || attempt.nodeId === null) return { verify: false, review: false, artifact: false };
       return resultSubmissionFields(workflows.get(state.get(attempt.taskId).workflowId), nodes.get(attempt.nodeId));
     },
+    projectIdOf: (id: string) => state.get(id).projectId,
     detail,
     async workbenchDetail(id: string): Promise<TaskDetailDTO> {
       await documents.prepare(id);
