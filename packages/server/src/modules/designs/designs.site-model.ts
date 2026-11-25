@@ -15,6 +15,12 @@ export function designSiteModel({ design, sections, files, diagrams, exportedAt 
       section.selected && section.blocks !== null,
   );
   const chapterIds = new Set(completed.map(({ id }) => id));
+  const excerptChapters = new Map<string, string>();
+  for (const section of completed) {
+    for (const block of section.blocks) {
+      if (block.type === 'code' && !excerptChapters.has(block.relPath)) excerptChapters.set(block.relPath, section.id);
+    }
+  }
   const graphs = diagrams
     .filter(({ sectionId }) => chapterIds.has(sectionId))
     .map(({ id, sectionId, kind, title, nodes, edges }) => ({
@@ -43,17 +49,17 @@ export function designSiteModel({ design, sections, files, diagrams, exportedAt 
       summary,
       blocks,
     })),
-    files: files
-      .filter(
-        ({ sectionId, responsibility }) => sectionId !== null && chapterIds.has(sectionId) && responsibility !== null,
-      )
-      .map(({ id, sectionId, relPath, responsibility, symbols }) => ({
-        id,
-        sectionId,
-        relPath,
-        responsibility,
-        symbols,
-      })),
+    files: files.flatMap<Pick<DesignFile, 'id' | 'sectionId' | 'relPath' | 'responsibility' | 'symbols'>>(
+      ({ id, sectionId, relPath, responsibility, symbols }) => {
+        if (sectionId !== null && chapterIds.has(sectionId) && responsibility !== null) {
+          return [{ id, sectionId, relPath, responsibility, symbols }];
+        }
+        const excerptSectionId = excerptChapters.get(relPath);
+        return excerptSectionId === undefined
+          ? []
+          : [{ id, sectionId: excerptSectionId, relPath, responsibility: null, symbols: [] }];
+      },
+    ),
     diagrams: graphs,
   };
 }

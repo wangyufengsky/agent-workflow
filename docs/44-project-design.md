@@ -1,6 +1,6 @@
 # 44 · 项目设计工作台
 
-> 状态：**设计稿（核心口径已确认，待拆任务写入 [05-dev-plan.md](05-dev-plan.md)）**。前端交互原型见 [design/44-project-design/prototype.html](design/44-project-design/prototype.html)（自包含单文件，浏览器直接打开，支持 6 个视图含模板库与 3 套主题切换）。
+> 状态：**已实施，报告阅读器按架构探索版更新**。早期页面原型见 [design/44-project-design/prototype.html](design/44-project-design/prototype.html)（自包含单文件，浏览器直接打开，支持 6 个视图含模板库与 3 套主题切换）。
 >
 > 来源说明：基于《Agent-Workflow-详细设计工作台开发规格》精简重构，去除不适配单机桌面应用的过度防御（自研事件溯源、多写者 CAS、多 Harness 抽象、仓库内多版本发布树等），对齐本仓库既有架构与规范（[03](03-architecture.md)、[06](06-coding-standards.md)、[07](07-testing-standards.md)、[23](23-ppt.md)、[38](38-convergence.md)）。
 
@@ -56,7 +56,7 @@
   - 状态覆盖：加载中、空状态、无匹配结果、错误态（`ErrorState`）；游标分页。
   - `opencode` 未就绪时仍可完整阅读、搜索与导出已有设计，仅发起新的 AI 生成/重写操作时提示原因。
 - **模板库**：
-  - 展示 5 套内置分析模板（只读）与用户自定义模板：每张卡片展示适用项目特征（自动识别判据）、默认章节蓝图、AI 分析侧重说明。
+  - 展示一套只读内置模板「架构探索」及用户自己的模板。每项展示章节蓝图与可展开的分析侧重。历史设计继续使用创建时保存的模板快照。
   - 支持「使用此模板新建」（跳转 `/designs/new?template=<key>`）、「复制为自定义模板」（内置模板只读，复制后可编辑名称、默认章节蓝图与分析侧重指引，同 [13 §5](13-builtin-workflows.md#5-自定义流程专业模式) 规则）；自定义模板支持编辑与删除。
 
 ### 2.3 新建页 `/designs/new`
@@ -65,10 +65,10 @@
 ┌────────────────────────────────────────────────────────────────┐
 │  新建项目设计                                                    │
 │  目标项目   [ order-platform ▾ ]  自动识别：TypeScript / Fastify │
-│  分析模板   [通用] [Java 后端] [React 前端] [全栈] [AI Agent] …  │
+│  分析模板   [架构探索] [用户自定义模板（如有）]  │
 │             └ 预设章节：总览 → 架构 → 模块与文件 → 核心流程       │
 │  分析深度   ◉ 标准（推荐）  ○ 快速（架构与模块）  ○ 深度（含异常/链路）│
-│  阅读风格   ◉ 技术文档（默认）  ○ 架构图谱优先    主题 [Default ▾]│
+│  阅读风格   ○ 技术文档   ◉ 架构图谱优先（默认）│
 │  排除规则   默认排除 .git / node_modules / dist / .env* / 密钥…   │
 │             [ 额外排除规则（glob，可选）                      ]   │
 │  复审选项   [ ] 生成完成后运行独立 AI 复审（深度模式默认勾选）       │
@@ -76,13 +76,13 @@
 └────────────────────────────────────────────────────────────────┘
 ```
 
-- **目标项目**（必填）：沿用已有项目列表；选定后自动按仓库特征推荐匹配的分析模板（无明确匹配回退 `general`），允许手动覆盖。删除项目后已有设计仍保留只读查看（`project_id` 置空）。
+- **目标项目**（必填）：沿用已有项目列表；选定后仅轻扫根目录识别技术栈，选用通用架构探索模板（沿用键 `general`），也可选择自定义模板。删除项目后已有设计仍保留只读查看（`project_id` 置空）。
 - **分析模板**：决定「初始章节蓝图」与注入给 `aw-designer` 的「分析侧重指令」（§5.4）；运行启动时快照固定模板内容，后续编辑自定义模板不影响已有设计。
 - **分析深度**：
   - `quick`（快速）：项目总览、系统架构、模块职责与目录结构。
   - `standard`（标准，默认）：在快速之上补齐关键文件职责、核心类/方法签名、调用关系与核心业务流程。
   - `deep`（深度）：方法级说明、异常与边界路径、并发/事务/状态流转，默认勾选「生成完成后运行独立 AI 复审」。
-- **阅读风格与主题**：`doc`（技术文档，正文与图均衡）或 `arch`（架构图谱优先，结构图与模块卡片置顶），搭配应用现有 `ThemeId`；二者均可在工作台与导出前随时切换，**零 AI 调用**。
+- **阅读风格与主题**：默认架构图谱优先（`arch`），亦可按技术文档顺序阅读（`doc`）。工作台随应用当前主题，离线阅读器随系统明暗自动变化。
 - **排除规则**：内置安全与噪音排除（§4.1），允许追加项目级 glob 排除规则。
 - 点击「扫描项目并拟定大纲」→ 后端执行**纯程序扫描**（零 AI 调用），按所选模板与真实目录结构生成初始大纲，创建设计记录并立即跳转 `/designs/:designId` 进入大纲确认阶段。
 
@@ -134,7 +134,8 @@
 - **中栏 · 实时阅读与下钻**：
   - 首次进入生成时，未生成的章节显示明确空态（「等待生成」）；每当一个分片经 MCP 工具提交入库，左侧目录状态与中栏正文、文件卡片、关系图**立即增量出现**，不等待整份任务结束。
   - **跟随最新 vs 自由阅读**：默认「跟随最新」，自动切到刚提交的章节；用户一旦手动点击其他章节、搜索跳转或主动滚动，即自动切为「自由阅读」，保留阅读位置、折叠状态与图缩放，其他分片继续在后台更新目录与内容。
-  - **下钻路径**：系统架构节点 → 模块 → 文件详情（职责、类/方法签名、输入输出、异常、调用方/被调方）→ 点击路径可调用宿主能力定位源码（桌面端复用现有文件打开/定位能力；无对应能力时提供一键复制相对路径与行号）。
+  - **下钻路径**：报告首页呈现项目介绍、大纲和总体组成图。模块章可包含显式子模块，每个子模块有自己的功能解读、证据、组成文件；简单模块及旧章可直接进入文件。文件标题突出文件名，完整相对路径作为次级信息。用稳定标识进行导航，组成关系与有向依赖分开呈现。
+  - **代码阅读**：本机按文件 ID 读取与扫描哈希一致的完整源码，展示高亮和行号。磁盘内容变化、文件移除或项目解绑时明确展示状态。离线站点只展示已提交的引用片段与行号。
   - **局部重写**：选中任意章节（或其中的文件/图），点「让 AI 重写」并输入一句要求（如「补充退款异常返回时由谁处理」），只重跑该分片；覆盖前自动保存上一版到 `previous`，提供一键「恢复上一版」。
 - **右栏 · AI 执行过程（可收折）**：
   - **直接复用 `features/stream/ConversationStream`**（[25-conversation-stream.md](25-conversation-stream.md)），展示当前分片的真实思考流、读文件动作、当前进展与错误提示，支持「停止」与单个失败分片「重试」。
@@ -158,7 +159,7 @@
 | template_key | TEXT | 使用的分析模板 key（内置 `general` / `java_backend` / `react_frontend` / `fullstack` / `ai_agent` 或自定义模板 key） |
 | template_snapshot | TEXT(JSON) | 创建时快照的模板名称、章节蓝图与分析侧重指引，确保模板变更不影响旧设计 |
 | layout_style | TEXT | `DesignLayoutStyle`：`doc`（技术文档）/ `arch`（架构图谱优先），随时切换零 AI 调用 |
-| theme | TEXT | `ThemeId`，默认当前应用主题；随时可换，零 AI 调用 |
+| theme | TEXT | 历史主题字段，保留既有接口；在线显示跟随应用，离线跟随系统 |
 | exclude_patterns | TEXT(JSON) | `string[]`：用户追加的排除 glob |
 | ai_review_enabled | INTEGER(bool) | 完成后是否运行独立 AI 复审（`deep` 默认 true，其余 false） |
 | source_snapshot | TEXT(JSON) | `DesignSourceSnapshot`：`{ branch, commitSha, dirty, scannedAt, analyzableCount, skippedCount, skippedReasons, techStack[] }` |
@@ -242,11 +243,11 @@
 
 ### `design_templates`
 
-用户自定义分析模板表（内置 5 套模板由 `packages/builtin/` 随启动同步，只读不可改，同 `workflows` 约定）。
+用户自定义分析模板表（内置架构探索模板由 `packages/builtin/` 随启动同步，只读不可改，同 `workflows` 约定）。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
-| key | TEXT PK | 模板键（内置如 `java_backend`，自定义由系统/用户生成） |
+| key | TEXT PK | 模板键（本期内置为 `general`，自定义由系统/用户生成） |
 | kind | TEXT | `builtin` / `custom` |
 | name | TEXT | 显示名称 |
 | description | TEXT | 适用范围一句说明 |
@@ -284,7 +285,7 @@
 | 步骤 | 操作 | AI 尝试类型 | 行为与结果 |
 | --- | --- | --- | --- |
 | 优化大纲（可选） | `designs.reviseOutline` | `design_outline` | AI 读目录清单与入口文件，调用 `submit_design_outline` 更新章节树与 `scope_paths` |
-| 全量/继续生成 | `designs.generate` | `design_generate` | 首次调用锁定 `outline_confirmed_at`；按章节顺序对所有未完成章节（`blocks IS NULL`）逐章分析，每章提交即落库并推送 `design.updated`；超过单次会话上下文上限时后端自动按剩余章节切新尝试继续，不丢已完成章节 |
+| 全量/继续生成 | `designs.generate` | `design_generate` | 首次调用锁定 `outline_confirmed_at`；按章节顺序对所有未完成章节（`blocks IS NULL`）逐章分析，每章提交即落库并推送 `design.updated`；每章一个独立会话，释放模型槽后再串行启动下一章。每轮带精简大纲和当前章授权清单。失败/停止保留提交结果，续作只处理尚未生成的勾选章 |
 | 局部重写 | `designs.reviseSection` | `design_revise` | 目标为单个章节（可带聚焦的文件路径/符号名/图 ID 与一句用户要求）；覆盖前把该章当前内容快照进 `previous` |
 | 独立复审（可选） | `designs.review`（或生成完成后自动衔接） | `design_review` | 独立新会话，对照源码抽查关键结论、无依据断言与跨模块遗漏，经 `submit_design_review` 写回各章 `review_state` 与 `review_notes` |
 | 停止与续作 | `designs.stop` / 再次 `designs.generate` | — | 停止只中止当前尝试，已提交章节完整保留；应用重启时未完成尝试标为 `interrupted`，用户点「继续生成」只补跑剩余未完成章节 |
@@ -326,6 +327,7 @@
 | `table` | `title`, `columns: string[]`, `rows: string[][]`, `caption?` | 接口表、配置表、核心数据表说明 |
 | `code` | `title?`, `language`, `code`, `relPath`, `lineStart`, `lineEnd` | 只读源码片段；工作台复用 `shiki` 高亮，离线站点带轻量样式与行号 |
 | `callout` | `tone: 'info' \| 'warn'`, `title`, `body` | 关键约束、动态分派说明、待人工核实提示 |
+| `submodule` | `id, title, summary, files[], behaviors[]` | 本章的功能子模块。文件来自本章提交清单且仅归属一个子模块。每项行为包含标题、Markdown 和非空证据数组，静态证据须有合法源码行范围。 |
 | `diagram_ref` | `diagramId` | 引用本章 `design_diagrams` 中的结构图，在正文流中原位展示 |
 
 ### 5.2 三类结构图（不引入 Mermaid）
@@ -351,18 +353,9 @@
 
 模板拆为正交的两层数据配置（无插件系统或脚本注入）：
 
-1. **内置分析模板**（位于 `packages/builtin/src/design-templates.ts` + `prompts/design-templates/*.md`，自动识别推荐并允许手动覆盖）：
-
-| key | 名称 | 自动识别线索 | 预设章节与分析侧重 |
-| --- | --- | --- | --- |
-| `general` | 通用代码仓库 | 默认兜底 | 项目总览、系统架构、按主要目录拆分的模块与文件职责、核心调用与业务流程 |
-| `java_backend` | Java / Spring 后端 | `pom.xml`、`build.gradle*` | 分层架构（Controller / Service / DAO）、事务与并发边界、数据表与 SQL 映射、对外 REST 接口契约表 |
-| `react_frontend` | React / Web 前端 | `package.json` 含 `react` / `vite` / `next` | 路由与页面树、核心组件层次、状态管理与数据流、前后端 API 调用契约 |
-| `fullstack` | 全栈应用 | 同仓含前后端子包或 Monorepo | 系统拓扑与部署边界、前后端契约与共享 Schema、服务端模块与数据模型、端到端主链路 |
-| `ai_agent` | AI Agent / 工具链 | 含 MCP、Agent 编排或提示词目录 | 会话与执行生命周期、Agent 角色与提示词架构、工具 / MCP 清单、上下文与权限安全边界 |
-
+1. **内置分析模板**：`general`（架构探索）适用于所有技术栈。根据真实入口和主要职责生成「项目介绍 → 总体架构 → 模块及子模块 → 核心流程」。功能解读从实际行为追到输入、输出、关键分支及证据。扫描时的技术栈提示帮助分析员选择切入点。
 2. **自定义模板**：从任一内置模板「复制为自定义」，仅可修改名称、预设章节蓝图与 `focus_prompt`（分析侧重文本），沿用同一只读工具权限与结构化 Schema 校验，不开放自定义执行节点或脚本。
-3. **阅读风格 × 主题**：`DesignLayoutStyle`（`doc` 技术文档 / `arch` 架构图谱优先）与现有 `ThemeId` 自由组合，只影响前端组件与离线 HTML 排布，随时切换零 AI 调用。
+3. **阅读风格 × 主题**：`DesignLayoutStyle`（`doc` 技术文档 / `arch` 架构图谱优先）用同一份生成数据。在线跟随全局主题，离线使用系统主题。
 
 ---
 
@@ -386,7 +379,7 @@
   design-data.js          # window.__AW_DESIGN_DATA__ = {...}（经典脚本，规避 file:// 下 fetch 跨域限制）
   design-model.json       # 规范化只读 JSON（供其他工具/脚本解析，与 design-data.js 内容同源）
   assets/
-    style.css             # 主题样式（使用所选 ThemeId 的调色板与系统字体栈，零外链字体）
+    style.css             # 主题样式（系统明暗主题与系统字体栈，零外链字体）
     viewer.js             # 离线阅读器脚本（目录、面包屑、Hash 深链、全文搜索、SVG 图交互与文本边列表）
 ```
 
@@ -394,7 +387,8 @@
 
 1. **纯 `file://` 可用**：将整个导出目录复制到另一台断网、未安装 Agent Workflow、路径含中文和空格的电脑上，双击 `index.html` 即可完整使用目录、面包屑、Hash 深链、全局搜索（中文/英文/路径）、文件与符号详情、三类图交互与复制相对路径。
 2. **零外部请求**：不引用任何 CDN、在线字体、在线布局服务或 Service Worker；导出产物中**不包含本机绝对路径、项目凭据、Token 或原始 AI 会话日志**。
-3. **安全写出**：后端先在目标目录同级的临时目录 `.aw-design-export-tmp-<id>` 中完整生成并校验全部文件（入口存在、数据可解析、引用完整），全部通过后再替换目标目录；任一步失败清理临时目录，不破坏已有的旧导出目录。
+3. **源码范围**：离线站点始终只打包报告已引用的代码片段；本机文件全文读取接口独立，导出器不读取它。
+4. **安全写出**：后端先在目标目录同级的临时目录 `.aw-design-export-tmp-<id>` 中完整生成并校验全部文件（入口存在、数据可解析、引用完整），全部通过后再替换目标目录；任一步失败清理临时目录，不破坏已有的旧导出目录。
 
 ---
 
@@ -425,6 +419,8 @@
 - 会话工作目录为项目根目录（只读）；`opencode.dispatch.ts` 的 `SessionPurpose` 新增 `Design`。
 - `SessionAgent` 新增 `designer`（`OPENCODE_AGENT_NAME.designer = 'aw-designer'`）；`AttemptKind` 新增 `design_outline`、`design_generate`、`design_revise`、`design_review`。
 
+设计角色单独分配内置 `aw-design-analysis` Skill，详见 [41](41-skills.md)。只读权限及工具提交的边界仍由协议和服务端校验。
+
 ### 7.2 执行 MCP 工具
 
 | 工具 | 允许的 `AttemptKind` | 输入与校验行为 |
@@ -450,6 +446,7 @@
 | --- | --- | --- | --- |
 | `designs.list` | `GET /designs?projectId&query&limit&cursor` | read | 设计列表（`DesignSummaryDTO`），按 `updated_at` 倒序 |
 | `designs.get` | `GET /designs/:id` | read | 设计完整详情（含 `sourceSnapshot`、全部章节、文件详情、图、推导状态、活跃与历史 runs） |
+| `designs.source` | `GET /designs/:id/files/:fileId/source` | read | 仅本机阅读器，返回 available + content、changed 或 unavailable，按本设计的文件 ID、授权路径和扫描哈希读取，助手不可调用 |
 | `designs.create` | `POST /designs` `{ projectId, templateKey?, depth?, layoutStyle?, excludePatterns?, aiReviewEnabled?, theme? }` | write | 执行程序扫描并按所选模板生成默认章节大纲（201，零 AI 调用） |
 | `designs.update` | `PATCH /designs/:id` `{ title?, theme?, layoutStyle?, aiReviewEnabled? }` | write | 改名、换主题、切阅读风格、切换复审开关（不调用 AI） |
 | `designs.listTemplates` | `GET /designs/templates?projectId` | read | 列出内置与自定义分析模板；传 `projectId` 时轻扫根目录特征文件返回识别到的技术栈与推荐模板（不递归全仓算哈希） |

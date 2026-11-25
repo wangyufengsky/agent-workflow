@@ -766,13 +766,14 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 
 | 操作 | 路径 | 请求与返回 |
 | --- | --- | --- |
+| designs.source | GET /designs/:id/files/:fileId/source | 仅本机阅读器可用。验证文件归属与扫描哈希，匹配返回 available 和全文；变化返回 changed，解绑或不可读返回 unavailable。此操作不暴露给助手 |
 | designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试 |
 | designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |
 | designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
 | designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
 | designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；可选 AI 优化只在确认前进行 |
-| designs.generate | POST /designs/:id/generate | 首次省略 sectionId 确认大纲。未勾选任何章节返回 400 VALIDATION_FAILED。确认后只补未生成的选中章，带 sectionId 仅重试其中一章。确认前指定章节、重试未选章或已生成章返回 409 STATE_TRANSITION_INVALID |
+| designs.generate | POST /designs/:id/generate | 首次省略 sectionId 确认大纲。未勾选任何章节返回 400 VALIDATION_FAILED。每个章节使用独立会话，依次释放模型槽再续下一章。确认后只补未生成的选中章，带 sectionId 仅重试其中一章。确认前指定章节、重试未选章或已生成章返回 409 STATE_TRANSITION_INVALID |
 | designs.reviseSection / restoreSection | POST /designs/:id/sections/:sectionId/revise 或 /restore | 重写前保存最近一版，恢复一次同时还原正文、文件和图 |
 | designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止保留已提交内容 |
-| designs.export | POST /designs/:id/export | 已完成至少一章且无活动运行时导出。非托管目录须显式确认覆盖；助手发起覆盖时逐次确认 |
+| designs.export | POST /designs/:id/export | 已完成至少一章且无活动运行时导出。离线 HTML 只打包引用片段。非托管目录须显式确认覆盖；助手发起覆盖时逐次确认 |
 | designs.delete | DELETE /designs/:id | critical，删除关联尝试、会话流及数据库内容，已导出的站点由用户保管 |

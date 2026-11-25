@@ -192,7 +192,7 @@ Worker 在临时目录中使用本次请求实际选定的模型和对应项目 
 | `submit_outline` | deck_outline | 提交 PPT 大纲与 AI 的理解（v1.2，23 §7.3） |
 | `submit_slide` | deck_slides | 按页码提交 PPT 的一页（v1.2，23 §7.3） |
 | `submit_design_outline` | design_outline | 提交完整项目设计大纲及章节范围（44 §7.2） |
-| `submit_design_section` | design_generate · design_revise | 逐章提交项目设计正文、文件说明和图，返回剩余章节 ID（44 §7.2） |
+| `submit_design_section` | design_generate · design_revise | 提交本轮一章的正文、子模块功能与证据、文件说明和图，返回剩余章节 ID（44 §7.2） |
 | `submit_design_review` | design_review | 提交独立复审的章节结论和证据（44 §7.2） |
 | `submit_findings` | git_review | 提交 Git 工作台审查的结论与结构化问题（v1.2，27 §4.4） |
 | `submit_commit_message` | commit_message | 提交草拟的提交信息（v1.2，27 §7.3） |
@@ -597,7 +597,7 @@ IDEA 联调组可由应用助手通过 `projects_modules` 读取，`tasks_create
 | 工具 | 允许的尝试 | 成功结果 |
 | --- | --- | --- |
 | submit_design_outline | design_outline | 校验范围并替换待确认大纲，返回 `{ accepted: true }` |
-| submit_design_section | design_generate、design_revise | 一个事务提交章节、文件详情和图，返回 `{ remainingSectionIds }` |
+| submit_design_section | design_generate、design_revise | 一个事务提交本轮唯一目标章节、子模块功能与证据、归属文件和图。子模块与正文随 previous 一起恢复，返回 `{ remainingSectionIds }` |
 | submit_design_review | design_review | 至少提交一个已抽查章节，逐章写入结论与意见。本轮目标里未抽查的章节回到未复审，返回 `{ accepted: true }` |
 
 模型提交的字段见 [44 §7.2](44-project-design.md#72-执行-mcp-工具)。

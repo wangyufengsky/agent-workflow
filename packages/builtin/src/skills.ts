@@ -5,6 +5,7 @@ import { FUNCTIONAL_TEST_WORKFLOW_KEY, SessionAgent } from '@aw/shared';
  * backend puts into `skills.paths` (D206); which agent sees which one is decided in the opencode configuration (D207).
  */
 export const SkillName = {
+  DesignAnalysis: 'aw-design-analysis',
   /** The assistant finds out why a task failed or is stuck and what to do next (41 §5.1). */
   TaskDiagnosis: 'aw-task-diagnosis',
   /** The assistant writes the requirement of a task, batch, scheduled task or initiative (41 §5.1). */
@@ -79,7 +80,7 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.DatabaseAnalyst]: [SkillName.DbReadonly, SkillName.SubmitResult],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
-  [SessionAgent.Designer]: [],
+  [SessionAgent.Designer]: [SkillName.DesignAnalysis],
   [SessionAgent.CodeReviewer]: [SkillName.CodeReview, SkillName.ImageAnalysis],
   [SessionAgent.Delegate]: [],
 };

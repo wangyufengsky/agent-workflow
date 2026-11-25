@@ -160,66 +160,94 @@ export function TemplateLibrary({ projectId }: { projectId: string | undefined }
   const [editor, setEditor] = useState<Editor | null>(null);
   const [deleting, setDeleting] = useState<DesignTemplate | null>(null);
   const remove = useDeleteDesignTemplate();
+  const [order, setOrder] = useState<'builtin' | 'name'>('builtin');
+  const items = (templates.data?.items ?? []).toSorted(
+    (a, b) => (order === 'builtin' ? a.kind.localeCompare(b.kind) : 0) || a.name.localeCompare(b.name, 'zh-CN'),
+  );
   return (
     <div className="col">
-      <div>
+      <div className="row wrap">
+        <label className={`row ${styles.templateOrder}`}>
+          <span className="hint">{C.templateOrder}</span>
+          <select
+            className="select"
+            value={order}
+            onChange={(event) => setOrder(event.currentTarget.value === 'name' ? 'name' : 'builtin')}
+          >
+            <option value="builtin">{C.builtinFirst}</option>
+            <option value="name">{C.nameOrder}</option>
+          </select>
+        </label>
+        <span className="grow" />
         <Button icon="plus" onClick={() => setEditor({ copy: false })}>
           {C.newTemplate}
         </Button>
       </div>
       {templates.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
       {templates.isError && <ErrorState error={templates.error} onRetry={() => void templates.refetch()} />}
-      <div className={styles.grid}>
-        {templates.data?.items.map((template) => {
-          const builtin = template.kind === DesignTemplateKind.Builtin;
-          return (
-            <article className={`card pad col ${styles.templateCard}`} key={template.key}>
-              <div className="row wrap">
-                <strong className="grow">{template.name}</strong>
-                <span className="badge">{builtin ? C.builtin : C.custom}</span>
-              </div>
-              {template.description && <p className="hint">{template.description}</p>}
-              {template.matchHints.length > 0 && (
-                <div className="hint">
-                  {C.detection} · {template.matchHints.join('、')}
+      {items.length > 0 && (
+        <div>
+          <div className={`${styles.templateRow} ${styles.templateHead}`} aria-hidden="true">
+            <span>{C.template}</span>
+            <span>{C.chapterPreview}</span>
+            <span>{C.templateFocus}</span>
+            <span />
+          </div>
+          {items.map((template) => {
+            const builtin = template.kind === DesignTemplateKind.Builtin;
+            return (
+              <article className={styles.templateRow} key={template.key}>
+                <div className={styles.templateIdentity}>
+                  <h3>{template.name}</h3>
+                  <span className="hint">{builtin ? C.builtin : C.custom}</span>
+                  {template.description && <p className="hint">{template.description}</p>}
                 </div>
-              )}
-              <div className="col">
-                <strong>{C.chapterBlueprint}</strong>
-                <p>{template.defaultSections.map((section) => section.title).join(' → ')}</p>
-              </div>
-              <details>
-                <summary>{C.templateFocus}</summary>
-                <p className={styles.focus}>{template.focusPrompt}</p>
-              </details>
-              <div className={`row wrap ${styles.templateActions}`}>
-                <Link to={ROUTES.designNew} search={{ projectId, template: template.key }} className="btn primary sm">
-                  {C.useTemplate}
-                </Link>
-                <Button size="sm" onClick={() => setEditor({ base: template, copy: true })}>
-                  {C.copyTemplate}
-                </Button>
-                {!builtin && (
-                  <>
-                    <Button size="sm" onClick={() => setEditor({ base: template, copy: false })}>
-                      {C.edit}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        remove.reset();
-                        setDeleting(template);
-                      }}
-                    >
-                      {C.delete}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
+                <div>
+                  <h4 className={styles.narrowTemplateLabel}>{C.chapterPreview}</h4>
+                  <ul className={styles.templateChapters}>
+                    {template.defaultSections.map((section, position) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: preview entries may share a label, and their index is their order.
+                      <li key={position}>{section.title}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className={styles.narrowTemplateLabel}>{C.templateFocus}</h4>
+                  <details className={styles.templateFocus}>
+                    <summary>{C.expandFocus}</summary>
+                    <p className={styles.focus}>{template.focusPrompt}</p>
+                  </details>
+                </div>
+                <div className={styles.templateActions}>
+                  <Link to={ROUTES.designNew} search={{ projectId, template: template.key }} className="btn sm">
+                    {C.useTemplate}
+                  </Link>
+                  <Button size="sm" variant="ghost" onClick={() => setEditor({ base: template, copy: true })}>
+                    {C.copyTemplate}
+                  </Button>
+                  {!builtin && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => setEditor({ base: template, copy: false })}>
+                        {C.edit}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          remove.reset();
+                          setDeleting(template);
+                        }}
+                      >
+                        {C.delete}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
       {editor !== null && <TemplateEditor editor={editor} onClose={() => setEditor(null)} />}
       {deleting !== null && (
         <Dialog

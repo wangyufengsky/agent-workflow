@@ -23,6 +23,7 @@ import { createProject, type E2EProject, type FakeStep, git, patchSettings } fro
 import { inspectPage, WALKTHROUGH_DIR } from './walkthrough.ts';
 
 const IMPLEMENTATION = 'src/refunds.ts';
+const FILE_NAME = 'refunds.ts';
 const SYMBOL = 'refunds.buildRefund';
 const SYMBOL_ID = 'build-refund';
 const REPOSITORY_TITLE = '退款工作流设计';
@@ -113,14 +114,18 @@ function chapter(
   });
 }
 
-function chapters(ids: ChapterIds, pause = false): FakeStep[] {
-  return [
+async function queueChapters(request: APIRequestContext, project: E2EProject, ids: ChapterIds, pause = false) {
+  await queueDesign(request, project, [
     chapter(ids.overview, '总览已提交', DesignDiagramKind.Architecture, GRAPH_TITLES[0], true),
+  ]);
+  await queueDesign(request, project, [
     ...(pause ? [gate(GATES[0])] : []),
     chapter(ids.calls, '调用关系已提交', DesignDiagramKind.CallGraph, GRAPH_TITLES[1]),
+  ]);
+  await queueDesign(request, project, [
     ...(pause ? [gate(GATES[1])] : []),
     chapter(ids.flow, '流程内容已提交', DesignDiagramKind.BusinessFlow, GRAPH_TITLES[2]),
-  ];
+  ]);
 }
 
 async function fixtureProject(request: APIRequestContext) {
@@ -211,12 +216,14 @@ async function verifyOffline(browser: Browser, target: string) {
     const failures: string[] = [];
     offline.on('pageerror', (error) => failures.push(error.message));
     await offline.goto(pathToFileURL(join(target, 'index.html')).href);
-    await expect(offline.getByRole('heading', { name: OVERVIEW, exact: true })).toBeVisible();
+    await expect(offline.getByRole('heading', { name: '总体架构', exact: true })).toBeVisible();
     const nav = offline.getByRole('navigation', { name: '章节目录' });
     await expect(nav.getByRole('link', { name: OMIT, exact: true })).toHaveCount(0);
     const article = offline.getByRole('main');
+    const search = offline.getByRole('searchbox', { name: '搜索章节、文件和符号' });
     for (const [index, name] of GRAPH_TITLES.entries()) {
-      await nav.getByRole('link', { name, exact: true }).click();
+      await search.fill(name);
+      await offline.locator('.search-results').getByRole('link', { name, exact: true }).click();
       await expect(article.getByRole('heading', { name, exact: true })).toBeVisible();
       await expect(article.getByRole('group', { name, exact: true })).toBeVisible();
       await expect(article.getByText(['架构图', '调用图', '业务流程图'][index] ?? '')).toBeVisible();
@@ -231,9 +238,8 @@ async function verifyOffline(browser: Browser, target: string) {
     await expect(article.getByRole('heading', { name: IMPLEMENTATION, exact: true })).toBeVisible();
     await expect(article.locator('.symbol.highlight')).toContainText(SYMBOL);
 
-    const search = offline.getByRole('searchbox', { name: '搜索章节、文件和符号' });
     await search.fill('退款流程');
-    await offline.getByRole('link', { name: FLOW, exact: true }).click();
+    await offline.locator('.search-results').getByRole('link', { name: FLOW, exact: true }).click();
     await expect(article.getByRole('heading', { name: FLOW, exact: true })).toBeVisible();
     await search.fill('BUILDREFUND');
     await offline.locator('.search-results').getByRole('link', { name: SYMBOL, exact: true }).click();
@@ -263,17 +269,16 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await page.getByRole('link', { name: '新建项目设计', exact: true }).click();
   await expect(page.getByRole('main').getByRole('heading', { name: '新建项目设计' })).toBeVisible();
   await expect(page.getByLabel('目标项目')).toHaveValue(project.id);
-  await expect(page.getByText(/自动识别.*React/)).toBeVisible();
+  await expect(page.getByText(/识别的技术栈.*React/)).toBeVisible();
   const template = page.getByRole('group', { name: '分析模板' });
-  await expect(template.getByRole('radio', { name: /React.*自动推荐/ })).toBeChecked();
-  const java = template.getByRole('radio', { name: /Java.*Spring/ });
-  await java.check();
-  await expect(java).toBeChecked();
+  await expect(template.getByRole('radio')).toHaveCount(1);
+  await expect(template.getByRole('radio', { name: /^架构探索/ })).toBeChecked();
+  await expect(page.getByLabel('主题', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '扫描项目并拟定大纲' }).click();
   await expect(page).toHaveURL(/\/designs\/[0-9a-f-]+(?:\?|$)/);
   await expect(page.getByRole('heading', { name: '分析大纲' })).toBeVisible();
   const id = designId(page);
-  expect((await design(request, id)).templateKey).toBe('java_backend');
+  expect((await design(request, id)).templateKey).toBe('general');
 
   await queueDesign(request, project, [
     tool(McpToolName.SubmitDesignOutline, { title: REPOSITORY_TITLE, sections: OUTLINE }),
@@ -291,7 +296,7 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await expect(unchecked).not.toBeChecked();
   const ids = chapterIds(await design(request, id));
 
-  await queueDesign(request, project, chapters(ids, true));
+  await queueChapters(request, project, ids, true);
   await page.getByRole('button', { name: '确认大纲，开始生成' }).click();
   const directory = page.getByRole('navigation', { name: '章节目录' });
   await expect(page.getByText('1 / 3 章节', { exact: true })).toBeVisible();
@@ -326,18 +331,17 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await expect(reader.and(page.locator('[data-highlight]'))).toContainText(OVERVIEW);
   await search.fill('BUILDREFUND');
   await page.getByRole('button', { name: new RegExp(SYMBOL) }).click();
-  await expect(page.getByRole('heading', { name: IMPLEMENTATION, exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: FILE_NAME, exact: true })).toBeVisible();
   await expect(reader.locator('section[data-highlight]')).toContainText(SYMBOL);
 
   await search.clear();
-  await directory.getByText('文件与符号 · 2', { exact: true }).click();
   await directory.getByRole('button', { name: GRAPH_TITLES[0], exact: true }).click();
   await expect(page.getByRole('heading', { name: GRAPH_TITLES[0], exact: true })).toBeVisible();
   await page.getByText('文本边列表', { exact: false }).click();
   await expect(page.getByText('调用退款构建', { exact: false }).last()).toBeVisible();
   const graph = reader.getByRole('region', { name: GRAPH_TITLES[0], exact: true });
   await graph.getByRole('button', { name: '退款入口', exact: true }).click();
-  await expect(page.getByRole('heading', { name: IMPLEMENTATION, exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: FILE_NAME, exact: true })).toBeVisible();
   await directory.getByRole('button', { name: GRAPH_TITLES[0], exact: true }).click();
   await graph.getByRole('button', { name: '构建退款单', exact: true }).click();
   await expect(reader.locator('section[data-highlight]')).toContainText('构建一份退款单。');
@@ -379,7 +383,7 @@ async function themeFixture(request: APIRequestContext) {
   });
   expect(outline.ok(), await outline.text()).toBe(true);
   const ids = chapterIds(await outline.json());
-  await queueDesign(request, project, chapters(ids));
+  await queueChapters(request, project, ids);
   const generated = await request.post(`${API_BASE}/designs/${id}/generate`, { headers: AUTH, data: {} });
   expect(generated.ok(), await generated.text()).toBe(true);
   await expect.poll(async () => (await design(request, id)).status).toBe(DesignStatus.Ready);
@@ -403,9 +407,9 @@ test.describe('项目设计阅读页主题走查', () => {
       await expect(page.getByRole('heading', { name: OVERVIEW, exact: true })).toBeVisible();
       const preferences = page.locator('summary[aria-label="阅读与复审设置"]');
       await preferences.click();
-      await preferences.locator('..').getByLabel(/^主题/).selectOption(theme);
+      await expect(preferences.locator('..').getByLabel('主题', { exact: true })).toHaveCount(0);
       await preferences.click();
-      await expect(page.locator(`body [data-theme="${theme}"]`)).toBeVisible();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       const chapterReport = await inspectPage(page);
       expect(chapterReport.contrast).toEqual([]);
       expect(chapterReport.overflow).toEqual([]);
@@ -431,19 +435,29 @@ test('工作台原位改名、架构阅读顺序与图边交互', async ({ page,
   await page.goto(`/designs/${id}`);
 
   const splitter = page.getByRole('separator', { name: '调整目录宽度' });
-  await expect(splitter).toHaveAttribute('aria-valuenow', '232');
+  await expect(splitter).toHaveAttribute('aria-valuenow', '245');
   await splitter.press('ArrowRight');
-  await expect(splitter).toHaveAttribute('aria-valuenow', '248');
+  await expect(splitter).toHaveAttribute('aria-valuenow', '261');
   await page.getByRole('button', { name: '收起目录' }).click();
   await expect(splitter).toHaveCount(0);
   await page.getByRole('button', { name: '展开目录' }).click();
-  await expect(splitter).toHaveAttribute('aria-valuenow', '248');
+  await expect(splitter).toHaveAttribute('aria-valuenow', '261');
+  const splitterBounds = await splitter.boundingBox();
+  if (splitterBounds === null) throw new Error('Outline splitter is not visible');
+  const x = Math.round(splitterBounds.x + splitterBounds.width / 2);
+  const y = Math.round(splitterBounds.y + splitterBounds.height / 2);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 24, y);
+  await page.mouse.up();
+  await expect(splitter).toHaveAttribute('aria-valuenow', '285');
 
   await page.getByRole('button', { name: '修改设计标题' }).click();
   const title = page.getByRole('textbox', { name: '修改设计标题' });
   await title.fill('退款 · 项目设计');
   await title.press('Enter');
-  await expect(page.getByRole('heading', { name: '退款 · 项目设计', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '退款 · 项目设计', exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '退款 · 项目设计', exact: true, level: 2 })).toBeVisible();
   expect((await design(request, id)).title).toBe('退款 · 项目设计');
 
   const preferences = page.locator('summary[aria-label="阅读与复审设置"]');
@@ -551,6 +565,124 @@ test('草稿可以取消删除，所属项目删除后仍能确认删除', async
     listProjectsOp.output.parse(await projects.json()).items.length === 0 &&
     listDesignsOp.output.parse(await designs.json()).items.length === 0;
   await expect(page).toHaveURL(emptyWorkspace ? /\/onboarding$/ : /\/designs$/);
+});
+
+test('架构探索模板区在选项目时保持尺寸，自定义模板可从库选用', async ({ page, request }) => {
+  const project = await fixtureProject(request);
+  await page.goto('/designs/new');
+  const picker = page.getByRole('group', { name: '分析模板' });
+  await expect(picker.getByRole('radio', { name: /^架构探索/ })).toBeChecked();
+  const before = await picker.boundingBox();
+  await page.getByLabel('目标项目').selectOption(project.id);
+  await expect(page.getByText(/识别的技术栈.*React/)).toBeVisible();
+  const after = await picker.boundingBox();
+  expect(after?.height).toBe(before?.height);
+  expect(after?.width).toBe(before?.width);
+  await expect(page.getByLabel('主题', { exact: true })).toHaveCount(0);
+
+  await page.getByRole('link', { name: '查看模板库' }).click();
+  const architecture = page.getByRole('article').filter({ has: page.getByRole('heading', { name: '架构探索' }) });
+  await expect(architecture.getByText('总体架构', { exact: true })).toBeVisible();
+  await architecture.getByText('展开侧重').click();
+  await expect(architecture.getByText(/区分组成关系和带方向的依赖关系/)).toBeVisible();
+  await architecture.getByRole('button', { name: '复制为自定义模板' }).click();
+  const editor = page.getByRole('dialog', { name: '复制为自定义模板' });
+  await editor.getByLabel('模板名称').fill('研发结构简报');
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
+  const custom = page.getByRole('article').filter({ has: page.getByRole('heading', { name: '研发结构简报' }) });
+  await custom.getByRole('link', { name: '使用此模板新建' }).click();
+  await expect(picker.getByRole('radio', { name: /^研发结构简报/ })).toBeChecked();
+  await expect(picker.getByRole('radio')).toHaveCount(2);
+});
+
+test('架构探索从项目首页逐级进入子模块、文件和可校验的完整源码', async ({ page, request }) => {
+  const project = await fixtureProject(request);
+  await patchSettings(request, { 'ui.mode': 'pro', 'ui.theme': ThemeId.Codex });
+  const created = await request.post(`${API_BASE}/designs`, {
+    headers: AUTH,
+    data: { projectId: project.id, aiReviewEnabled: false },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const { id }: DesignDTO = await created.json();
+  const outline = await request.put(`${API_BASE}/designs/${id}/outline`, {
+    headers: AUTH,
+    data: { sections: [{ kind: DesignSectionKind.Module, title: '退款处理', scopePaths: ['src'], selected: true }] },
+  });
+  expect(outline.ok(), await outline.text()).toBe(true);
+  const { sections }: DesignDTO = await outline.json();
+  const module = sections[0];
+  if (module === undefined) throw new Error('Expected module draft');
+  const base = chapter(module.id, '处理退款请求。', DesignDiagramKind.Architecture, '模块架构', true);
+  if (base.type !== 'callTool') throw new Error('Expected submission');
+  const submodule = {
+    type: 'submodule',
+    id: 'refund-command',
+    title: '退款指令',
+    summary: '实现退款入口。',
+    files: [IMPLEMENTATION],
+    behaviors: [
+      {
+        title: '构建退款单',
+        markdown: '初始化待处理的退款请求。',
+        evidence: [{ evidenceClass: DesignEvidenceClass.Static, relPath: IMPLEMENTATION, lineStart: 1, lineEnd: 3 }],
+      },
+    ],
+  };
+  await queueDesign(request, project, [
+    {
+      ...base,
+      args: { ...base.args, blocks: [submodule, { type: 'markdown', title: '消息处理', markdown: '记录实际请求。' }] },
+    },
+  ]);
+  const generated = await request.post(`${API_BASE}/designs/${id}/generate`, { headers: AUTH, data: {} });
+  expect(generated.ok(), await generated.text()).toBe(true);
+  await expect.poll(async () => (await design(request, id)).status).toBe(DesignStatus.Ready);
+
+  await page.setViewportSize({ width: 1440, height: 1040 });
+  await page.goto(`/designs/${id}`);
+  const reader = page.getByRole('region', { name: '设计正文' });
+  const crumbs = reader.getByRole('navigation', { name: '面包屑' });
+  await expect(reader.getByRole('heading', { name: '项目大纲' })).toBeVisible();
+  await expect(reader.getByText('项目介绍将在总览章节提交后显示', { exact: false })).toHaveCount(0);
+  const shots = process.env.AW_ARCHITECTURE_SCREENSHOTS;
+  if (shots !== undefined) {
+    mkdirSync(shots, { recursive: true });
+    await page.screenshot({ path: join(shots, 'overview.png'), animations: 'disabled' });
+  }
+  await reader
+    .getByRole('region', { name: '总体架构', exact: true })
+    .getByRole('button', { name: '退款处理' })
+    .press('Enter');
+  await expect(reader.getByRole('heading', { name: '退款处理' })).toBeVisible();
+  const internal = reader.getByRole('region', { name: '内部架构', exact: true });
+  await internal.getByRole('button', { name: '退款指令' }).click();
+  await expect(reader.getByRole('heading', { name: '退款指令' })).toBeVisible();
+  await expect(reader.getByText('初始化待处理的退款请求。')).toBeVisible();
+  await internal.getByRole('button', { name: FILE_NAME }).click();
+  await expect(reader.getByRole('heading', { name: FILE_NAME, exact: true })).toBeVisible();
+  await expect(crumbs.getByRole('button', { name: '退款指令' })).toBeVisible();
+  const source = reader.getByLabel('完整源码');
+  await expect(source).toContainText('export function submitRefund');
+  await expect(source).toHaveCSS('background-color', 'rgb(23, 34, 53)');
+  if (shots !== undefined) await page.screenshot({ path: join(shots, 'file.png'), animations: 'disabled' });
+  await reader
+    .getByRole('region', { name: '文件内部结构', exact: true })
+    .getByRole('button', { name: 'buildRefund' })
+    .click();
+  await expect(source.locator('[data-current-line]')).toHaveCount(3);
+  await expect(source.locator('[data-current-line]').first()).toContainText('export function buildRefund');
+  await crumbs.getByRole('button', { name: '退款指令' }).click();
+  await expect(reader.getByRole('heading', { name: '退款指令' })).toBeVisible();
+  await reader.getByRole('button', { name: `${IMPLEMENTATION}:1`, exact: true }).click();
+  const focusedLine = source.locator('[data-current-line]').first();
+  await expect(focusedLine).toContainText('export function buildRefund');
+  await expect(focusedLine).toBeInViewport({ ratio: 1 });
+  await expect(focusedLine).toHaveCSS('background-color', 'rgb(41, 62, 96)');
+  await expect(focusedLine.locator('span').filter({ hasText: /^export$/ })).toHaveCSS('color', 'rgb(200, 183, 255)');
+  if (shots !== undefined) await page.screenshot({ path: join(shots, 'focus-line.png'), animations: 'disabled' });
+  await patchSettings(request, { 'ui.theme': ThemeId.Default });
+  await expect(source).toHaveCSS('background-color', 'rgb(14, 21, 32)');
+  await expect(focusedLine).toHaveCSS('background-color', 'rgb(34, 57, 83)');
 });
 
 test.afterAll(({ request }) => patchSettings(request, { 'ui.theme': ThemeId.Codex, 'ui.mode': 'simple' }));

@@ -716,7 +716,7 @@ class AppError extends Error {
 `none / passed / needs_attention`。显示状态由选中章节的完成数、大纲确认时间和最近一次尝试推导，
 取值为 `outlining / outline_ready / generating / reviewing / incomplete / ready / failed`。
 
-`designer` 对应 `aw-designer`。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
+`designer` 对应 `aw-designer`。`design_generate` 每章独占一个全新的会话，独立复审另开会话。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
 `design_review`。实体类型为 `design`，设计更新事件为 `design.updated`。
 
 | 错误码 | HTTP | 含义 |

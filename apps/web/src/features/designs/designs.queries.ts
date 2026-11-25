@@ -7,6 +7,7 @@ import {
   exportDesignOp,
   generateDesignOp,
   getDesignOp,
+  getDesignSourceOp,
   listDesignsOp,
   listDesignTemplatesOp,
   type OperationContract,
@@ -26,6 +27,13 @@ import { queryKeys } from '../../api/query-keys.ts';
 
 export const designQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.design(id), queryFn: () => callOperation(getDesignOp, { id }) });
+
+export const designSourceQuery = (id: string, fileId: string) =>
+  queryOptions({
+    queryKey: [...queryKeys.design(id), 'source', fileId],
+    queryFn: () => callOperation(getDesignSourceOp, { id, fileId }),
+    refetchOnMount: 'always',
+  });
 
 export const designPagesQuery = (filter: { projectId?: string; query?: string }) =>
   infiniteQueryOptions({

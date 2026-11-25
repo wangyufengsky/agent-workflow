@@ -15,6 +15,7 @@ import {
   exportDesignOp,
   generateDesignOp,
   getDesignOp,
+  InboxKind,
   McpToolName,
   OPENCODE_AGENT_NAME,
   readonlyBashRules,
@@ -24,14 +25,13 @@ import {
   reviseDesignSectionOp,
   ServerEventType,
   stopDesignOp,
-  TranscriptEntryKind,
   updateDesignOutlineOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject } from '../../../test/helpers/tasks.ts';
+import { addProject, inboxOpens } from '../../../test/helpers/tasks.ts';
 
 const DESIGNER = { agent: OPENCODE_AGENT_NAME.designer };
 const OUTLINE = [
@@ -139,32 +139,27 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
         ...bad,
         files: [{ relPath: '.env', responsibility: '错误分析', symbols: [] }],
       })
-      .callTool(McpToolName.SubmitDesignSection, section(overview.id, originalSummary))
-      .hang(),
+      .callTool(McpToolName.SubmitDesignSection, section(overview.id, originalSummary)),
     DESIGNER,
   );
-  const firstAccepted = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
-    entries.some(
-      ({ kind, data }) =>
-        kind === TranscriptEntryKind.ToolResult &&
-        data.tool.endsWith(McpToolName.SubmitDesignSection) &&
-        data.status === 'completed',
-    ),
-  );
+  const waiting = inboxOpens(t, InboxKind.Permission);
+  t.fake.enqueue(script().requestPermission('bash', ['rg -n endpoint src/endpoint.ts']).hang(), DESIGNER);
   const parallel = await Promise.all([t.call(generateDesignOp, { id }), t.call(generateDesignOp, { id })]);
   expect(parallel.map(({ status }) => status).sort()).toEqual([200, 409]);
   expect(parallel.find(({ status }) => status === 409)?.raw.json()).toMatchObject({
     error: { code: ErrorCode.DesignBusy },
   });
-  await firstAccepted;
+  await waiting;
 
   const running = await get(id);
   expect(running).toMatchObject({ status: DesignStatus.Generating, doneSections: 1, totalSections: 3 });
   expect(running.outlineConfirmedAt).not.toBeNull();
-  expect(running.runs.at(-1)).toMatchObject({
-    targetSectionIds: [overview.id, endpoint.id, flow.id],
-    doneSectionIds: [overview.id],
-  });
+  expect(
+    running.runs.slice(-2).map(({ targetSectionIds, doneSectionIds }) => ({ targetSectionIds, doneSectionIds })),
+  ).toEqual([
+    { targetSectionIds: [overview.id], doneSectionIds: [overview.id] },
+    { targetSectionIds: [endpoint.id], doneSectionIds: [] },
+  ]);
   expect(t.fake.toolCalls.find(({ isError }) => isError)?.result).toMatchObject({
     code: ErrorCode.ValidationFailed,
     details: { issues: expect.any(Array) },
@@ -298,18 +293,15 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
   }
 });
 
-it('有进展的上下文溢出保留已提交章节，单章再次溢出后停止自动续作', async () => {
+it('单章失败保留前章，停止本次队列，定向重试后仍保留未选为目标的章节', async () => {
   const { id } = await createDraft(false);
   const { overview, endpoint, flow } = await optimize(id);
-  t.fake.enqueue(
-    script()
-      .callTool(McpToolName.SubmitDesignSection, section(overview.id, '已生成'))
-      .error('ContextOverflowError', '超出窗口'),
-    DESIGNER,
-  );
-  t.fake.enqueue(script().error('ContextOverflowError', '仍然超出窗口'), DESIGNER);
-  t.fake.enqueue(script().error('ContextOverflowError', '单章已经超过窗口'), DESIGNER);
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(overview.id, '已生成')), DESIGNER);
+  t.fake.enqueue(script().error('ContextOverflowError', '单章已超过上下文窗口'), DESIGNER);
+
+  const failed = ended(AttemptKind.DesignGenerate, AttemptStatus.Failed);
   expect((await t.call(generateDesignOp, { id, model: null })).status).toBe(200);
+  await failed;
   await t.fake.settled();
   const design = await get(id);
   expect(design).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 1, totalSections: 3 });
@@ -320,38 +312,35 @@ it('有进展的上下文溢出保留已提交章节，单章再次溢出后停�
       doneSectionIds,
     })),
   ).toEqual([
-    {
-      status: AttemptStatus.Failed,
-      targetSectionIds: [overview.id, endpoint.id, flow.id],
-      doneSectionIds: [overview.id],
-    },
-    { status: AttemptStatus.Failed, targetSectionIds: [endpoint.id, flow.id], doneSectionIds: [] },
+    { status: AttemptStatus.Succeeded, targetSectionIds: [overview.id], doneSectionIds: [overview.id] },
     { status: AttemptStatus.Failed, targetSectionIds: [endpoint.id], doneSectionIds: [] },
   ]);
   expect(design.sections.find(({ id }) => id === overview.id)?.summary).toBe('已生成');
-  expect(design.runs.at(-1)?.attempt.error?.message).toContain('单章已经超过窗口');
-  expect(t.fake.prompts.at(-1)?.sessionId).not.toBe(t.fake.prompts.at(-2)?.sessionId);
+  expect(design.runs.at(-1)?.attempt.error?.message).toContain('单章已超过上下文窗口');
   t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '手动重试完成')), DESIGNER);
+  const retried = ended(AttemptKind.DesignGenerate);
   expect((await t.call(generateDesignOp, { id, sectionId: endpoint.id })).status).toBe(200);
+  await retried;
   await t.fake.settled();
-  const retried = await get(id);
-  expect(retried).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 2 });
-  expect(retried.runs).toHaveLength(design.runs.length + 1);
-  expect(retried.runs.at(-1)?.targetSectionIds).toEqual([endpoint.id]);
-  expect(retried.sections.find(({ id }) => id === flow.id)?.blocks).toBeNull();
+  const completed = await get(id);
+  expect(completed).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 2 });
+  expect(completed.runs).toHaveLength(design.runs.length + 1);
+  expect(completed.runs.at(-1)?.targetSectionIds).toEqual([endpoint.id]);
+  expect(completed.sections.find(({ id }) => id === flow.id)?.blocks).toBeNull();
 });
 
-it('首章前溢出会缩小新会话的分片，分片成功后继续原目标并独立复审', async () => {
+it('每章使用独立会话与授权范围，最后独立复审', async () => {
   const { id } = await createDraft(true);
   const { overview, endpoint, flow } = await optimize(id);
-  t.fake.enqueue(script().error('ContextOverflowError', '首章前读满窗口'), DESIGNER);
   t.fake.enqueue(
-    script()
-      .callTool(McpToolName.SubmitDesignSection, section(overview.id, '已缩小分片'))
-      .callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '端点已完成')),
+    script().callTool(McpToolName.SubmitDesignSection, section(overview.id, '总览说明仅留在第一章')),
     DESIGNER,
   );
-  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(flow.id, '原请求其余章节')), DESIGNER);
+  t.fake.enqueue(
+    script().callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '端点说明仅留在第二章')),
+    DESIGNER,
+  );
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(flow.id, '流程完成')), DESIGNER);
   t.fake.enqueue(
     script().callTool(McpToolName.SubmitDesignReview, {
       findings: [feedback(overview.id), feedback(endpoint.id), feedback(flow.id)],
@@ -366,43 +355,103 @@ it('首章前溢出会缩小新会话的分片，分片成功后继续原目标�
   const design = await get(id);
   expect(design).toMatchObject({ status: DesignStatus.Ready, doneSections: 3, totalSections: 3 });
   expect(
-    design.runs.slice(1).map(({ kind, attempt, targetSectionIds, doneSectionIds }) => ({
-      kind,
-      status: attempt.status,
-      targetSectionIds,
-      doneSectionIds,
-    })),
+    design.runs
+      .slice(1)
+      .map(({ kind, attempt, targetSectionIds, doneSectionIds }) => [
+        kind,
+        attempt.status,
+        targetSectionIds,
+        doneSectionIds,
+      ]),
   ).toEqual([
-    {
-      kind: DesignRunKind.Generate,
-      status: AttemptStatus.Failed,
-      targetSectionIds: [overview.id, endpoint.id, flow.id],
-      doneSectionIds: [],
-    },
-    {
-      kind: DesignRunKind.Generate,
-      status: AttemptStatus.Succeeded,
-      targetSectionIds: [overview.id, endpoint.id],
-      doneSectionIds: [overview.id, endpoint.id],
-    },
-    {
-      kind: DesignRunKind.Generate,
-      status: AttemptStatus.Succeeded,
-      targetSectionIds: [flow.id],
-      doneSectionIds: [flow.id],
-    },
-    {
-      kind: DesignRunKind.Review,
-      status: AttemptStatus.Succeeded,
-      targetSectionIds: [overview.id, endpoint.id, flow.id],
-      doneSectionIds: [overview.id, endpoint.id, flow.id],
-    },
+    [DesignRunKind.Generate, AttemptStatus.Succeeded, [overview.id], [overview.id]],
+    [DesignRunKind.Generate, AttemptStatus.Succeeded, [endpoint.id], [endpoint.id]],
+    [DesignRunKind.Generate, AttemptStatus.Succeeded, [flow.id], [flow.id]],
+    [
+      DesignRunKind.Review,
+      AttemptStatus.Succeeded,
+      [overview.id, endpoint.id, flow.id],
+      [overview.id, endpoint.id, flow.id],
+    ],
   ]);
-  const [initial, partial, remainder, review] = t.fake.prompts.slice(1);
-  if (!initial || !partial || !remainder || !review) throw new Error('Expected generation and review sessions');
-  expect(new Set([initial, partial, remainder, review].map(({ sessionId }) => sessionId)).size).toBe(4);
-  expect(partial.text.length).toBeLessThan(initial.text.length);
-  expect(partial.text).not.toContain(flow.id);
-  expect(remainder.text).not.toContain(overview.id);
-  expect(remainder.text).not.toContain(endpoint.id);
+  const [initial, next, last, review] = t.fake.prompts.slice(1);
+  if (!initial || !next || !last || !review) throw new Error('Expected generation and review sessions');
+  expect(new Set([initial, next, last, review].map(({ sessionId }) => sessionId)).size).toBe(4);
+  expect(next.text).toContain(`"id":"${overview.id}"`);
+  expect(next.text).toContain(`"id":"${flow.id}"`);
+  expect(next.text).toContain('src/endpoint.ts');
+  expect(next.text).not.toContain('README.md');
+  expect(next.text).not.toContain('总览说明仅留在第一章');
+  expect(last.text).not.toContain('端点说明仅留在第二章');
+  expect(review.text).toContain('端点说明仅留在第二章');
+});
+
+it('在已提交章节释放模型槽之前可以停止切章', async () => {
+  const { id } = await createDraft(false);
+  const { overview, endpoint } = await optimize(id);
+  const endCommandStarted = Promise.withResolvers<void>();
+  const releaseEndCommand = Promise.withResolvers<void>();
+  const abort = t.fake.abort;
+  t.fake.abort = async (input) => {
+    endCommandStarted.resolve();
+    await releaseEndCommand.promise;
+    return abort(input);
+  };
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(overview.id, '首章完成')).hang(), DESIGNER);
+  const finished = ended(AttemptKind.DesignGenerate);
+  try {
+    expect((await t.call(generateDesignOp, { id })).status).toBe(200);
+    await finished;
+    await endCommandStarted.promise;
+    const during = await get(id);
+    expect(during.doneSections).toBe(1);
+    expect(during.activeRunId).toBeNull();
+    expect(during.runs.at(-1)?.attempt.status).toBe(AttemptStatus.Succeeded);
+    expect((await t.call(generateDesignOp, { id })).status).toBe(409);
+    expect((await t.call(stopDesignOp, { id })).status).toBe(200);
+  } finally {
+    releaseEndCommand.resolve();
+  }
+  await t.fake.settled();
+  const stopped = await get(id);
+  expect(stopped).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 1 });
+  expect(stopped.runs.at(-1)?.targetSectionIds).toEqual([overview.id]);
+  expect(stopped.sections.find(({ id }) => id === endpoint.id)?.blocks).toBeNull();
+  expect(t.fake.prompts).toHaveLength(2);
+});
+
+it('应用重启保留已提交的章节，仅在用户点击继续后补跑', async () => {
+  const { id } = await createDraft(false);
+  const { overview, endpoint, flow } = await optimize(id);
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(overview.id, '重启前完成')), DESIGNER);
+  t.fake.enqueue(script().requestPermission('bash', ['rg -n endpoint src/endpoint.ts']).hang(), DESIGNER);
+  const waiting = inboxOpens(t, InboxKind.Permission);
+  expect((await t.call(generateDesignOp, { id })).status).toBe(200);
+  await waiting;
+  expect(await get(id)).toMatchObject({ status: DesignStatus.Generating, doneSections: 1 });
+  const dataDir = t.dataDir;
+  await t.close();
+  t = await createTestApp({ dataDir });
+  const restarted = await get(id);
+  expect(restarted).toMatchObject({ status: DesignStatus.Incomplete, activeRunId: null, doneSections: 1 });
+  expect(restarted.sections[0]?.summary).toBe('重启前完成');
+  expect(t.fake.prompts).toHaveLength(0);
+
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '续作端点')), DESIGNER);
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(flow.id, '续作流程')), DESIGNER);
+  let successes = 0;
+  const completed = waitForEvent(
+    t.app.events,
+    ServerEventType.AttemptUpdated,
+    ({ attempt }) =>
+      attempt.kind === AttemptKind.DesignGenerate && attempt.status === AttemptStatus.Succeeded && ++successes === 2,
+  );
+  expect((await t.call(generateDesignOp, { id })).status).toBe(200);
+  await completed;
+  expect(await get(id)).toMatchObject({ status: DesignStatus.Ready, doneSections: 3 });
+  expect((await get(id)).runs.slice(-2).map(({ targetSectionIds }) => targetSectionIds)).toEqual([
+    [endpoint.id],
+    [flow.id],
+  ]);
+  expect(t.fake.prompts).toHaveLength(2);
 });

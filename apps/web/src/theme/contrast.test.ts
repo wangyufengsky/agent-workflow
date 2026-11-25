@@ -1,4 +1,5 @@
 import { STATUS_TONES, THEME_IDS } from '@aw/shared';
+import { DESIGN_CODE_TOKENS } from '@aw/shared/theme';
 import { describe, expect, it } from 'vitest';
 import { THEMES } from './registry.ts';
 import type { ThemeTokenName } from './tokens.ts';
@@ -154,4 +155,28 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
     expect(contrast(c(p.codeInk), c(p.codeBg)), 'codeInk on codeBg').toBeGreaterThanOrEqual(MIN);
     for (const value of Object.values(p)) expect(value, 'opaque #rrggbb').toMatch(/^#[0-9a-f]{6}$/);
   });
+});
+
+it.each(['light', 'dark'] as const)('项目设计代码在 %s 主题的面板和证据行上可辨读', (scheme) => {
+  const tokens = DESIGN_CODE_TOKENS[scheme];
+  const colors = [
+    'design-code-ink',
+    'design-code-muted',
+    'design-code-keyword',
+    'design-code-string',
+    'design-code-number',
+    'design-code-function',
+    'design-code-error',
+  ] as const;
+  for (const background of ['design-code-bg', 'design-code-focus'] as const) {
+    for (const name of colors) {
+      expect(
+        contrast(parseColor(tokens[name]), parseColor(tokens[background])),
+        `${name} on ${background}`,
+      ).toBeGreaterThanOrEqual(MIN);
+    }
+    expect(
+      contrast(parseColor(tokens['design-code-focus-mark']), parseColor(tokens[background])),
+    ).toBeGreaterThanOrEqual(3);
+  }
 });

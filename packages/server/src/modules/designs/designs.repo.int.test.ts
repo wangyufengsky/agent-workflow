@@ -203,37 +203,46 @@ describe('项目设计的 SQLite 持久化', () => {
     expect(persisted.find(({ id }) => id === 'file-4199')).toEqual(files.at(-1));
   });
 
-  it('同步五套内置模板，保留自定义模板和设计创建时保存的快照', () => {
+  it('原五套模板收敛为架构探索，保留自定义模板和所有旧设计快照', () => {
     const { db } = database;
     const repo = createDesignsRepo(db);
     const unit = createUnitOfWork(db, createEventBus());
-    syncBuiltinDesignTemplates(repo, unit, systemClock, seeds);
-    expect(
-      repo
-        .listTemplates()
-        .map((template) => template.key)
-        .sort(),
-    ).toEqual(Object.values(BuiltinDesignTemplateKey).sort());
-    const original = design('design');
-    repo.insertDesign(original);
+    const legacyTemplates = [
+      [BuiltinDesignTemplateKey.General, '通用代码仓库'],
+      ['java_backend', 'Java / Spring 后端'],
+      ['react_frontend', 'React / Web 前端'],
+      ['fullstack', '全栈应用'],
+      ['ai_agent', 'AI Agent / 工具链'],
+    ] as const;
+    const reports = legacyTemplates.map(([key, name]) => {
+      const original = design(`saved-${key}`);
+      const snapshot = { ...original.templateSnapshot, key, name, focusPrompt: `${name}的原始侧重` };
+      repo.upsertTemplate({
+        ...snapshot,
+        kind: DesignTemplateKind.Builtin,
+        description: name,
+        matchHints: [],
+        updatedAt: 1,
+      });
+      const report = { ...original, templateKey: key, templateSnapshot: snapshot };
+      repo.insertDesign(report);
+      return report;
+    });
     repo.upsertTemplate({
-      ...original.templateSnapshot,
+      ...design('custom-sample').templateSnapshot,
       key: 'custom-test',
       kind: DesignTemplateKind.Custom,
       description: '自定义分析',
       matchHints: [],
       updatedAt: 1,
     });
-    syncBuiltinDesignTemplates(
-      repo,
-      unit,
-      systemClock,
-      seeds.map((seed) =>
-        seed.key === BuiltinDesignTemplateKey.General ? { ...seed, focusPrompt: '更新后的分析重点' } : seed,
-      ),
-    );
-    expect(repo.findTemplate(BuiltinDesignTemplateKey.General)?.focusPrompt).toBe('更新后的分析重点');
-    expect(repo.findTemplate('custom-test')?.kind).toBe(DesignTemplateKind.Custom);
-    expect(repo.findDesign(original.id)?.templateSnapshot).toEqual(original.templateSnapshot);
+    syncBuiltinDesignTemplates(repo, unit, systemClock, seeds);
+    expect(repo.listTemplates().map(({ key, kind }) => ({ key, kind }))).toEqual([
+      { key: BuiltinDesignTemplateKey.General, kind: DesignTemplateKind.Builtin },
+      { key: 'custom-test', kind: DesignTemplateKind.Custom },
+    ]);
+    expect(repo.findTemplate(BuiltinDesignTemplateKey.General)?.name).toBe('架构探索');
+    expect(repo.findTemplate('custom-test')?.description).toBe('自定义分析');
+    for (const original of reports) expect(repo.findDesign(original.id)).toEqual(original);
   });
 });

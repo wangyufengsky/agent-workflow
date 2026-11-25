@@ -163,6 +163,14 @@ export function createDesignsRepo(db: DbExecutor) {
           .run();
       }
     },
+    findFile(designId: string, fileId: string): DesignFile | undefined {
+      const row = db
+        .select()
+        .from(files)
+        .where(and(eq(files.designId, designId), eq(files.id, fileId)))
+        .get();
+      return row === undefined ? undefined : toFile(row);
+    },
     listFiles(designId: string): DesignFile[] {
       return db.select().from(files).where(eq(files.designId, designId)).orderBy(asc(files.relPath)).all().map(toFile);
     },

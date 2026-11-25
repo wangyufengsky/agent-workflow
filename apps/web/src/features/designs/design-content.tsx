@@ -1,6 +1,6 @@
 import { type DesignBlock, DesignEvidenceClass } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import type { Components } from 'react-markdown';
 import { highlight } from '../../components/diff/highlight.ts';
 import { Markdown } from '../../components/markdown.tsx';
@@ -13,30 +13,60 @@ export const markdownComponents: Components = {
   img: ({ alt }) => (alt === undefined ? null : <span>{alt}</span>),
 };
 
-export function Syntax({ path, source, start }: { path: string; source: string; start?: number }) {
+export function Syntax({
+  path,
+  source,
+  start,
+  selection,
+  label,
+}: {
+  path: string;
+  source: string;
+  start?: number;
+  selection?: { start: number; end: number } | undefined;
+  label?: string | undefined;
+}) {
+  const frame = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (selection === undefined || frame.current === null) return;
+    const pre = frame.current;
+    const line = pre.querySelector('[data-current-line]');
+    if (line === null) return;
+    line.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }, [selection]);
   const query = useQuery({
     queryKey: ['designHighlight', path, source],
     queryFn: () => highlight(path, source),
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const lines = source.split('\n');
+  const lines = source.split('\n').map((text, index) => ({ text, index }));
   return (
-    <pre className={styles.code}>
+    <pre className={styles.code} ref={frame} {...(label === undefined ? {} : { role: 'region', 'aria-label': label })}>
       <code>
-        {lines.map((line, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: source lines are position-based
-          <span className={styles.codeLine} key={index}>
+        {lines.map((line) => (
+          <span
+            className={styles.codeLine}
+            key={line.index}
+            data-current-line={
+              selection !== undefined &&
+              start !== undefined &&
+              start + line.index >= selection.start &&
+              start + line.index <= selection.end
+                ? true
+                : undefined
+            }
+          >
             {start !== undefined && (
               <span className={styles.lineNumber} aria-hidden="true">
-                {start + index}
+                {start + line.index}
               </span>
             )}
-            {query.data?.[index]?.map((token, tokenIndex) => (
+            {query.data?.[line.index]?.map((token, tokenIndex) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: tokens are position-based within a line
               <span key={tokenIndex} style={{ color: token.color }}>
                 {token.content}
               </span>
-            )) ?? line}
+            )) ?? line.text}
           </span>
         ))}
       </code>
@@ -45,12 +75,13 @@ export function Syntax({ path, source, start }: { path: string; source: string; 
 }
 
 export type ContentContext = {
-  source: (path: string, line?: number) => ReactNode;
+  source: (path: string, line?: number, end?: number) => ReactNode;
   figure: (id: string) => ReactNode;
 };
 
 export function ContentBlock({ block, context }: { block: DesignBlock; context: ContentContext }) {
   if (block.type === 'diagram_ref') return context.figure(block.diagramId);
+  if (block.type === 'submodule') return null;
   return (
     <section className={styles.proseBlock} data-callout={block.type === 'callout' ? block.tone : undefined}>
       {block.title !== undefined && <h2>{block.title}</h2>}
@@ -65,7 +96,7 @@ export function ContentBlock({ block, context }: { block: DesignBlock; context: 
                   {evidence.evidenceClass === DesignEvidenceClass.Static ? (
                     <>
                       <span className={styles.sourceTag}>{C.static}</span>
-                      {context.source(evidence.relPath, evidence.lineStart)}
+                      {context.source(evidence.relPath, evidence.lineStart, evidence.lineEnd)}
                     </>
                   ) : (
                     <>
@@ -82,7 +113,7 @@ export function ContentBlock({ block, context }: { block: DesignBlock; context: 
       {block.type === 'callout' && <Markdown source={block.body} components={markdownComponents} />}
       {block.type === 'code' && (
         <>
-          <div className="hint">{context.source(block.relPath, block.lineStart)}</div>
+          <div className="hint">{context.source(block.relPath, block.lineStart, block.lineEnd)}</div>
           <Syntax path={block.relPath} source={block.code} start={block.lineStart} />
         </>
       )}

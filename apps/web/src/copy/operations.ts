@@ -295,6 +295,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.decks.stop': '停止制作 PPT',
   'op.decks.delete': '删除 PPT',
   'op.designs.list': '项目设计列表',
+  'op.designs.source': '阅读报告引用的本机源码',
   'op.designs.get': '查看项目设计',
   'op.designs.create': '新建项目设计',
   'op.designs.update': '修改项目设计',
