@@ -69,6 +69,8 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.KnowledgeHistory]: 'the knowledge Q&A history',
   [AssistantPage.Insights]: 'the quality and usage page (how much AI did, how well, and what it cost)',
   [AssistantPage.Ppt]: 'the PPT list (slide decks made from a brief and material)',
+  [AssistantPage.Designs]: 'the project design list and template library',
+  [AssistantPage.DesignNew]: 'the page for scanning a project and creating a draft design outline',
   [AssistantPage.PptNew]: 'the new PPT page (a brief, material and the number of pages, then an outline)',
   [AssistantPage.Batches]: 'the batch list (one fixed workflow run over many targets)',
   [AssistantPage.BatchNew]: 'the new batch page (a project, a workflow and the targets to run it over)',
@@ -178,6 +180,8 @@ export function createContextRenderer(deps: ContextDeps) {
         const conversation = knowledge.get(param(ref, 'knowledgeConversationId'));
         return `the knowledge Q&A conversation "${conversation.title}" (knowledge conversation id ${conversation.id}, project "${conversation.project.name}", ${conversation.turns.length} questions)`;
       }
+      case AssistantPage.DesignWorkbench:
+        return `the project design workspace (design id ${param(ref, 'designId')})`;
       case AssistantPage.PptDeck: {
         const deck = decks.get(param(ref, 'deckId'));
         const base = `the workspace of PPT "${deck.title}" (deck id ${deck.id}, status ${deck.status}, ${deck.slides.length} pages)`;

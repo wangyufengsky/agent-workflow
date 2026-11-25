@@ -36,6 +36,10 @@ export const ENTITY_ROUTES = {
     icon: 'sparkle',
     open: (navigate, id) => navigate({ to: ROUTES.gitReview, params: { reviewId: id } }),
   },
+  [EntityKind.Design]: {
+    icon: 'book',
+    open: (navigate, id) => navigate({ to: ROUTES.designWorkbench, params: { designId: id } }),
+  },
   [EntityKind.Deck]: {
     icon: 'slides',
     open: (navigate, id) => navigate({ to: ROUTES.pptDeck, params: { deckId: id } }),
@@ -44,4 +48,4 @@ export const ENTITY_ROUTES = {
     icon: 'book',
     open: (navigate, id) => navigate({ to: ROUTES.knowledgeConversation, params: { conversationId: id } }),
   },
-} as const satisfies Record<Exclude<EntityKind, typeof EntityKind.Design>, EntityRoute>;
+} as const satisfies Record<EntityKind, EntityRoute>;

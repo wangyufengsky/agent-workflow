@@ -102,8 +102,12 @@ function placeDesktopShortcut(): void {
   }
 }
 
-ipcMain.handle('aw:select-directory', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+ipcMain.handle('aw:select-directory', async (_event, defaultPath: unknown) => {
+  if (defaultPath !== undefined && typeof defaultPath !== 'string') throw new Error('Invalid default directory');
+  const result = await dialog.showOpenDialog({
+    ...(defaultPath === undefined ? {} : { defaultPath }),
+    properties: ['openDirectory', 'createDirectory'],
+  });
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });
 ipcMain.handle('aw:open-external', async (_e, url: string) => {

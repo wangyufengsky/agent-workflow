@@ -37,6 +37,9 @@ const PAGE_ROUTE = {
   [AssistantPage.Ppt]: ROUTES.ppt,
   [AssistantPage.PptNew]: ROUTES.pptNew,
   [AssistantPage.PptDeck]: ROUTES.pptDeck,
+  [AssistantPage.Designs]: ROUTES.designs,
+  [AssistantPage.DesignNew]: ROUTES.designNew,
+  [AssistantPage.DesignWorkbench]: ROUTES.designWorkbench,
   [AssistantPage.Batches]: ROUTES.batches,
   [AssistantPage.BatchNew]: ROUTES.batchNew,
   [AssistantPage.Batch]: ROUTES.batch,
@@ -113,6 +116,7 @@ export function useAssistantPage(): AssistantPageRef {
         gitReviewId: text(params.reviewId),
         knowledgeConversationId: text(params.conversationId),
         deckId: text(params.deckId),
+        designId: text(params.designId),
         slideId: text(search.slide),
         batchId: text(params.batchId),
         scheduleId: text(params.scheduleId),
@@ -177,6 +181,8 @@ export function useOpenAssistantPage() {
             to: ROUTES.knowledgeConversation,
             params: { conversationId: param(ref, 'knowledgeConversationId') },
           });
+        case AssistantPage.DesignWorkbench:
+          return navigate({ to: ROUTES.designWorkbench, params: { designId: param(ref, 'designId') } });
         case AssistantPage.PptDeck:
           return navigate({
             to: ROUTES.pptDeck,

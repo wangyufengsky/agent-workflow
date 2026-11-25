@@ -10,11 +10,13 @@ import { Icon } from '../../components/icon.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
 import { ENTITY_COPY as C } from '../../copy/assistant.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
+import { DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
 import { INITIATIVE_STATUS_LABEL, INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { frequencyText } from '../../copy/schedules.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
+import { designQuery } from '../designs/designs.queries.ts';
 import { gitReviewQuery } from '../git/git.queries.ts';
 import { ReviewBadge } from '../git/git-parts.tsx';
 import { initiativeQuery } from '../initiatives/initiatives.queries.ts';
@@ -56,7 +58,7 @@ function byList<T>(query: UseQueryResult<T[]>, found: (item: T) => boolean): Pre
 
 function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) {
   const navigate = useNavigate();
-  const route = entity.kind === EntityKind.Design ? undefined : ENTITY_ROUTES[entity.kind];
+  const route = ENTITY_ROUTES[entity.kind];
   const deleted = presence.state === 'deleted';
   return (
     <section
@@ -67,7 +69,7 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
     >
       <div className={styles.cardHead}>
         <span className={styles.tile} data-tone="accent" aria-hidden="true">
-          <Icon name={route?.icon ?? 'flow'} size="sm" />
+          <Icon name={route.icon} size="sm" />
         </span>
         <span className={styles.cardHeading}>
           <span className={styles.eyebrow}>{C.kind[entity.kind]}</span>
@@ -75,11 +77,9 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
         </span>
         {deleted ? <span className={styles.chip}>{C.deleted}</span> : presence.state === 'present' && presence.status}
         {/* The panel shows the conversation beside the page it opens, also from the home page (15 §6, D112). */}
-        {route !== undefined && (
-          <Button size="sm" disabled={deleted} onClick={() => followAssistant(() => route.open(navigate, entity.id))}>
-            {C.open}
-          </Button>
-        )}
+        <Button size="sm" disabled={deleted} onClick={() => followAssistant(() => route.open(navigate, entity.id))}>
+          {C.open}
+        </Button>
       </div>
       {presence.state === 'error' && <ErrorState error={presence.error} />}
     </section>
@@ -171,6 +171,13 @@ function ScheduleEntityCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byDetail(query, ErrorCode.ScheduleNotFound, status)} />;
 }
 
+function DesignEntityCard({ entity }: { entity: EntityRef }) {
+  const query = useQuery(designQuery(entity.id));
+  const status =
+    query.data === undefined ? undefined : <span className="hint">{DESIGN_STATUS_LABEL[query.data.status]}</span>;
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.DesignNotFound, status)} />;
+}
+
 /** A navigation card for an object an operation of the assistant produced (D66). */
 export function EntityCard({ entity }: { entity: EntityRef }) {
   switch (entity.kind) {
@@ -189,7 +196,7 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
     case EntityKind.Batch:
       return <BatchEntityCard entity={entity} />;
     case EntityKind.Design:
-      return <Shell entity={entity} presence={{ state: 'present' }} />;
+      return <DesignEntityCard entity={entity} />;
     case EntityKind.Deck:
       return <DeckEntityCard entity={entity} />;
     case EntityKind.Schedule:

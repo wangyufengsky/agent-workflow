@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { getJson } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import type { PaletteItem } from '../../components/command-palette.tsx';
+import { DESIGNS_COPY } from '../../copy/designs.ts';
 import { OPERATION_TITLE } from '../../copy/operations.ts';
 import { PALETTE_COPY } from '../../copy/palette.ts';
 import { TASK_DISPLAY_LABEL } from '../../copy/tasks.ts';
@@ -100,5 +101,18 @@ export function usePaletteItems(): PaletteItem[] {
         ? []
         : [{ id: `op.${op.id}`, group: PALETTE_COPY.groupActions, label, run }];
     });
-  return [...pages, ...actions, modeToggle, ...themes, ...taskItems, ...projectItems];
+  const designNew: PaletteItem = {
+    id: 'page.designNew',
+    group: PALETTE_COPY.groupActions,
+    label: DESIGNS_COPY.newDesign,
+    run: () => void navigate({ to: ROUTES.designNew }),
+  };
+  if (mode === UiMode.Simple)
+    pages.push({
+      id: 'page.designs',
+      group: PALETTE_COPY.groupPages,
+      label: DESIGNS_COPY.title,
+      run: () => void navigate({ to: ROUTES.designs }),
+    });
+  return [...pages, designNew, ...actions, modeToggle, ...themes, ...taskItems, ...projectItems];
 }

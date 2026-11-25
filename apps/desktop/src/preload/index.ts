@@ -13,7 +13,7 @@ const bridge: AwBridge = {
   companion: companionBridge,
   apiToken: arg('aw-api-token'),
   appVersion: arg('aw-app-version'),
-  selectDirectory: () => ipcRenderer.invoke('aw:select-directory'),
+  selectDirectory: (defaultPath) => ipcRenderer.invoke('aw:select-directory', defaultPath),
   openExternal: (url) => ipcRenderer.invoke('aw:open-external', url),
   revealInFinder: (path) => ipcRenderer.invoke('aw:reveal-in-finder', path),
   openPath: (path) => ipcRenderer.invoke('aw:open-path', path),

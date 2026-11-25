@@ -73,7 +73,7 @@ export interface AwBridge {
   companion: CompanionBridge;
   apiToken: string;
   appVersion: string;
-  selectDirectory(): Promise<string | null>;
+  selectDirectory(defaultPath?: string): Promise<string | null>;
   openExternal(url: string): Promise<void>;
   revealInFinder(path: string): Promise<void>;
   /** Opens a file the assistant wrote with the system's default app (39 §8.2); main refuses any other path. */

@@ -16,6 +16,7 @@ import { INBOX_COPY } from '../../copy/tasks.ts';
 import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
+import { designQuery } from '../designs/designs.queries.ts';
 import { FunctionalTestScopeSummary } from '../functional-testing/functional-test-fields.tsx';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { initiativeQuery } from '../initiatives/initiatives.queries.ts';
@@ -167,6 +168,11 @@ function AttachmentRef({ ids }: { ids: string[] }) {
   );
 }
 
+function DesignRef({ id }: { id: string }) {
+  const query = useQuery(designQuery(id));
+  return <Named ids={[id]} names={[query.data?.title]} query={query} />;
+}
+
 function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; input: Input }) {
   const ids = idsSchema.safeParse(value).data;
   if (ids === undefined || ids.length === 0) return <pre className={styles.json}>{JSON.stringify(value, null, 2)}</pre>;
@@ -201,7 +207,7 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
     case InputRef.InboxItem:
       return <InboxItemRef ids={ids} />;
     case InputRef.Design:
-      return <span className="mono">{first}</span>;
+      return <DesignRef id={first} />;
     case InputRef.Attempt:
       return <span className="mono">{first.slice(0, 8)}</span>;
     case InputRef.Attachment:

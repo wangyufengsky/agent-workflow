@@ -369,7 +369,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.updated` | `AssistantConversationDTO` | 对话列表与面板（忙碌、待回复的权限请求） |
 | `assistant.transcript` | `{ conversationId, entries: TranscriptEntry[] }` | 追加到面板的消息流；含 `confirmation`（确认卡片）、`attachment`（文件）、`entity_ref`（`{ kind, id, title }`，产出对象的导航卡片，D66）、`chart`（`{ chart: ChartSpec }`，助手画的图，35 §4）条目（10 §3） |
 | `assistant.confirmation` | `AssistantConfirmationDTO` | 确认卡片的状态与结果 |
-| `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：跳转，面板打开并显示该对话（目标为主页时由主页显示对话，D112） |
+| `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：跳转，面板打开并显示该对话（目标为主页时由主页显示对话，D112）；项目设计入口包括 `designs`、`design_new` 和 `design_workbench`（需 `designId`） |
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `assistant.export_deck` | `{ conversationId, deckId, format }` | 助手调用 `export_deck`：界面打开这份 PPT，由页头执行与「导出」按钮相同的导出（28 §4） |
@@ -400,7 +400,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/context-snapshots` | `assistant.snapshotContext`，`{ source: { kind: 'task', taskId, nodeId? } \| { kind: 'selection', text, page: AssistantPageRef } }` → 201 `AttachmentDTO`。用户显式附加文字，write，不暴露给助手或命令面板。任务／步骤信息由后端读取；不存在 404 `TASK_NOT_FOUND` / `NODE_NOT_FOUND`，步骤必须属于任务。选中文字 trim 后 1–12000 字符，超长／空白／多余字段 400 `VALIDATION_FAILED`；仅文字，NUL 等仍由附件边界拒绝。结果是固定的文本附件，使用现有查看、移除、绑定与清理接口 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
 | DELETE | `/assistant/conversations/:id` | 204；先中止运行并删除底层会话，失败保留本地对话以便重试；成功后清理确认、待发消息、任务跟进记录、消息流 JSONL 与 `files/<id>/`。正在异步建会话/发送或另一删除中返回 409 `ASSISTANT_BUSY`，防止孤儿会话和删除期间回传 |
-| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求、删除或等待模型回复时 409 `ASSISTANT_BUSY` |
+| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, designId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象；项目设计工作台上下文使用 `designId`；正在创建会话、发送请求、删除或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | PUT | `/assistant/conversations/:id/preview` | `assistant.bindPreview`，界面专用、不对助手开放；`{ preview: { taskId, tabId } \| null }` → 204。只接受属于该任务的真实用户预览，不能绑定 AI 页签；`null` 解除关联，删除后的清理也幂等。仅保存在内存 |
 | PUT | `/assistant/conversations/:id/browser-control` | `assistant.controlBrowser`，界面专用。 `{ tabId, enabled }` → `{ enabled }`；启用仅接受当前对话关联的项目预览。网页动作通过助手现有确认接口批准一次。 |
@@ -605,7 +605,7 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 ```ts
 interface AwBridge {
   apiToken: string;
-  selectDirectory(): Promise<string | null>;
+  selectDirectory(defaultPath?: string): Promise<string | null>; // 可预填上次位置或建议的导出目录
   openExternal(url: string): Promise<void>;       // 仅 http(s)
   revealInFinder(path: string): Promise<void>;
   appVersion: string;

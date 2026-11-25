@@ -1,0 +1,146 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: var(--s-4);
+}
+
+.designCard {
+  display: grid;
+  gap: var(--s-3);
+  align-content: start;
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.designCard:hover,
+.designCard:focus-visible {
+  border-color: var(--accent-line);
+}
+
+.templateCard {
+  min-width: 0;
+}
+
+.templateActions {
+  margin-top: auto;
+}
+
+.reasons {
+  margin: 0;
+  padding-inline-start: var(--s-6);
+}
+
+.focus {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.creator {
+  max-width: var(--read-max);
+}
+
+.fieldset {
+  display: grid;
+  min-width: 0;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend {
+  margin-bottom: var(--s-2);
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
+  gap: var(--s-2);
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.choice:has(input:checked) {
+  background: var(--accent-fill);
+  border-color: var(--accent-line);
+}
+
+.choice input {
+  flex: none;
+}
+
+.templatePreview {
+  display: grid;
+  gap: var(--s-1);
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  padding: var(--s-2) var(--s-3);
+}
+
+.formFooter {
+  margin-top: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+
+.sectionTitle {
+  font-size: var(--fs-lg);
+}
+
+.outline {
+  min-width: 0;
+}
+
+.chapters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chapterRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  align-items: center;
+  padding: var(--s-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.chapterFields,
+.templateFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+.chapterFields input,
+.templateFields input {
+  flex: 1 1 145px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .chapterRow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .chapterRow > :last-child {
+    grid-column: 2;
+  }
+}
