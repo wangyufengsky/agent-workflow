@@ -25,6 +25,7 @@ export const OpencodeEventType = {
   /** opencode sends a model request (again, after a retry wait). */
   Busy: 'busy',
   Idle: 'idle',
+  Deleted: 'deleted',
   Compacted: 'compacted',
   Error: 'error',
   PermissionAsked: 'permission_asked',
@@ -103,6 +104,7 @@ export type OpencodeEvent =
   | { type: typeof E.Retry; sessionId: string; message: string | undefined }
   | { type: typeof E.Stalled; sessionId: string }
   | { type: typeof E.Busy; sessionId: string }
+  | { type: typeof E.Deleted; sessionId: string }
   | { type: typeof E.Idle; sessionId: string }
   | { type: typeof E.Compacted; sessionId: string }
   /** `error` is opencode's error object (`{ name, data }`), absent when opencode gives none. */
@@ -183,6 +185,7 @@ const payloadSchema = z.discriminatedUnion('type', [
       status: z.looseObject({ type: z.string(), message: z.string().optional() }),
     }),
   }),
+  z.object({ type: z.literal('session.deleted'), properties: z.object({ info: z.object({ id: z.string() }) }) }),
   z.object({ type: z.literal('session.idle'), properties: z.object({ sessionID: z.string() }) }),
   z.object({ type: z.literal('session.compacted'), properties: z.object({ sessionID: z.string() }) }),
   z.object({
@@ -209,6 +212,7 @@ const HANDLED_TYPES: ReadonlySet<string> = new Set([
   'message.part.delta',
   'session.status',
   'session.idle',
+  'session.deleted',
   'session.compacted',
   'session.error',
   'permission.asked',
@@ -282,6 +286,8 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
       if (status.message === SSE_READ_TIMED_OUT) return { type: E.Stalled, sessionId: sessionID };
       return { type: E.Retry, sessionId: sessionID, message: status.message };
     }
+    case 'session.deleted':
+      return { type: E.Deleted, sessionId: event.properties.info.id };
     case 'session.idle':
       return { type: E.Idle, sessionId: event.properties.sessionID };
     case 'session.compacted':

@@ -34,6 +34,7 @@ import { investigateDatabaseTool } from './tools/investigate-database.tool.ts';
 import { readOfficeFileTool } from './tools/office-file.tool.ts';
 import { processDocumentTool } from './tools/process-document.tool.ts';
 import { delegationTools } from './tools/readonly-delegation.tool.ts';
+import { recallTool } from './tools/recall.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { createSubmissionGuides } from './tools/submission-guide.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
@@ -103,6 +104,7 @@ export function createMcpModule({
     getTaskContextTool(tasks, debug, functionalTests),
     guides.tool,
     getNodeOutputTool(tasks),
+    recallTool(attempts),
     getTaskDiffTool(tasks),
     ...delegationTools(tasks),
     ...attachmentTools(tasks, initiatives, attachments),

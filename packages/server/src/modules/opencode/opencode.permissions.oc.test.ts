@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   AttemptKind,
   AttemptStatus,
@@ -40,6 +42,19 @@ import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 const PROVIDER = 'aw-scripted';
 const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
+const CONTEXT_PROBE = 'AW_CHECK_REQUEST_PROJECTION';
+const DISABLE_PROBE = 'AW_DISABLE_AFTER_PROJECTION';
+const SUMMARY_PROBE = 'AW_CHECK_BACKGROUND_SUMMARY';
+const workerStarted = Promise.withResolvers<void>();
+const newReadProduced = Promise.withResolvers<void>();
+const summarySaved = Promise.withResolvers<void>();
+const workerTools: string[][] = [];
+const RECALL_PROBE = 'AW_CHECK_PAGED_RECALL';
+const FOREIGN_PROBE = 'AW_CHECK_FOREIGN_RECALL';
+const coordinates = /messageId=(msg_\w+) partId=(prt_\w+)/;
+const BUDGET_PROBE = 'AW_CHECK_BUDGET_STOP';
+const contextRequests: ChatMessage[][] = [];
+let providerRequests = 0;
 const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
 const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
@@ -70,7 +85,12 @@ const ASKED = [
   'cat README.md | xargs echo',
 ];
 
-type ChatMessage = { role: string; content: string | Array<{ type: string; text?: string }> | null };
+type ChatMessage = {
+  tool_call_id?: string;
+  tool_calls?: { id: string }[];
+  role: string;
+  content: string | Array<{ type: string; text?: string }> | null;
+};
 
 function textOf(message: ChatMessage): string {
   if (typeof message.content === 'string') return message.content;
@@ -97,11 +117,16 @@ async function recordCommand(req: IncomingMessage) {
 
 function scriptedModel(): Server {
   return createServer((req, res) => {
+    if (req.url === '/summary-read-produced') {
+      newReadProduced.resolve();
+      void summarySaved.promise.then(() => res.end());
+      return;
+    }
     if (req.url === '/session-command-probe') {
       void recordCommand(req).then(() => res.end());
       return;
     }
-    void bodyOf(req).then(({ messages, stream, tools, reasoning_effort }) => {
+    void bodyOf(req).then(async ({ messages, stream, tools, reasoning_effort }) => {
       const last = messages.at(-1);
       const prompt = last?.role === 'user' ? textOf(last) : '';
       if (prompt.startsWith(EFFORT_PROBE)) sentEfforts.push(reasoning_effort);
@@ -113,7 +138,65 @@ function scriptedModel(): Server {
         args,
       });
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-      if (hasProbe(PROBE_CHILD)) {
+      providerRequests++;
+      let replyText = 'done';
+      if (messages.some((m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'))) {
+        workerTools.push(names);
+        workerStarted.resolve();
+        await newReadProduced.promise;
+        replyText = messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))
+          ? 'Verified the early finding in bulk.txt.'
+          : 'Source missing';
+      } else if (hasProbe(SUMMARY_PROBE)) {
+        contextRequests.push(messages);
+        const count = messages.filter((m) => m.role === 'tool').length;
+        if (messages.some((m) => textOf(m).includes('[AW prior work]'))) {
+          calls = [
+            operation(McpToolName.SubmitResult, { summary: 'Finished with summary', notes: last ? textOf(last) : '' }),
+          ];
+        } else if (count === 0) calls = [{ name: 'grep', args: { pattern: 'EARLY_FINDING', include: 'bulk.txt' } }];
+        else if (count === 1) calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
+        else if (count === 2) {
+          await workerStarted.promise;
+          calls = [{ name: 'read', args: { filePath: 'new.txt' } }];
+        } else calls = [operation(McpToolName.SubmitResult, { summary: 'Missing summary' })];
+      } else if (hasProbe(FOREIGN_PROBE)) {
+        const ref = coordinates.exec(prompt);
+        if (ref) calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2] })];
+        else if (last?.role === 'tool')
+          calls = [operation(McpToolName.SubmitResult, { summary: 'Checked foreign reference', notes: textOf(last) })];
+      } else if (hasProbe(CONTEXT_PROBE) || hasProbe(DISABLE_PROBE) || hasProbe(RECALL_PROBE)) {
+        contextRequests.push(messages);
+        const reads = messages.filter((m) => m.role === 'tool').length;
+        if (reads < 2) calls = [{ name: 'read', args: { filePath: reads === 0 ? 'bulk.txt' : 'latest.txt' } }];
+        else if (hasProbe(RECALL_PROBE)) {
+          const outputs = messages.filter((m) => m.role === 'tool').map(textOf);
+          const reference = outputs[0] ?? '';
+          const ref = coordinates.exec(reference);
+          const tool = names.find(
+            (name) => name === `${MCP_TOOL_PREFIX}${McpToolName.Recall}` && reference.includes(name),
+          );
+          const page = outputs.at(-1) ?? '';
+          if (ref && tool && reads === 2)
+            calls = [{ name: tool, args: { messageId: ref[1], partId: ref[2], limit: 16 } }];
+          else if (ref && tool && reads === 3) {
+            const offset = /"nextOffset"\s*:\s*(\d+)/.exec(page)?.[1];
+            if (offset)
+              calls = [
+                { name: tool, args: { messageId: ref[1], partId: ref[2], offset: Number(offset), limit: 1024 } },
+              ];
+          } else if (reads === 4) {
+            const evidence = /EVIDENCE=([a-f0-9-]+)/.exec(page)?.[1];
+            if (evidence)
+              calls = [
+                operation(McpToolName.SubmitResult, { summary: 'Recovered evidence from page two', notes: evidence }),
+              ];
+          }
+        } else if (reads === 2 && hasProbe(DISABLE_PROBE)) {
+          await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+          calls = [{ name: 'read', args: { filePath: 'README.md' } }];
+        } else calls = [operation(McpToolName.SubmitResult, { summary: 'Read both files', notes: 'completed' })];
+      } else if (hasProbe(PROBE_CHILD)) {
         for (const name of names) advertisedChild.add(name);
         childPrompts.push(...messages.map(textOf));
         if (last?.role === 'tool') {
@@ -136,7 +219,7 @@ function scriptedModel(): Server {
       }
       const delta =
         calls.length === 0
-          ? { role: 'assistant', content: 'done' }
+          ? { role: 'assistant', content: replyText }
           : {
               role: 'assistant',
               tool_calls: calls.map(({ name, args }, index) => ({
@@ -201,7 +284,18 @@ beforeAll(async () => {
       },
     }),
   );
-  t = await createTestApp({ realOpencode: true, env: { ...process.env, OPENCODE_CONFIG: configFile } });
+  t = await createTestApp({
+    realOpencode: true,
+    env: {
+      ...process.env,
+      OPENCODE_CONFIG: configFile,
+      OPENCODE_TEST_HOME: configDir,
+      OPENCODE_DISABLE_MODELS_FETCH: '1',
+      ...Object.fromEntries(
+        ['DATA', 'CONFIG', 'STATE', 'CACHE'].map((key) => [`XDG_${key}_HOME`, join(configDir, key)]),
+      ),
+    },
+  });
   await t.app.start(t.port);
   repo = await createTestRepo({ files: { 'scripts/check.sh': '#!/bin/sh\necho ok\n' } });
   await chmod(join(repo.path, 'scripts', 'check.sh'), 0o755);
@@ -502,3 +596,283 @@ it('@opencode 结束命令需要权限时可以授权，保留已提交结果', 
     await t.call(cancelTaskOp, { id: task.id });
   }
 }, 45_000);
+
+it.each([
+  ['折叠', { context: 131072 }],
+  ['首步超限', { context: 2048 }],
+  ['运行中停用', { context: 57000 }],
+  ['新任务关闭', { context: 131072 }],
+  ['未知上下文上限', { context: 0 }],
+  ['零输入上限', { context: 131072, input: 0 }],
+] as const)(
+  'M1 真实模型请求（%s）',
+  async (scenario, limits) => {
+    const blocked = scenario === '首步超限';
+    const disable = scenario === '运行中停用';
+    const native = scenario === '新任务关闭';
+    contextRequests.length = 0;
+    providerRequests = 0;
+    await t.call(updateSettingsOp, { 'ai.contextEngine': !native, 'ai.defaultModel': null, 'node.maxAttempts': 3 });
+    const spec = providerFor(model);
+    const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
+    const { project } = await addProject(t, {
+      checkCommand: null,
+      files: {
+        'bulk.txt': Array(200).fill('RAW_CONTEXT_EVIDENCE '.repeat(10)).join('\n'),
+        'latest.txt': Array(200).fill('LATEST_CONTEXT_EVIDENCE '.repeat(9)).join('\n'),
+        'opencode.json': JSON.stringify({
+          model: projectModel,
+          compaction: { auto: true, prune: true },
+          provider: {
+            [PROJECT_PROVIDER]: {
+              ...spec,
+              models: {
+                [MODEL]: {
+                  ...spec.models[MODEL],
+                  limit: { ...limits, output: 1024 },
+                },
+              },
+            },
+          },
+        }),
+      },
+    });
+    const done = waitForEvent(
+      t.app.events,
+      ServerEventType.NodeUpdated,
+      ({ node }) =>
+        node.key === 'locate' && (node.status === NodeStatus.Failed || node.status === NodeStatus.AwaitingAcceptance),
+      30000,
+    );
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      requirement: blocked ? BUDGET_PROBE : disable ? DISABLE_PROBE : CONTEXT_PROBE,
+      checkpoints: { accept_each_node: true },
+    });
+    try {
+      const { node } = await done;
+      expect(node.status).toBe(blocked || disable ? NodeStatus.Failed : NodeStatus.AwaitingAcceptance);
+      const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+      expect(detail.attempts).toHaveLength(1);
+      if (scenario === '未知上下文上限' || scenario === '零输入上限') {
+        expect(t.logs).toContainEqual(
+          expect.objectContaining({
+            msg: 'context budget',
+            attemptId: detail.attempts[0]?.id,
+            blocked: false,
+            limit: scenario === '未知上下文上限' ? null : 131072 - 1024,
+          }),
+        );
+      }
+      const worktree = t.app.services.worktrees.findByTask(task.id);
+      if (!worktree) throw new Error('Missing worktree');
+      const sdk = t.app.services.runtime.sdk();
+      expect(
+        (await sdk.config.get({ directory: worktree.path }, { throwOnError: true })).data.compaction,
+      ).toMatchObject({ auto: native, prune: native });
+      if (blocked || disable) {
+        expect(detail.attempts[0]).toMatchObject({
+          nudges: 0,
+          error: {
+            code: ErrorCode.AttemptContextBudget,
+            message: 'Request exceeded the model context budget before sending',
+          },
+        });
+        expect(detail.retryFeedback).toContain('Reduce the input before retrying');
+        expect(providerRequests).toBe(blocked ? 0 : 3);
+      }
+      if (!blocked) {
+        const last = contextRequests.at(-1) ?? [];
+        expect(last.filter((m) => m.role === 'tool').map(textOf)).toEqual([
+          native
+            ? expect.stringContaining('RAW_CONTEXT_EVIDENCE')
+            : expect.stringMatching(/AW read messageId=.*partId=.*bulk.txt/),
+          expect.stringContaining('LATEST_CONTEXT_EVIDENCE'),
+        ]);
+        expect(last.filter((m) => m.role === 'tool').map((m) => m.tool_call_id)).toEqual(
+          last.flatMap((m) => m.tool_calls?.map((call) => call.id) ?? []),
+        );
+        expect(contextRequests).toHaveLength(3);
+        const owner = detail.attempts[0];
+        if (!owner) throw new Error('Missing attempt');
+        const sessionID = t.app.services.attempts.get(owner.id).opencodeSessionId;
+        if (!sessionID) throw new Error('Missing session');
+        const history = await sdk.session.messages({ sessionID, directory: worktree.path }, { throwOnError: true });
+        expect(
+          history.data.some((m) =>
+            m.parts.some(
+              (p) =>
+                p.type === 'tool' &&
+                p.tool === 'read' &&
+                p.state.status === 'completed' &&
+                p.state.output.includes('RAW_CONTEXT_EVIDENCE'),
+            ),
+          ),
+        ).toBe(true);
+        expect(
+          t.app.services.attempts
+            .transcript(owner.id, 0)
+            .entries.some((e) => e.kind === 'tool_result' && e.data.output?.includes('RAW_CONTEXT_EVIDENCE')),
+        ).toBe(true);
+      }
+    } finally {
+      await t.call(cancelTaskOp, { id: task.id });
+      await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+    }
+  },
+  45000,
+);
+
+it('M2 真实 Session 从折叠引用分页回查并提交证据，其他 Session 读不到同一片段', async () => {
+  contextRequests.length = 0;
+  await t.call(updateSettingsOp, { 'ai.contextEngine': true, 'ai.defaultModel': `${PROVIDER}/${MODEL}` });
+  const evidence = randomUUID();
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'bulk.txt': `EVIDENCE=${evidence}\n${Array(200).fill('large file line '.repeat(12)).join('\n')}`,
+      'latest.txt': 'latest read',
+    },
+  });
+  const taskIds: string[] = [];
+  async function run(requirement: string) {
+    const finished = nodeReaches(t, 'locate', NodeStatus.AwaitingAcceptance, 30000);
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      requirement,
+      checkpoints: { accept_each_node: true },
+    });
+    taskIds.push(task.id);
+    const { node } = await finished;
+    return (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+  }
+  try {
+    const source = await run(RECALL_PROBE);
+    expect(source.attempts).toHaveLength(1);
+    expect(source.result?.notes).toBe(evidence);
+    expect(contextRequests).toHaveLength(5);
+    const projected = contextRequests[2] ?? [];
+    expect(projected.map(textOf).join('')).not.toContain(evidence);
+    const reference = projected.filter((m) => m.role === 'tool').map(textOf)[0] ?? '';
+    const ref = coordinates.exec(reference);
+    if (!ref) throw new Error('Missing folded source coordinates');
+    const foreign = await run(`${FOREIGN_PROBE} ${ref[0]}`);
+    expect(foreign.attempts).toHaveLength(1);
+    expect(foreign.result?.notes).toContain(ErrorCode.NotFound);
+    expect(foreign.result?.notes).toContain('current session');
+    expect(foreign.result?.notes).not.toContain(evidence);
+  } finally {
+    for (const id of taskIds) await t.call(cancelTaskOp, { id });
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+  }
+}, 90000);
+
+it('M3 真实主请求在途时生成无工具摘要，同一 Session 下一请求带新证据并完成', async () => {
+  contextRequests.length = 0;
+  const spec = providerFor(model);
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'bulk.txt': Array.from({ length: 90 }, (_, i) => `EARLY_FINDING ${i} ${'sample '.repeat(65)}`).join('\n'),
+      'latest.txt': 'Latest batch before worker',
+      'new.txt': 'EVIDENCE_AFTER_FREEZE',
+      // 测试屏障：read 已取得新证据，此时允许 Worker 回答，再让主循环进入下一次真实 transform。
+      '.opencode/plugins/read-barrier.js': `export const barrier = async () => ({
+        'tool.execute.after': async ({tool}, result) => {
+          if (tool === 'read' && result.output.includes('EVIDENCE_AFTER_FREEZE'))
+            await fetch('http://127.0.0.1:${(model.address() as AddressInfo).port}/summary-read-produced');
+        }
+      })`,
+      'opencode.json': JSON.stringify({
+        model: `${PROJECT_PROVIDER}/${MODEL}`,
+        provider: {
+          [PROJECT_PROVIDER]: {
+            ...spec,
+            models: { [MODEL]: { ...spec.models[MODEL], limit: { context: 60000, output: 1024 } } },
+          },
+        },
+      }),
+    },
+  });
+  await t.call(updateSettingsOp, {
+    'ai.contextEngine': true,
+    'ai.defaultModel': null,
+    'scheduler.maxConcurrentAttempts': 3,
+  });
+  const unsubscribe = t.app.services.opencode.subscribe((e) => {
+    if (
+      e.type === OpencodeEventType.Deleted &&
+      t.logs.some(
+        (l) => l.msg === 'context summary usage' && 'workerSessionId' in l && l.workerSessionId === e.sessionId,
+      )
+    )
+      summarySaved.resolve();
+  });
+  const done = waitForEvent(
+    t.app.events,
+    ServerEventType.NodeUpdated,
+    ({ node }) =>
+      node.key === 'locate' && [NodeStatus.AwaitingAcceptance, NodeStatus.Failed].some((s) => s === node.status),
+    25000,
+  );
+  const task = await createTask(t, {
+    projectId: project.id,
+    workflow: 'bugfix',
+    requirement: SUMMARY_PROBE,
+    checkpoints: { accept_each_node: true },
+  });
+  try {
+    const { node } = await done;
+    const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+    expect(detail.result?.summary, JSON.stringify(t.logs.filter((l) => String(l.msg).startsWith('context ')))).toBe(
+      'Finished with summary',
+    );
+    expect(detail.result?.notes).toContain('EVIDENCE_AFTER_FREEZE');
+    expect(detail.attempts).toHaveLength(1);
+    expect(contextRequests).toHaveLength(4);
+    expect(workerTools).toEqual([[]]);
+    const before = (contextRequests[2] ?? []).map(textOf).join('');
+    const after = (contextRequests[3] ?? []).map(textOf).join('');
+    expect(before).toContain('EARLY_FINDING');
+    expect(after).toContain('Verified the early finding');
+    expect(after).not.toContain('EARLY_FINDING');
+    expect(after.length).toBeLessThan(before.length * 0.7);
+    const owner = detail.attempts[0];
+    if (!owner) throw new Error('Missing attempt');
+    const attempt = t.app.services.attempts.get(owner.id);
+    const storage = new DatabaseSync(join(t.dataDir, 'app.db'), { readOnly: true });
+    try {
+      expect(
+        storage.prepare('SELECT summary_text FROM context_summaries WHERE session_id=?').all(attempt.opencodeSessionId),
+      ).toEqual([{ summary_text: 'Verified the early finding in bulk.txt.' }]);
+    } finally {
+      storage.close();
+    }
+    expect(
+      t.logs.filter(
+        (l) =>
+          l.msg === 'mcp tool called' &&
+          'tool' in l &&
+          l.tool === McpToolName.SubmitResult &&
+          'attemptId' in l &&
+          l.attemptId === attempt.id,
+      ),
+    ).toHaveLength(1);
+    expect(t.logs).toContainEqual(
+      expect.objectContaining({
+        msg: 'context summary usage',
+        sessionId: attempt.opencodeSessionId,
+        tokens: expect.objectContaining({ output: 1 }),
+      }),
+    );
+  } finally {
+    workerStarted.resolve();
+    newReadProduced.resolve();
+    summarySaved.resolve();
+    unsubscribe();
+    await t.call(cancelTaskOp, { id: task.id });
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+  }
+}, 40000);

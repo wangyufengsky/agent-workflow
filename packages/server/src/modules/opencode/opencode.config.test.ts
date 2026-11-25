@@ -60,6 +60,21 @@ describe('opencode 配置生成', () => {
     expect(rest).toMatchSnapshot();
   });
 
+  it('预算回调只注入通过预研的运行时，其他可托管版本照常启动', () => {
+    const input = configInput(undefined, false);
+    const plugin = (runtimeVersion: string) => buildOpencodeConfig({ ...input, runtimeVersion }).plugin;
+    expect(plugin('1.18.0')).toEqual([pathToFileURL(PLUGIN_FILE).href]);
+    expect(plugin('1.19.0')).toEqual([
+      [
+        pathToFileURL(PLUGIN_FILE).href,
+        {
+          contextApi: 'http://127.0.0.1:4000/internal/context/',
+          contextToken: input.mcpToken,
+        },
+      ],
+    ]);
+  });
+
   it('固定 shell 时注入 shell（Windows 上的 Git Bash，D72），否则不设置', () => {
     expect(config('C:\\Program Files\\Git\\bin\\bash.exe').shell).toBe('C:\\Program Files\\Git\\bin\\bash.exe');
     expect('shell' in config(undefined)).toBe(false);

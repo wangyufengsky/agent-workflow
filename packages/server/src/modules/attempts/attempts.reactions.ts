@@ -67,12 +67,32 @@ export function watchSessions(
     }
   }
 
+  function stopForBudget(attempt: Attempt, session: LiveSession): void {
+    move(attempt, AttemptEvent.SessionError, {
+      code: ErrorCode.AttemptContextBudget,
+      message: 'Request exceeded the model context budget before sending',
+    });
+    state.releaseSession(session);
+  }
+
+  /** 登记本身就是停止的依据。此时结束也能取消正在等待的开始命令，避免它再派发首条提示。 */
+  function blockContext(sessionId: string, attemptId: string): void {
+    const session = live.get(sessionId);
+    if (session?.attemptId !== attemptId) return;
+    const attempt = mustFind(attemptId);
+    if (attempt.status !== AttemptStatus.Running) return;
+    session.budgetBlocked = true;
+    if (state.waitsForUser(attemptId)) state.park(session, attempt);
+    else stopForBudget(attempt, session);
+  }
+
   async function onIdle(attempt: Attempt, session: LiveSession): Promise<void> {
     session.idle = true;
     if (state.waitsForUser(attempt.id)) {
       state.park(session, attempt);
       return;
     }
+    if (session.budgetBlocked) return stopForBudget(attempt, session);
     const { stall } = session;
     if (stall !== null) {
       stall.idled = true;
@@ -328,7 +348,7 @@ export function watchSessions(
         if (session.finishingCommand) return;
         if (running) {
           if (session.firstPrompt !== null) return;
-          if (session.contextOverflow !== null) {
+          if (!session.budgetBlocked && session.contextOverflow !== null) {
             failSession(attempt, session, session.contextOverflow);
             state.releaseSession(session);
           } else state.inBackground(attempt.id, () => onIdle(attempt, session));
@@ -337,6 +357,7 @@ export function watchSessions(
         } else state.releaseSession(session);
         return;
       case OpencodeEventType.Error:
+        if (session.budgetBlocked) return;
         // OpenCode emits this before trying compaction. Keep the attempt active until recovery or idle.
         if (event.error?.name === CONTEXT_OVERFLOW_ERROR) {
           if (session.contextOverflow === null) {
@@ -393,6 +414,10 @@ export function watchSessions(
    */
   function resume(session: LiveSession): void {
     if (!session.parked || state.waitsForUser(session.attemptId)) return;
+    if (session.budgetBlocked) {
+      stopForBudget(mustFind(session.attemptId), session);
+      return;
+    }
     session.parked = false;
     if (session.firstPrompt?.messageId !== null) arm(session, session.timeoutMs);
     deps.slots.changed();
@@ -400,5 +425,5 @@ export function watchSessions(
     state.signal('input_answered', attempt);
     if (session.idle) state.inBackground(attempt.id, () => onIdle(attempt, session));
   }
-  return { arm, timeOut, interruptActive, resume };
+  return { arm, timeOut, interruptActive, resume, blockContext };
 }

@@ -32,7 +32,7 @@ export type OpencodeRuntimeDeps = {
    * `offline` (D168). Built per launch because the configuration holds the MCP endpoint and follows the settings.
    * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D72).
    */
-  launchEnv: () => Promise<{ env: Record<string, string>; offline: boolean; headerInput?: string }>;
+  launchEnv: (version: string) => Promise<{ env: Record<string, string>; offline: boolean; headerInput?: string }>;
   /** Certificate and proxy variables for the next launch (D164, D165), on top of `env`. */
   networkEnv: () => Promise<NodeJS.ProcessEnv>;
   log: Logger;
@@ -202,7 +202,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     let launchEnv: Awaited<ReturnType<OpencodeRuntimeDeps['launchEnv']>>;
     let networkEnv: NodeJS.ProcessEnv;
     try {
-      launchEnv = await deps.launchEnv();
+      launchEnv = await deps.launchEnv(version);
       networkEnv = await deps.networkEnv();
     } catch (err) {
       // Recovery with a defined meaning: opencode cannot be hosted here (or its CA bundle cannot be written), so it

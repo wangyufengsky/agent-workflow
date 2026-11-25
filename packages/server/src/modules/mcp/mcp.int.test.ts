@@ -18,6 +18,8 @@ import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 
 import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
 
+import { OpencodeEventType, ToolCallStatus } from '../opencode/index.ts';
+
 let t: TestApp;
 let mcp: Client;
 
@@ -64,6 +66,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.GetTaskContext,
       McpToolName.GetSubmissionGuide,
       McpToolName.GetNodeOutput,
+      McpToolName.Recall,
       McpToolName.GetTaskDiff,
       McpToolName.DelegateReadonly,
       McpToolName.InspectDelegation,
@@ -121,6 +124,64 @@ describe('执行 MCP（/mcp/exec）', () => {
     expect(browserReport?.inputSchema.required).toEqual(['summary']);
     expect(Object.keys(browserReport?.inputSchema.properties ?? {})).toEqual(['summary', 'notes']);
     expect(JSON.stringify(tools)).not.toContain(MCP_SESSION_ARG);
+  });
+
+  it('Recall 分页、截断上限，只读调用会话中完成的文本结果', async () => {
+    const source = await activeSession(AttemptKind.Execute);
+    const other = await activeSession(AttemptKind.Execute);
+    const ref = { messageId: 'msg_source', partId: 'prt_source' };
+    const output = `首🌱${'x'.repeat(4095)}`;
+    const result = {
+      type: OpencodeEventType.Tool,
+      sessionId: source,
+      ...ref,
+      callId: 'call_read',
+      tool: 'read',
+      input: {},
+      status: ToolCallStatus.Completed,
+      output,
+    } as const;
+    t.fake.replay([result, { ...result, partId: 'prt_pending', status: ToolCallStatus.Running }]);
+    const recall = (owner: string, args: Record<string, unknown>) =>
+      callTool(mcp, McpToolName.Recall, { [MCP_SESSION_ARG]: owner, ...ref, ...args });
+    expect((await recall(source, { limit: 2 })).body).toEqual({
+      content: '首🌱',
+      offset: 0,
+      totalLength: 4097,
+      nextOffset: 2,
+    });
+    expect((await recall(source, { offset: 2, limit: 99999 })).body).toEqual({
+      content: 'x'.repeat(4095),
+      offset: 2,
+      totalLength: 4097,
+      nextOffset: null,
+    });
+    expect((await recall(source, { limit: 99999 })).body).toMatchObject({
+      nextOffset: 4096,
+      content: output.slice(0, -1),
+    });
+    expect((await recall(source, { offset: 5000 })).body).toEqual({
+      content: '',
+      offset: 4097,
+      totalLength: 4097,
+      nextOffset: null,
+    });
+    for (const response of [
+      await recall(other, {}),
+      await recall(source, { messageId: 'msg_missing' }),
+      await recall(source, { partId: 'prt_missing' }),
+      await recall(source, { partId: 'prt_pending' }),
+    ]) {
+      expect(response).toMatchObject({
+        isError: true,
+        body: { code: ErrorCode.NotFound, hint: expect.stringContaining('current session') },
+      });
+      expect(response.body).not.toHaveProperty('content');
+    }
+    for (const args of [{ sessionId: source }, { directory: '/tmp' }]) {
+      expect((await recall(other, args)).body.code).toBe(ErrorCode.ValidationFailed);
+    }
+    expect((await recall(await activeSession(AttemptKind.Delegation), {})).body.code).toBe(ErrorCode.McpToolNotAllowed);
   });
 
   it('工具页的清单（GET /mcp/tools）带允许的尝试类型与输入 schema', async () => {

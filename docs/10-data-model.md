@@ -914,3 +914,15 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 ### 模型思考强度
 
 迁移 0054 为 roles 增加可空 JSON 列 effort。null 表示按角色的模型选择使用默认策略；对象保存 {model, variant}，其中 variant 为 null 时显式采用模型默认。已有角色无需重新配置。 同一迁移在 attempts.model_efforts 保存本次运行的模型档位选择；排队、恢复和同一尝试后续消息沿用快照。旧尝试使用模型默认。
+
+### context_summaries（后台上下文摘要）
+
+每个 OpenCode 物理 Session 保留一条可替换的摘要。原始历史由 OpenCode 保存。插件按当前消息数组定位终点，保留仍在执行的轮次；终点缺失时使用普通工具折叠。
+
+| 列 | 类型 | 含义 |
+| --- | --- | --- |
+| session_id | TEXT PK | 主任务的物理会话 |
+| task_id | TEXT NOT NULL FK → tasks.id | 删除任务时级联清理。原生会话删除事件也按 session_id 清理 |
+| upto_message_id | TEXT NOT NULL | 已摘要的最后一条闭合消息 |
+| summary_text | TEXT NOT NULL | 无工具 Worker 生成的历史摘要 |
+| updated_at | INTEGER NOT NULL | 最近一次发布的毫秒时间戳 |

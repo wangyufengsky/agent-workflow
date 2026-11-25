@@ -101,6 +101,7 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
       return () => beforeRemove.delete(listener);
     },
     listByTasks: (taskIds: readonly string[]) => repo.listByTasks(taskIds),
+    taskAt: repo.taskAt,
     findByTask: (taskId: string): Worktree | undefined => repo.findByTask(taskId),
     listByProject: (projectId: string): Worktree[] => repo.listByProject(projectId),
 

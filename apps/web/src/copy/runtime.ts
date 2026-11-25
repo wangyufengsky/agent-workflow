@@ -54,6 +54,7 @@ export const TOOLS_COPY = {
   description: {
     [McpToolName.GetSubmissionGuide]: '查询当前步骤的提交工具、参数、示例和最近一次拒绝原因。',
     [McpToolName.GetTaskContext]: '读取任务的需求、当前步骤、检查方式、前面步骤的结果，以及用户的回答与反馈。',
+    [McpToolName.Recall]: '按页取回当前会话中已完成工具的原始文本。',
     [McpToolName.GetNodeOutput]: '读取本任务中某个已完成步骤的完整产出：摘要、改动文件、注意事项与检查结果。',
     [McpToolName.GetTaskDiff]: '查看任务工作区相对基线的改动：文件列表，或某个文件的 diff。',
     [McpToolName.DelegateReadonly]: '并行委派至多两个独立的只读问题，并返回固定提交与证据。',

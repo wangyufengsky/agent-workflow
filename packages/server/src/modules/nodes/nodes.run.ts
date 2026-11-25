@@ -259,7 +259,12 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     if (node.status !== NodeStatus.Running && node.status !== NodeStatus.WaitingInput) return;
     const browserTest = deps.isBrowserTestTask?.(node.taskId) === true;
     if (attempt.status === AttemptStatus.Interrupted && !browserTest) interrupt(node);
-    else {
+    else if (attempt.error?.code === ErrorCode.AttemptContextBudget) {
+      move(node, NodeEvent.AttemptFailed, NodeStatus.Failed, {
+        finishedAt: clock.now(),
+        retryFeedback: feedbackFromAttempt(attempt.status, attempt.error),
+      });
+    } else {
       const submitTool = browserTest ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;
       fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(attempt.status, attempt.error, submitTool));
     }

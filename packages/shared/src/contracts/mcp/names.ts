@@ -6,6 +6,7 @@ export const McpToolName = {
   GetSubmissionGuide: 'get_submission_guide',
   GetTaskContext: 'get_task_context',
   GetNodeOutput: 'get_node_output',
+  Recall: 'recall',
   GetTaskDiff: 'get_task_diff',
   DelegateReadonly: 'delegate_readonly',
   InspectDelegation: 'inspect_delegation',

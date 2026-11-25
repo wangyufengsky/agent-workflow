@@ -390,6 +390,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ui.mode` | `simple` | 简单 |
 | `ui.theme` | `system` | 简单 |
 | `ui.introAnimation` | `true`（打开动画，下次启动生效；main 经 `launch.json` 读它，28 §5.3） | 简单 |
+| `ai.contextEngine` | `false` | 专业，受管任务工作树的请求级上下文折叠 |
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
 | `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
@@ -423,6 +424,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `network.noProxy` | `[]`（`network.proxy` 生效时直连的地址：`*`、主机名（含子域名，可写 `.` 或 `*.` 前缀）、IP、IPv4 / IPv6 网段、加 `:端口`；IP 与网段只匹配网址里直接写的 IP；由后端的转发代理统一判断，内置浏览器换算成 Chromium 的 bypass 规则；本机地址总是直连；助手不能修改，D165、D174） | 专业 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
+
+`ai.contextEngine` 在 OpenCode 1.19.0 初始化 AW 专用任务工作树时生效。关闭后，新任务沿用原配置，已受管会话下次发送前按完整历史检查预算。输入按 UTF-8 字节估算，计入系统提示、历史和工具定义，并为本次输出预留空间。V1 的工具清单接口未提供第三方 MCP 的完整 schema，其首轮按 AW 执行 MCP 的工具定义体积估算，连续执行时用 Provider 报告的输入用量修正。
 
 ## 5. 错误码
 
@@ -511,6 +514,7 @@ class AppError extends Error {
 | `CHECK_COMMAND_UNRUNNABLE` | — | 节点的检查命令在应用环境里无法运行（D116，记录在任务的 `failure` 上，不作为 HTTP 错误，不消耗预算）；`details: { nodeKey, nodeTitle, command, program, reason }`，`reason` 为 `CheckUnrunnableReason` |
 | **尝试 / opencode** | | |
 | `ATTEMPT_NOT_FOUND` | 404 | |
+| `ATTEMPT_CONTEXT_BUDGET` | — | 发送前超出上下文预算，尝试停止，节点等待手动重试 |
 | `ATTEMPT_NO_RESULT` | — | 会话结束但未提交结果（记录在尝试上，不作为 HTTP 错误） |
 | `ATTEMPT_TIMEOUT` | — | 超过 `attempt.timeoutMinutes` |
 | `ATTEMPT_SESSION_ERROR` | — | opencode `session.error`；`message` 为「错误类名: 模型服务的原话」（外部原文，界面直接显示，D163），`details` 为原始错误。模型服务连不上、5xx、限流时 opencode 只重试、不报错，尝试等待而不是失败 |

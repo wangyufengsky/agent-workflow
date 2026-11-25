@@ -6,7 +6,11 @@ import {
   abortAttemptOp,
   ErrorCode,
   getAttemptOp,
+  getModelSlotsOp,
+  InboxKind,
+  PermissionDecision,
   RoleBaseAgent,
+  resolveInboxOp,
   ServerEventType,
   startDebugAttemptOp,
   TranscriptSystemEvent,
@@ -19,6 +23,7 @@ import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock, type FakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
+import { inboxOpens } from '../../../test/helpers/tasks.ts';
 import { OpencodeEventType } from '../opencode/index.ts';
 
 let t: TestApp;
@@ -90,6 +95,28 @@ describe('尝试的结束条件（12 §4.2）', () => {
     expect(t.fake.aborts).toEqual([started.opencodeSessionId]);
   });
 
+  it('已接受的提交保留成功结果，迟来的预算阻断与空闲不再派发', async () => {
+    const succeeded = reaches('succeeded');
+    t.fake.enqueue(script().callTool('submit_result', submit));
+    const started = await startAttempt();
+    await succeeded;
+    const sessionId = started.opencodeSessionId;
+    if (!sessionId) throw new Error('Missing session');
+    t.app.services.attempts.blockContext(sessionId, started.id);
+    t.fake.replay([
+      { type: OpencodeEventType.Error, sessionId, error: undefined },
+      { type: OpencodeEventType.Idle, sessionId },
+    ]);
+    await t.fake.settled();
+    expect((await t.call(getAttemptOp, { id: started.id })).body).toMatchObject({
+      status: 'succeeded',
+      error: null,
+      nudges: 0,
+    });
+    expect(t.fake.toolCalls).toHaveLength(1);
+    expect(t.fake.prompts).toHaveLength(1);
+  });
+
   it('空闲且未提交时提醒一次，再次空闲仍未提交则失败 ATTEMPT_NO_RESULT', async () => {
     const failed = reaches('failed');
     const started = await startAttempt();
@@ -124,6 +151,45 @@ describe('尝试的结束条件（12 §4.2）', () => {
       message: 'APIError: Bad Gateway',
       details: { error: { name: 'APIError', data: { message: 'Bad Gateway' } } },
     });
+  });
+
+  it.each(['idle-first', 'error-first'])('预算阻断后只结束当前尝试（%s）', async (order) => {
+    t.fake.enqueue(script().hang());
+    const started = await startAttempt();
+    const sessionId = started.opencodeSessionId;
+    if (!sessionId) throw new Error('Missing session');
+    t.app.services.attempts.blockContext(sessionId, started.id);
+    const idle = { type: OpencodeEventType.Idle, sessionId } as const;
+    const error = {
+      type: OpencodeEventType.Error,
+      sessionId,
+      error: { name: 'UnknownError', data: { message: 'AW context budget exceeded' } },
+    } as const;
+    t.fake.replay(order === 'idle-first' ? [idle, error] : [error, idle]);
+    const attempt = (await t.call(getAttemptOp, { id: started.id })).body;
+    expect(attempt).toMatchObject({ nudges: 0, status: 'failed', error: { code: ErrorCode.AttemptContextBudget } });
+    expect(t.fake.prompts).toHaveLength(1);
+    expect((await t.call(getModelSlotsOp, {})).body).toMatchObject({ inUse: 0, queued: 0 });
+  });
+
+  it('预算阻断后保留未决审批，答复后结束且不催办', async () => {
+    const opened = inboxOpens(t, InboxKind.Permission);
+    t.fake.enqueue(script().requestPermission('webfetch', ['https://example.com']).hang());
+    const started = await startAttempt();
+    const { item } = await opened;
+    const sessionId = started.opencodeSessionId;
+    if (!sessionId) throw new Error('Missing session');
+    t.app.services.attempts.blockContext(sessionId, started.id);
+    t.fake.replay([
+      { type: OpencodeEventType.Error, sessionId, error: undefined },
+      { type: OpencodeEventType.Idle, sessionId },
+    ]);
+    expect(t.app.services.inbox.listOpen({ attemptId: started.id })).toMatchObject([{ id: item.id }]);
+    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(0);
+    const failed = reaches('failed');
+    await t.call(resolveInboxOp, { id: item.id, response: { decision: PermissionDecision.Once } });
+    expect((await failed).attempt).toMatchObject({ nudges: 0, error: { code: ErrorCode.AttemptContextBudget } });
+    expect(t.fake.prompts).toHaveLength(1);
   });
 
   it('上下文超限后等到原会话空闲，压缩未成功则保留原始错误', async () => {

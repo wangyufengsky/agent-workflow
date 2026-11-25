@@ -89,6 +89,7 @@ export type OpencodeClient = {
   isConnected(): boolean;
   /** Returns the new session id. */
   createSession(input: CreateSessionInput): Promise<string>;
+  readToolOutput(input: SessionRequest & { messageId: string; partId: string }): Promise<string | undefined>;
   sessionRules(input: SessionRequest): Promise<PermissionRule[]>;
   setPermissions(input: SessionRequest & { permission: PermissionRule[] }): Promise<void>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
@@ -99,7 +100,11 @@ export type OpencodeClient = {
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
   promptDocument(
-    input: SessionRequest & Pick<PromptInput, 'system' | 'model' | 'text' | 'efforts'> & { agent?: string },
+    input: SessionRequest &
+      Pick<PromptInput, 'system' | 'model' | 'text' | 'efforts'> & {
+        agent?: string;
+        onUsage?(tokens: { input: number; output: number }, cost: number): void;
+      },
   ): Promise<string>;
   promptImage(input: ImagePromptInput): Promise<string>;
   abort(input: SessionRequest): Promise<void>;
@@ -114,6 +119,8 @@ export type OpencodeClient = {
   listModels(directory?: string, signal?: AbortSignal): Promise<{ available: OpencodeModel[]; defaultModel?: string }>;
   /** 在独立目录恢复父会话实际使用的模型，复制的配置仅包含模型提供商。 */
   prepareDelegationModel(input: {
+    signal?: AbortSignal;
+    privateSession?: boolean;
     sourceDirectory: string;
     sourceSessionId: string | null;
     targetDirectory: string;
@@ -256,6 +263,31 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       );
       return data.id;
     },
+    async readToolOutput({ sessionId, directory, messageId, partId, signal }) {
+      return request('session.message', async () => {
+        try {
+          const { data } = await runtime
+            .sdk()
+            .session.message({ sessionID: sessionId, directory, messageID: messageId }, requestOptions(signal));
+          if (data.info.sessionID !== sessionId || data.info.id !== messageId || data.info.role !== 'assistant')
+            return undefined;
+          const part = data.parts.find(
+            (p) => p.id === partId && p.messageID === messageId && p.sessionID === sessionId,
+          );
+          if (
+            part?.type === 'tool' &&
+            part.state.status === 'completed' &&
+            typeof part.state.output === 'string' &&
+            !part.state.attachments?.length
+          )
+            return part.state.output;
+        } catch (err) {
+          if (err instanceof Error && sessionNotFoundCauseSchema.safeParse(err.cause).success) return undefined;
+          throw err;
+        }
+        return undefined;
+      });
+    },
     async sessionRules({ sessionId, directory, signal }) {
       const { data } = await request('session.get', () =>
         runtime.sdk().session.get({ sessionID: sessionId, directory }, requestOptions(signal)),
@@ -373,6 +405,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       text,
       signal,
       agent = OPENCODE_DOCUMENT_AGENT,
+      onUsage,
     }) {
       const { data } = await request('session.prompt', async () =>
         runtime.sdk().session.prompt(
@@ -394,6 +427,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
             ? 'The database investigator model returned an error'
             : 'The document model returned an error',
         );
+      if (data.info.role === 'assistant') onUsage?.(data.info.tokens, data.info.cost);
       return data.parts
         .flatMap((p) => (p.type === 'text' ? [p.text] : []))
         .join('\n')
@@ -455,13 +489,18 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       });
     },
     listModels,
-    async prepareDelegationModel({ sourceDirectory, sourceSessionId, targetDirectory, model }) {
+    async prepareDelegationModel({ sourceDirectory, sourceSessionId, targetDirectory, model, signal, privateSession }) {
       const sdk = runtime.sdk();
-      const { data: source } = await request('config.get', () => sdk.config.get({ directory: sourceDirectory }, THROW));
+      const { data: source } = await request('config.get', () =>
+        sdk.config.get({ directory: sourceDirectory }, requestOptions(signal)),
+      );
       let resolvedModel = model;
       if (resolvedModel === null && sourceSessionId !== null) {
         const { data } = await request('session.messages', () =>
-          sdk.session.messages({ sessionID: sourceSessionId, directory: sourceDirectory, limit: 1 }, THROW),
+          sdk.session.messages(
+            { sessionID: sourceSessionId, directory: sourceDirectory, limit: 1 },
+            requestOptions(signal),
+          ),
         );
         const message = data.at(-1)?.info;
         if (message?.role === 'assistant') resolvedModel = `${message.providerID}/${message.modelID}`;
@@ -470,21 +509,24 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       resolvedModel ??= source.model ?? null;
       if (resolvedModel === null) return null;
       const { providerId } = parseModelRef(resolvedModel);
-      const { data: global } = await request('config.get', () => sdk.config.get({}, THROW));
+      const { data: global } = await request('config.get', () => sdk.config.get({}, requestOptions(signal)));
       const provider = source.provider?.[providerId];
       const localProvider = provider !== undefined && !isDeepStrictEqual(provider, global.provider?.[providerId]);
       const enabledProvidersChanged = !isDeepStrictEqual(source.enabled_providers, global.enabled_providers);
       const disabledProvidersChanged = !isDeepStrictEqual(source.disabled_providers, global.disabled_providers);
-      if (localProvider || enabledProvidersChanged || disabledProvidersChanged) {
+      if (privateSession || localProvider || enabledProvidersChanged || disabledProvidersChanged) {
         // 使用运行时已解析的单个提供商。项目的指令、插件、MCP 和其他配置均不复制。
         await writeFile(
           join(targetDirectory, 'opencode.json'),
           JSON.stringify({
+            ...(privateSession
+              ? { share: 'disabled', autoshare: false, compaction: { auto: false, prune: false } }
+              : {}),
             ...(localProvider ? { provider: { [providerId]: provider } } : {}),
             ...(enabledProvidersChanged ? { enabled_providers: source.enabled_providers ?? [] } : {}),
             ...(disabledProvidersChanged ? { disabled_providers: source.disabled_providers ?? [] } : {}),
           }),
-          { mode: 0o600, flag: 'wx' },
+          { mode: 0o600, flag: 'wx', signal },
         );
       }
       return resolvedModel;

@@ -266,3 +266,6 @@ export const MASTER_PASSWORD_MAX_LENGTH = 1024;
 /** 用户 Skill 的正文会随会话上下文发送。 */
 export const USER_SKILL_MAX_CHARS = 12_000;
 export const SKILL_SELECTION_MAX = 5;
+
+/** Maximum Unicode code points returned by one Recall call. */
+export const RECALL_PAGE_MAX_CHARS = 4096;
