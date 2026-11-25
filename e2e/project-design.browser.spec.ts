@@ -10,6 +10,8 @@ import {
   DesignStatus,
   type InboxItemDTO,
   InboxKind,
+  listDesignsOp,
+  listProjectsOp,
   McpToolName,
   OPENCODE_AGENT_NAME,
   THEME_IDS,
@@ -507,6 +509,43 @@ test('工作台原位改名、架构阅读顺序与图边交互', async ({ page,
   await expect(page).toHaveURL(/\/designs$/);
   const deleted = await request.get(`${API_BASE}/designs/${id}`, { headers: AUTH });
   expect(deleted.status()).toBe(404);
+});
+
+test('草稿可以取消删除，所属项目删除后仍能确认删除', async ({ page, request }) => {
+  const project = await fixtureProject(request);
+  await page.goto(`/designs/new?projectId=${project.id}`);
+  await page.getByRole('button', { name: '扫描项目并拟定大纲' }).click();
+  await expect(page.getByRole('heading', { name: '分析大纲' })).toBeVisible();
+  const id = designId(page);
+  expect(await design(request, id)).toMatchObject({ outlineConfirmedAt: null, runs: [] });
+
+  const remove = page.getByRole('button', { name: '删除设计', exact: true });
+  const confirmation = page.getByRole('dialog', { name: '删除设计' });
+  await remove.click();
+  await confirmation.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(confirmation).toBeHidden();
+  expect(await design(request, id)).toMatchObject({ projectId: project.id, runs: [] });
+
+  const projectDeletion = await request.delete(`${API_BASE}/projects/${project.id}`, { headers: AUTH });
+  expect(projectDeletion.status(), await projectDeletion.text()).toBe(204);
+  await page.goto('/designs');
+  await expect(page).toHaveURL(/\/designs$/);
+  await expect(page.getByRole('link', { name: /退款服务 项目设计/ })).toBeVisible();
+  await page.goto(`/designs/${id}`);
+  await expect(page.getByText('项目已删除', { exact: true })).toBeVisible();
+  await expect(remove).toBeEnabled();
+  await remove.click();
+  await confirmation.getByRole('button', { name: '删除设计', exact: true }).click();
+  const deleted = await request.get(`${API_BASE}/designs/${id}`, { headers: AUTH });
+  expect(deleted.status()).toBe(404);
+  const [projects, designs] = await Promise.all([
+    request.get(`${API_BASE}/projects`, { headers: AUTH }),
+    request.get(`${API_BASE}/designs?limit=1`, { headers: AUTH }),
+  ]);
+  const emptyWorkspace =
+    listProjectsOp.output.parse(await projects.json()).items.length === 0 &&
+    listDesignsOp.output.parse(await designs.json()).items.length === 0;
+  await expect(page).toHaveURL(emptyWorkspace ? /\/onboarding$/ : /\/designs$/);
 });
 
 test.afterAll(({ request }) => patchSettings(request, { 'ui.theme': ThemeId.Codex, 'ui.mode': 'simple' }));

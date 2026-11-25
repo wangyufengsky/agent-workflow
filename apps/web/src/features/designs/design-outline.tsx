@@ -14,8 +14,10 @@ import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { DESIGN_WORKBENCH_COPY } from '../../copy/design-workbench.ts';
 import { DESIGNS_COPY as C, DESIGN_SECTION_LABEL, DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
+import { DeleteDesignDialog } from './design-workbench-dialogs.tsx';
 import styles from './designs.module.css';
 import { useGenerateDesign, useReviseDesignOutline, useStopDesign, useUpdateDesignOutline } from './designs.queries.ts';
 
@@ -119,6 +121,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
   const optimize = useReviseDesignOutline();
   const generate = useGenerateDesign();
   const stop = useStopDesign();
+  const [deleting, setDeleting] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [instruction, setInstruction] = useState('');
   const latest = design.runs.at(-1);
@@ -146,6 +149,14 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
           <p className="lede">{C.outlineHint}</p>
         </div>
         <span className="badge">{DESIGN_STATUS_LABEL[design.status]}</span>
+        <Button
+          icon="trash"
+          variant="danger"
+          disabled={active || update.isPending || optimize.isPending || generate.isPending}
+          onClick={() => setDeleting(true)}
+        >
+          {DESIGN_WORKBENCH_COPY.remove}
+        </Button>
         <Link to={ROUTES.designs} search={{ projectId: design.projectId ?? undefined }} className="btn">
           {C.back}
         </Link>
@@ -265,6 +276,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
           <AttemptView attemptId={latest.attempt.id} canAbort={false} foldOnEnd />
         </div>
       )}
+      {deleting && <DeleteDesignDialog design={design} close={() => setDeleting(false)} />}
       {optimizing && (
         <Dialog
           open
