@@ -176,8 +176,10 @@ export function createFakeOpencode() {
   };
 
   const nextId = (prefix: string) => `${prefix}_${++counter}`;
+  const toolParts = new Map<string, Extract<OpencodeEvent, { type: typeof E.Tool }>>();
   const emit = (event: OpencodeEvent) => {
     if (closed) return;
+    if (event.type === E.Tool) toolParts.set(event.partId, event);
     for (const listener of listeners) listener(event);
   };
 
@@ -209,7 +211,7 @@ export function createFakeOpencode() {
   ): Promise<OpencodeError | undefined> {
     const sessionId = session.id;
     const turnGeneration = generation.get(sessionId) ?? 0;
-    const messageId = nextId('fake_msg');
+    const messageId = nextId('msg_fake');
     if (parentMessageId !== undefined) emit({ type: E.Message, sessionId, messageId: parentMessageId, role: 'user' });
     // opencode 1.19.0 reports the session busy as each turn starts.
     emit({ type: E.Busy, sessionId });
@@ -224,7 +226,7 @@ export function createFakeOpencode() {
     for (const step of steps) {
       if ((generation.get(sessionId) ?? 0) !== turnGeneration || closed)
         return { name: 'MessageAbortedError', data: { message: 'Aborted' } };
-      const partId = nextId('fake_prt');
+      const partId = nextId('prt_fake');
       const ids = { sessionId, messageId, partId };
       switch (step.type) {
         case 'edit': {
@@ -537,6 +539,17 @@ export function createFakeOpencode() {
     },
     async promptImage() {
       throw new Error('This test did not configure an image reader response');
+    },
+    async readToolOutput({ sessionId, directory, messageId, partId }) {
+      const part = toolParts.get(partId);
+      if (
+        sessionOf(sessionId).directory === directory &&
+        part?.sessionId === sessionId &&
+        part.messageId === messageId &&
+        part.status === ToolCallStatus.Completed
+      )
+        return part.output;
+      return undefined;
     },
     async deleteSession({ sessionId }) {
       const index = sessions.findIndex((s) => s.id === sessionId);

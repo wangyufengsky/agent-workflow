@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -42,6 +43,9 @@ const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
 const CONTEXT_PROBE = 'AW_CHECK_REQUEST_PROJECTION';
 const DISABLE_PROBE = 'AW_DISABLE_AFTER_PROJECTION';
+const RECALL_PROBE = 'AW_CHECK_PAGED_RECALL';
+const FOREIGN_PROBE = 'AW_CHECK_FOREIGN_RECALL';
+const coordinates = /messageId=(msg_\w+) partId=(prt_\w+)/;
 const BUDGET_PROBE = 'AW_CHECK_BUDGET_STOP';
 const contextRequests: ChatMessage[][] = [];
 let providerRequests = 0;
@@ -124,11 +128,39 @@ function scriptedModel(): Server {
       });
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
       providerRequests++;
-      if (hasProbe(CONTEXT_PROBE) || hasProbe(DISABLE_PROBE)) {
+      if (hasProbe(FOREIGN_PROBE)) {
+        const ref = coordinates.exec(prompt);
+        if (ref) calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2] })];
+        else if (last?.role === 'tool')
+          calls = [operation(McpToolName.SubmitResult, { summary: 'Checked foreign reference', notes: textOf(last) })];
+      } else if (hasProbe(CONTEXT_PROBE) || hasProbe(DISABLE_PROBE) || hasProbe(RECALL_PROBE)) {
         contextRequests.push(messages);
         const reads = messages.filter((m) => m.role === 'tool').length;
         if (reads < 2) calls = [{ name: 'read', args: { filePath: reads === 0 ? 'bulk.txt' : 'latest.txt' } }];
-        else if (reads === 2 && hasProbe(DISABLE_PROBE)) {
+        else if (hasProbe(RECALL_PROBE)) {
+          const outputs = messages.filter((m) => m.role === 'tool').map(textOf);
+          const reference = outputs[0] ?? '';
+          const ref = coordinates.exec(reference);
+          const tool = names.find(
+            (name) => name === `${MCP_TOOL_PREFIX}${McpToolName.Recall}` && reference.includes(name),
+          );
+          const page = outputs.at(-1) ?? '';
+          if (ref && tool && reads === 2)
+            calls = [{ name: tool, args: { messageId: ref[1], partId: ref[2], limit: 16 } }];
+          else if (ref && tool && reads === 3) {
+            const offset = /"nextOffset"\s*:\s*(\d+)/.exec(page)?.[1];
+            if (offset)
+              calls = [
+                { name: tool, args: { messageId: ref[1], partId: ref[2], offset: Number(offset), limit: 1024 } },
+              ];
+          } else if (reads === 4) {
+            const evidence = /EVIDENCE=([a-f0-9-]+)/.exec(page)?.[1];
+            if (evidence)
+              calls = [
+                operation(McpToolName.SubmitResult, { summary: 'Recovered evidence from page two', notes: evidence }),
+              ];
+          }
+        } else if (reads === 2 && hasProbe(DISABLE_PROBE)) {
           await t.call(updateSettingsOp, { 'ai.contextEngine': false });
           calls = [{ name: 'read', args: { filePath: 'README.md' } }];
         } else calls = [operation(McpToolName.SubmitResult, { summary: 'Read both files', notes: 'completed' })];
@@ -659,3 +691,48 @@ it.each([
   },
   45000,
 );
+
+it('M2 真实 Session 从折叠引用分页回查并提交证据，其他 Session 读不到同一片段', async () => {
+  contextRequests.length = 0;
+  await t.call(updateSettingsOp, { 'ai.contextEngine': true, 'ai.defaultModel': `${PROVIDER}/${MODEL}` });
+  const evidence = randomUUID();
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'bulk.txt': `EVIDENCE=${evidence}\n${Array(200).fill('large file line '.repeat(12)).join('\n')}`,
+      'latest.txt': 'latest read',
+    },
+  });
+  const taskIds: string[] = [];
+  async function run(requirement: string) {
+    const finished = nodeReaches(t, 'locate', NodeStatus.AwaitingAcceptance, 30000);
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      requirement,
+      checkpoints: { accept_each_node: true },
+    });
+    taskIds.push(task.id);
+    const { node } = await finished;
+    return (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+  }
+  try {
+    const source = await run(RECALL_PROBE);
+    expect(source.attempts).toHaveLength(1);
+    expect(source.result?.notes).toBe(evidence);
+    expect(contextRequests).toHaveLength(5);
+    const projected = contextRequests[2] ?? [];
+    expect(projected.map(textOf).join('')).not.toContain(evidence);
+    const reference = projected.filter((m) => m.role === 'tool').map(textOf)[0] ?? '';
+    const ref = coordinates.exec(reference);
+    if (!ref) throw new Error('Missing folded source coordinates');
+    const foreign = await run(`${FOREIGN_PROBE} ${ref[0]}`);
+    expect(foreign.attempts).toHaveLength(1);
+    expect(foreign.result?.notes).toContain(ErrorCode.NotFound);
+    expect(foreign.result?.notes).toContain('current session');
+    expect(foreign.result?.notes).not.toContain(evidence);
+  } finally {
+    for (const id of taskIds) await t.call(cancelTaskOp, { id });
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+  }
+}, 90000);

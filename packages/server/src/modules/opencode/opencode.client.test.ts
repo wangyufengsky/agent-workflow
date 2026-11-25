@@ -110,3 +110,30 @@ describe('权限失效的边界识别', () => {
     ).rejects.toMatchObject({ code: ErrorCode.OpencodeRequestFailed });
   });
 });
+
+it('Recall 仅返回指定消息下已完成、无附件的工具文本', async () => {
+  const ref = { sessionID: 'ses_owner', messageID: 'msg_source' };
+  const completed = { status: 'completed', output: 'evidence' };
+  const parts = [
+    { id: 'prt_ok', type: 'tool', state: completed },
+    { id: 'prt_text', type: 'text', text: 'assistant text' },
+    { id: 'prt_attachment', type: 'tool', state: { ...completed, attachments: [{ type: 'file' }] } },
+    { id: 'prt_failed', type: 'tool', state: { status: 'error', error: 'read failed' } },
+  ].map((part) => ({ ...ref, ...part }));
+  const runtime = {
+    onEvent: () => () => undefined,
+    onLost: () => () => undefined,
+    sdk: () => ({
+      session: {
+        message: async () => ({
+          data: { info: { id: ref.messageID, sessionID: ref.sessionID, role: 'assistant' }, parts },
+        }),
+      },
+    }),
+  } as unknown as OpencodeRuntime;
+  const client = createRuntimeClient(runtime, pino({ level: 'silent' }));
+  const read = (partId: string) =>
+    client.readToolOutput({ sessionId: ref.sessionID, messageId: ref.messageID, directory: '/repo', partId });
+  expect(await read('prt_ok')).toBe('evidence');
+  for (const id of ['prt_text', 'prt_attachment', 'prt_failed']) expect(await read(id)).toBeUndefined();
+});

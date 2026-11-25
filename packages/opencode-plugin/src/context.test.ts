@@ -1,3 +1,4 @@
+import { MCP_TOOL_PREFIX, McpToolName } from '@aw/shared';
 import type { Hooks } from '@opencode-ai/plugin';
 import { expect, it } from 'vitest';
 import { projectHistory } from './context.ts';
@@ -34,7 +35,7 @@ it('只投影早期普通文件正文，保留标识、最新批次和局部规�
   expect(projected.slice(1)).toEqual(original.slice(1));
   expect(projected[0]?.parts[0]).toMatchObject({
     callID: 'ca',
-    state: { output: expect.stringMatching(/a.*pa.*large.txt/) },
+    state: { output: `[AW read messageId=a partId=pa path=/repo/large.txt → ${MCP_TOOL_PREFIX}${McpToolName.Recall}]` },
   });
   expect(source).toEqual(original);
 });

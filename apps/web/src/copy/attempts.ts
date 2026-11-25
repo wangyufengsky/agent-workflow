@@ -70,6 +70,7 @@ export const DEBUG_COPY = {
 const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.GetSubmissionGuide]: '查询提交指引',
   [McpToolName.GetTaskContext]: '读取任务背景',
+  [McpToolName.Recall]: '回查工具输出',
   [McpToolName.GetNodeOutput]: '读取前面步骤的产出',
   [McpToolName.GetTaskDiff]: '查看任务的改动',
   [McpToolName.DelegateReadonly]: '发起只读委派',

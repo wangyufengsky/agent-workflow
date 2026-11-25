@@ -89,6 +89,7 @@ export type OpencodeClient = {
   isConnected(): boolean;
   /** Returns the new session id. */
   createSession(input: CreateSessionInput): Promise<string>;
+  readToolOutput(input: SessionRequest & { messageId: string; partId: string }): Promise<string | undefined>;
   sessionRules(input: SessionRequest): Promise<PermissionRule[]>;
   setPermissions(input: SessionRequest & { permission: PermissionRule[] }): Promise<void>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
@@ -255,6 +256,31 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         runtime.sdk().session.create({ directory, title, agent, permission }, requestOptions(signal)),
       );
       return data.id;
+    },
+    async readToolOutput({ sessionId, directory, messageId, partId, signal }) {
+      return request('session.message', async () => {
+        try {
+          const { data } = await runtime
+            .sdk()
+            .session.message({ sessionID: sessionId, directory, messageID: messageId }, requestOptions(signal));
+          if (data.info.sessionID !== sessionId || data.info.id !== messageId || data.info.role !== 'assistant')
+            return undefined;
+          const part = data.parts.find(
+            (p) => p.id === partId && p.messageID === messageId && p.sessionID === sessionId,
+          );
+          if (
+            part?.type === 'tool' &&
+            part.state.status === 'completed' &&
+            typeof part.state.output === 'string' &&
+            !part.state.attachments?.length
+          )
+            return part.state.output;
+        } catch (err) {
+          if (err instanceof Error && sessionNotFoundCauseSchema.safeParse(err.cause).success) return undefined;
+          throw err;
+        }
+        return undefined;
+      });
     },
     async sessionRules({ sessionId, directory, signal }) {
       const { data } = await request('session.get', () =>

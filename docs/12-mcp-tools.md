@@ -165,6 +165,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | 工具 | 允许的尝试类型 | 作用 |
 | --- | --- | --- |
 | `get_task_context` | plan · execute · review | 取完整上下文 |
+| `recall` | plan · execute · review | 按消息与片段坐标分页取回当前物理会话的工具原文 |
 | `get_node_output` | plan · execute · review | 取某个已完成节点的完整产出 |
 | `get_task_diff` | execute · review | 当前 worktree 相对基线的改动 |
 | `delegate_readonly` | execute · review | 把独立的查证问题交给只读会话 |
@@ -420,6 +421,12 @@ type HandoffOutput = {
 `inspect_delegation` 输入 `{ action: 'list' | 'read' | 'search', path?, query?, startLine?, startOffset? }`。目录和读路径指向同一任务仓库的固定提交，搜索使用字面值。读取达到长度上限时，使用返回的 `nextLine` 与 `nextOffset` 继续读取，行内偏移按 UTF-16 码元计。`submit_delegation` 用 `{ summary }` 把报告提交给父步骤。
 
 委派会话在独立临时目录启动，沿用父会话的模型，按需继承该模型的项目提供商配置。工具权限仅放行两项委派工具，Git 对象由应用读取。父步骤结束或委派超时会中止活跃子尝试。子尝试沿用已有状态机和会话流，父步骤负责代码修改、核验和提交结果。
+
+### 6.19 `recall`
+
+折叠引用中的 `messageId` 和 `partId` 可直接传给 `agent-workflow_recall`。服务器从当前活动尝试取得物理 Session 与工作目录，读取该 Session 指定消息内已完成、无附件的文本工具结果。坐标不存在、属于其他 Session 或指向不可读片段时统一返回 `NOT_FOUND`。
+
+`offset` 从 0 起算，`limit` 默认为 4096，单页最多 4096 个 Unicode 码点。返回 `{ content, offset, totalLength, nextOffset }`。下一页使用返回的 `nextOffset`，到末尾为 `null`；超出末尾返回空页。
 
 ## 7. 实现结构
 

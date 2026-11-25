@@ -34,7 +34,7 @@ function reference(part: Part, messageId: string): Part {
     /(?:^|[/\\])(?:agents\.md|claude\.md|context\.md|copilot-instructions\.md)$/i.test(display.path)
   )
     return part;
-  const output = `[AW read messageId=${messageId} partId=${part.id} path=${display.path}]`;
+  const output = `[AW read messageId=${messageId} partId=${part.id} path=${display.path} → agent-workflow_recall]`;
   return output.length < state.output.length ? { ...part, state: { ...state, output } } : part;
 }
 

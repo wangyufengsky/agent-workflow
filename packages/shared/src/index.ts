@@ -62,6 +62,7 @@ export * from './contracts/mcp/office-write.ts';
 export * from './contracts/mcp/process-document.ts';
 export * from './contracts/mcp/read-attachment.ts';
 export * from './contracts/mcp/readonly-delegation.ts';
+export * from './contracts/mcp/recall.ts';
 export * from './contracts/mcp/report-progress.ts';
 export * from './contracts/mcp/sheets.ts';
 export * from './contracts/mcp/submission-guide.ts';

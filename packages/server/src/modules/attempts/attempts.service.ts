@@ -22,6 +22,9 @@ import {
   OPENCODE_FUNCTIONAL_TEST_AGENT,
   PermissionDecision,
   type PermissionPayload,
+  RECALL_PAGE_MAX_CHARS,
+  type RecallInput,
+  type RecallOutput,
   RoleBaseAgent,
   type SessionAgent,
   type SkillSnapshot,
@@ -532,6 +535,32 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     latestPlanAttempt: (taskId: string): AttemptDTO | undefined => {
       const attempt = repo.findLatestPlan(taskId);
       return attempt === undefined ? undefined : toDto(attempt);
+    },
+    async recall(
+      attempt: AttemptDTO,
+      { messageId, partId, offset, limit }: RecallInput,
+      signal?: AbortSignal,
+    ): Promise<RecallOutput> {
+      if (attempt.opencodeSessionId === null)
+        throw new AppError(ErrorCode.McpAttemptUnresolved, 'Attempt has no physical session');
+      const text = await opencode.readToolOutput({
+        sessionId: attempt.opencodeSessionId,
+        directory: attempt.directory,
+        messageId,
+        partId,
+        ...(signal && { signal }),
+      });
+      if (text === undefined)
+        throw new AppError(ErrorCode.NotFound, 'Completed text tool result not found in the current session');
+      const chars = Array.from(text);
+      const start = Math.min(offset, chars.length);
+      const end = Math.min(start + Math.min(limit, RECALL_PAGE_MAX_CHARS), chars.length);
+      return {
+        content: chars.slice(start, end).join(''),
+        offset: start,
+        totalLength: chars.length,
+        nextOffset: end < chars.length ? end : null,
+      };
     },
     contextOwner(sessionId: string, directory: string, taskId: string): string | undefined {
       const session = state.live.get(sessionId);
