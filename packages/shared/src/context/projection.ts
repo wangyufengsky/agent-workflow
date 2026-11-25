@@ -4,7 +4,7 @@ import { hasModelContent, type Messages } from './messages.ts';
 
 type Part = Messages[number]['parts'][number];
 
-export function referenceText(part: Part, messageId: string): string | undefined {
+export function referenceText(part: Part, messageId: string, recallTool = 'agent-workflow_recall'): string | undefined {
   if (
     part.type !== 'tool' ||
     part.tool !== 'read' ||
@@ -35,17 +35,17 @@ export function referenceText(part: Part, messageId: string): string | undefined
     /(?:^|[/\\])(?:agents\.md|claude\.md|context\.md|copilot-instructions\.md)$/i.test(display.path)
   )
     return undefined;
-  return `[AW read messageId=${messageId} partId=${part.id} path=${display.path} → agent-workflow_recall]`;
+  return `[AW read messageId=${messageId} partId=${part.id} path=${display.path} → ${recallTool}]`;
 }
 
-function reference(part: Part, messageId: string): Part {
-  const output = referenceText(part, messageId);
+function reference(part: Part, messageId: string, recallTool?: string): Part {
+  const output = referenceText(part, messageId, recallTool);
   return output && part.type === 'tool' && part.state.status === 'completed' && output.length < part.state.output.length
     ? { ...part, state: { ...part.state, output } }
     : part;
 }
 /** 只替换结果正文，保留原消息顺序、调用参数与 callID。最新工具批次包括同消息的所有兄弟调用。 */
-export function projectHistory(messages: Messages): Messages {
+export function projectHistory(messages: Messages, recallTool?: string): Messages {
   const latest = messages.findLastIndex((m) => m.parts.some((p) => p.type === 'tool'));
   return messages.map((m, i) => {
     if (
@@ -63,7 +63,7 @@ export function projectHistory(messages: Messages): Messages {
       )
     )
       return m;
-    return { ...m, parts: m.parts.map((p) => reference(p, m.info.id)) };
+    return { ...m, parts: m.parts.map((p) => reference(p, m.info.id, recallTool)) };
   });
 }
 
@@ -166,8 +166,8 @@ export function freezePrefix(messages: Messages, previousEnd?: string) {
     : undefined;
 }
 
-export function projectWindow(messages: Messages, summary?: Summary) {
-  const folded = projectHistory(messages);
+export function projectWindow(messages: Messages, summary?: Summary, recallTool?: string) {
+  const folded = projectHistory(messages, recallTool);
   const candidate = applySummary(folded, summary);
   return {
     folded,

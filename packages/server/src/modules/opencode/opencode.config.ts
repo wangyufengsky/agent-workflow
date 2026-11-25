@@ -80,6 +80,7 @@ const DELEGATE_PERMISSION = {
   question: 'deny',
   webfetch: 'deny',
   external_directory: 'deny',
+  [`${MCP_TOOL_PREFIX}${McpToolName.Recall}`]: 'allow',
   [`${MCP_TOOL_PREFIX}${McpToolName.InspectDelegation}`]: 'allow',
   [`${MCP_TOOL_PREFIX}${McpToolName.SubmitDelegation}`]: 'allow',
   [ASSISTANT_TOOLS]: 'deny',

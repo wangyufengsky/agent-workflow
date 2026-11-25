@@ -170,6 +170,8 @@ stateDiagram-v2
 
 受管会话的估算超限只预警。Provider 返回 `ContextOverflowError` 后，在原会话空闲且没有未决审批时等待旧 runner 释放、显式调用 `session.summarize(auto:false)`，核对新的原生摘要后发送一次续跑指令。压缩期间的 idle 不催办。恢复失败、下一成功步骤前再次真实超窗，或手动停用后原文超限时触发 `ATTEMPT_CONTEXT_BUDGET`，经 `session_error` 结束尝试，节点经 `attempt_failed` 直接进入 `failed`，等待手动重试。有未决审批时先保持等待，已接受的提交继续生效。
 
+受管助手每轮遇到真实超窗时，等待旧请求结束，在同一物理会话显式压缩并重发该轮输入一次。关闭开关、压缩失败或重发后再次溢出时，记录原有超窗结果，保留用户输入供「继续新对话」使用。
+
 **`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；除上述上下文阻断外，`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`check_unrunnable` → `failed`；`recheck` → `verifying`；`interrupted`（重启恢复）→ `ready`。
 
 **`verifying`** 依次执行检查：`command` 在 worktree 中运行（超时 `ACCEPTANCE_COMMAND_TIMEOUT_MS`）；`ai_review` 创建 `review` 类尝试，`submit_review` 返回 `pass/fail`。任一失败即 `checks_failed`。

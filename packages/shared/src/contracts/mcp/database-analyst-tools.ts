@@ -8,6 +8,7 @@ export const DATABASE_ANALYST_TOOLS: readonly McpToolName[] = [
   McpToolName.DbDescribe,
   McpToolName.DbQuery,
   McpToolName.InvestigateDatabase,
+  McpToolName.Recall,
   McpToolName.ReadAttachment,
   McpToolName.AskUser,
   McpToolName.ReportProgress,

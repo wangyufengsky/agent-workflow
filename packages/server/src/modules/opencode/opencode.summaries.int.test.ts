@@ -1,6 +1,13 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { AttemptKind, cancelTaskOp, deleteTaskOp, getAttemptContextOp, RoleBaseAgent } from '@aw/shared';
+import {
+  AttemptKind,
+  cancelTaskOp,
+  deleteTaskOp,
+  getAttemptContextOp,
+  RoleBaseAgent,
+  updateSettingsOp,
+} from '@aw/shared';
 import type { Messages } from '@aw/shared/context';
 import { expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -35,7 +42,7 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     opencode: t.fake,
     sessions,
     enabled: () => true,
-    ownerSignal: attempts.delegationSignal,
+    ownerSignal: (owner: { id: string }, sessionId: string) => attempts.delegationSignal(owner.id, sessionId),
   };
   const summaries = createContextSummaries(deps);
   const entered = Promise.withResolvers<{ sessionId: string; directory: string; signal: AbortSignal }>();
@@ -64,8 +71,7 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     const sessionId = first.opencodeSessionId;
     if (!sessionId) throw new Error('Missing first session');
     const job = {
-      taskId: task.id,
-      attemptId: first.id,
+      owner: { kind: 'attempt' as const, id: first.id, taskId: task.id },
       sessionId,
       directory: repo.path,
       model: 'opencode/fake-model',
@@ -107,7 +113,12 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     expect(summaries.get(sessionId)).toBeUndefined();
     t.fake.promptDocument = async ({ text }) => text.slice(0, text.indexOf(' '));
     for (const id of ['msg_z', 'msg_a'])
-      await summaries.generate({ ...job, attemptId: next.id, uptoMessageId: id, source: `${id} evidence` });
+      await summaries.generate({
+        ...job,
+        owner: { ...job.owner, id: next.id },
+        uptoMessageId: id,
+        source: `${id} evidence`,
+      });
     const reopened = createContextSummaries(deps);
     try {
       expect(reopened.get(sessionId)).toMatchObject({ uptoMessageId: 'msg_a', summaryText: 'msg_a' });
@@ -141,6 +152,7 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
           parts: [{ type: 'tool', tool: 'grep', state: { status: 'completed', input: {}, output: 'ok' } }],
         },
       ] as unknown as Messages;
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
     const { body: detail } = await t.call(getAttemptContextOp, { id: next.id });
     expect(detail).toMatchObject({ budget: null, reconstructed: true, summary: { summaryText: 'msg_a' } });
     expect(detail.historyParts.summary).toBeGreaterThan(0);
@@ -153,14 +165,14 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
       waiting.resolve();
       return late.promise;
     };
-    const stale = summaries.generate({ ...job, attemptId: next.id, uptoMessageId: 'old-window' });
+    const stale = summaries.generate({ ...job, owner: { ...job.owner, id: next.id }, uptoMessageId: 'old-window' });
     await waiting.promise;
     t.fake.replay([{ type: 'compacted', sessionId }]);
     await stale;
     late.resolve('late result from old window');
     expect(summaries.get(sessionId)).toBeUndefined();
     t.fake.promptDocument = async () => 'new window';
-    await summaries.generate({ ...job, attemptId: next.id, uptoMessageId: 'new-window' });
+    await summaries.generate({ ...job, owner: { ...job.owner, id: next.id }, uptoMessageId: 'new-window' });
     expect(summaries.get(sessionId)?.summaryText).toBe('new window');
     await t.fake.deleteSession({ sessionId, directory: repo.path });
     expect(summaries.get(sessionId)).toBeUndefined();
@@ -181,7 +193,7 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     });
     const retainedId = last.opencodeSessionId;
     if (!retainedId) throw new Error('Missing retained session');
-    await summaries.generate({ ...job, attemptId: last.id, sessionId: retainedId });
+    await summaries.generate({ ...job, owner: { ...job.owner, id: last.id }, sessionId: retainedId });
     expect(summaries.get(retainedId)).toBeDefined();
     await attempts.abort(last.id);
     await t.call(cancelTaskOp, { id: task.id });

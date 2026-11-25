@@ -10,6 +10,7 @@ import {
   createAssistantContinuationOp,
   createConversationOp,
   deleteConversationOp,
+  getAssistantContextOp,
   OPENCODE_ASSISTANT_AGENT,
   PermissionDecision,
   ServerEventType,
@@ -54,6 +55,7 @@ async function bodyOf(req: IncomingMessage) {
 
 /** 本地模型仅指定工具调用；真实 opencode 决定文件边界，测试不替代工具或权限判断。 */
 function scriptedModel(): Server {
+  let recovered = false;
   return createServer((req, res) => {
     void (async () => {
       const { messages, tools } = await bodyOf(req);
@@ -61,6 +63,20 @@ function scriptedModel(): Server {
       const last = messages.at(-1);
       const text =
         typeof last?.content === 'string' ? last.content : (last?.content ?? []).map((p) => p.text ?? '').join('');
+      if (!recovered && last?.role === 'user' && text.includes('VERIFY_ASSISTANT_OVERFLOW')) {
+        recovered = true;
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: {
+              message: "This model's maximum context length is 32000 tokens. Please reduce your input.",
+              code: 'context_length_exceeded',
+              type: 'invalid_request_error',
+            },
+          }),
+        );
+        return;
+      }
       if (text.includes(CONTINUATION_TEST)) continuationRequests.push(messages);
       if (text.includes('WAIT_FOR_ABORT')) {
         res.setHeader('content-type', 'text/event-stream');
@@ -132,6 +148,22 @@ afterAll(async () => {
   await t.close();
   model.closeAllConnections();
   await new Promise<void>((resolve, reject) => model.close((error) => (error ? reject(error) : resolve())));
+});
+
+it('@opencode 受管助手真实超窗后在原会话压缩重发一次，抽屉显示新窗口', async () => {
+  const { body: c } = await t.call(createConversationOp, {});
+  const idle = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (v) => v.id === c.id && !v.busy, 60000);
+  await t.call(sendAssistantMessageOp, {
+    id: c.id,
+    text: 'VERIFY_ASSISTANT_OVERFLOW',
+    context: { page: 'home', params: {} },
+  });
+  await idle;
+  expect(t.app.services.assistant.get(c.id).usage.latest?.status).toBe(AssistantTurnStatus.Completed);
+  const { body } = await t.call(getAssistantContextOp, { id: c.id });
+  expect(body).toMatchObject({ managed: true, compactions: 1, budget: { model: MODEL } });
+  expect(t.logs.filter((l) => l.msg === 'assistant context recovery continued')).toHaveLength(1);
+  expect(advertisedTools.has('agent-workflow-app_recall')).toBe(true);
 });
 
 it('@opencode 续接在新模型会话发送绑定项目和旧决定，下一轮不重复添加交接', async () => {

@@ -1,7 +1,7 @@
 import {
   AppError,
   AttemptKind,
-  type AttemptStatus,
+  AttemptStatus,
   ErrorCode,
   type ErrorInfo,
   errorInfoSchema,
@@ -58,6 +58,18 @@ export function createAttemptsRepo(db: DbExecutor) {
         .orderBy(desc(attemptsTable.startedAt), desc(sql`rowid`))
         .get();
       return row === undefined ? undefined : toAttempt(row);
+    },
+    hasActiveDirectory(directory: string): boolean {
+      return !!db
+        .select({ id: attemptsTable.id })
+        .from(attemptsTable)
+        .where(
+          and(
+            eq(attemptsTable.directory, directory),
+            inArray(attemptsTable.status, [AttemptStatus.Starting, AttemptStatus.Running]),
+          ),
+        )
+        .get();
     },
     listByStatus(statuses: readonly AttemptStatus[]): Attempt[] {
       return db.select().from(attemptsTable).where(inArray(attemptsTable.status, statuses)).all().map(toAttempt);

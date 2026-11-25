@@ -783,6 +783,12 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   mcp.register(server);
   const contextEnabled = () => settings.service.get('ai.contextEngine');
+  const directoryManaged = (directory: string): boolean =>
+    !!worktrees.service.taskAt(directory) ||
+    projects.service.hasDirectory(directory) ||
+    directory === decks.service.blankDir ||
+    assistant.service.isFilesDirectory(directory) ||
+    attempts.service.hasActiveDirectory(directory);
   const summaries = createContextSummaries({
     db: database.db,
     clock,
@@ -790,7 +796,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     sessions,
     opencode,
     enabled: contextEnabled,
-    ownerSignal: attempts.service.delegationSignal,
+    ownerSignal: (owner, sessionId): AbortSignal | undefined =>
+      owner.kind === 'attempt'
+        ? attempts.service.delegationSignal(owner.id, sessionId)
+        : assistant.service.summarySignal(owner.id, sessionId),
   });
   server.addHook('preClose', async () => {
     summaries.close();
@@ -811,7 +820,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     summaries,
     prompts,
     mcpToolBytes,
-    (directory, taskId) => contextEnabled() && worktrees.service.taskAt(directory) === taskId,
+    (directory) => contextEnabled() && directoryManaged(directory),
   );
   const stopWatchingContext = opencode.subscribe((event) => {
     if (event.type === OpencodeEventType.Compacted || event.type === OpencodeEventType.Deleted)
@@ -821,15 +830,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     stopWatchingContext();
   });
   registerContextRoutes(server, {
-    manage: attempts.service.manageContext,
+    manage: (owner, sessionId, model) =>
+      owner.kind === 'attempt'
+        ? attempts.service.manageContext(sessionId, model)
+        : assistant.service.manageContext(owner.id, model),
     snapshots,
     summaries,
     token: mcpToken,
     enabled: contextEnabled,
-    taskAt: worktrees.service.taskAt,
-    owner: attempts.service.contextOwner,
-    block: attempts.service.blockContext,
-    toolBytes: () => mcpToolBytes(true),
+    directoryManaged,
+    owner: (sessionId, directory) =>
+      attempts.service.contextOwner(sessionId, directory) ?? assistant.service.contextOwner(sessionId, directory),
+    block: (owner, sessionId) => attempts.service.blockContext(sessionId, owner.id),
+    toolBytes: mcpToolBytes,
     log,
   });
   attempts.registerRoutes(server);

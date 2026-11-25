@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
@@ -97,7 +97,7 @@ const newSlide = (deckId: string, seq: number, page: OutlineSlide, now: number):
 export function createDecksService(deps: DecksServiceDeps) {
   const { unit, clock, attempts, projects, tasks, knowledge, browser, inbox, settings, prompts } = deps;
   const repo = createDecksRepo(deps.db);
-  const blankDir = join(deps.dataDir, ...BLANK_DIR);
+  const blankDir = join(realpathSync(deps.dataDir), ...BLANK_DIR);
   mkdirSync(blankDir, { recursive: true });
 
   function mustFind(id: string): Deck {
@@ -328,6 +328,7 @@ export function createDecksService(deps: DecksServiceDeps) {
   });
 
   return {
+    blankDir,
     get: detail,
 
     /** A page of PPTs, most recently updated first (23 §8). */

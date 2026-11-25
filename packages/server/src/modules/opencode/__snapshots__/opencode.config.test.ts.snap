@@ -66,6 +66,11 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "*",
+      "permission": "agent-workflow_recall",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
       "permission": "agent-workflow_read_attachment",
     },
     {
@@ -5944,6 +5949,11 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "*",
+      "permission": "agent-workflow_recall",
+    },
+    {
+      "action": "allow",
+      "pattern": "*",
       "permission": "agent-workflow_read_attachment",
     },
     {
@@ -10000,6 +10010,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 br
         "agent-workflow_get_task_context": "allow",
         "agent-workflow_investigate_database": "allow",
         "agent-workflow_read_attachment": "allow",
+        "agent-workflow_recall": "allow",
         "agent-workflow_report_progress": "allow",
         "agent-workflow_submit_result": "allow",
         "edit": "deny",
@@ -10115,6 +10126,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 br
         "agent-workflow-app_*": "deny",
         "agent-workflow_browser_submit_report": "deny",
         "agent-workflow_inspect_delegation": "allow",
+        "agent-workflow_recall": "allow",
         "agent-workflow_submit_delegation": "allow",
         "edit": "deny",
         "external_directory": "deny",

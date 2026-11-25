@@ -126,7 +126,7 @@ export const SETTING_DEFAULTS: Settings = {
   'ui.mode': UiMode.Simple,
   'ui.theme': ThemePreference.System,
   'ui.introAnimation': true,
-  'ai.contextEngine': false,
+  'ai.contextEngine': true,
   'ai.askOnUncertainty': false,
   'ai.defaultModel': null,
   'ai.defaultEffort': null,

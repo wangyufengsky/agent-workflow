@@ -17,6 +17,7 @@ import {
   ServerEventType,
   sendAssistantMessageOp,
   TRANSCRIPT_PAGE_SIZE,
+  updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -94,6 +95,7 @@ it('续接隔离模型会话、固定历史范围，并在来源删除后保留�
 });
 
 it('上下文超限时将失败输入带到续接草稿，接受前失败不会消费交接', async () => {
+  await t.call(updateSettingsOp, { 'ai.contextEngine': false });
   const source = (await t.call(createConversationOp, {})).body;
   t.fake.enqueue(script().error('ContextOverflowError', 'context too long'), { agent: OPENCODE_ASSISTANT_AGENT });
   await say(source.id, '请继续处理这段输入');
@@ -253,4 +255,35 @@ it('应用回传的超限错误不会把上一条成功用户输入误当作失�
     await t.call(createAssistantContinuationOp, { id: source.id, requestId: crypto.randomUUID(), attachmentIds: [] })
   ).body;
   expect(child.continuation?.draftText).toBeNull();
+});
+
+it.each(['compaction fails', 'retry overflows'])('自动恢复后仍超窗时可续接原输入（%s）', async (scenario) => {
+  const c = (await t.call(createConversationOp, {})).body;
+  const first = Promise.withResolvers<{ error: { name: string; data: { message: string } } }>();
+  const original = t.fake.promptAssistant;
+  const prompts = vi
+    .spyOn(t.fake, 'promptAssistant')
+    .mockImplementationOnce(() => ({
+      accepted: Promise.resolve(),
+      started: Promise.resolve(),
+      isRunning: async () => true,
+      completed: first.promise,
+    }))
+    .mockImplementation(original);
+  const compactor = vi.spyOn(t.fake, 'summarizeSession');
+  if (scenario === 'compaction fails') compactor.mockRejectedValueOnce(new Error('compactor failed'));
+  else t.fake.enqueue(script().error('ContextOverflowError', 'still too long'));
+  const idle = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (v) => v.id === c.id && !v.busy);
+  const text = '继续核对这份资料';
+  await t.call(sendAssistantMessageOp, { id: c.id, text, context: { page: 'home', params: {} } });
+  t.app.services.assistant.manageContext(c.id, 'opencode/fake-model');
+  first.resolve({ error: { name: 'ContextOverflowError', data: { message: 'too long' } } });
+  await idle;
+  expect(compactor).toHaveBeenCalledTimes(1);
+  expect(prompts).toHaveBeenCalledTimes(scenario === 'compaction fails' ? 1 : 2);
+  expect(new Set(prompts.mock.calls.map(([p]) => p.sessionId)).size).toBe(1);
+  const child = (
+    await t.call(createAssistantContinuationOp, { id: c.id, requestId: crypto.randomUUID(), attachmentIds: [] })
+  ).body;
+  expect(child.continuation?.draftText).toBe(text);
 });
