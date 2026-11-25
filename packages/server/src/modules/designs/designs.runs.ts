@@ -292,8 +292,16 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     async generate(id: string, input: GenerateInput) {
       const design = mustFindDesign(id);
       assertIdle(id);
-      if (repo.listFiles(id).length === 0) invalidState('The project has no analyzable source files');
       const sections = repo.listSections(id);
+      if (design.outlineConfirmedAt === null) {
+        if (input.sectionId !== undefined) invalidState('Confirm the outline before retrying a section');
+        if (!sections.some((item) => item.selected)) {
+          throw new AppError(ErrorCode.ValidationFailed, 'The outline has no selected sections', {
+            issues: [{ path: ['sections'], message: 'Select at least one chapter before confirming the outline' }],
+          });
+        }
+      }
+      if (design.sourceSnapshot.analyzableCount === 0) invalidState('The project has no analyzable source files');
       const section = input.sectionId === undefined ? undefined : sections.find(({ id }) => id === input.sectionId);
       if (input.sectionId !== undefined && section === undefined) throw new AppError(ErrorCode.DesignSectionNotFound);
       const targets = (section === undefined ? sections : [section]).filter(

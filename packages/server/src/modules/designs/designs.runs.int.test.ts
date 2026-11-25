@@ -113,9 +113,18 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
     selected,
   }));
   await t.call(updateDesignOutlineOp, { id, sections: editedOutline.map((item) => ({ ...item, selected: false })) });
-  expect((await t.call(generateDesignOp, { id })).status).toBe(409);
+  const emptyOutline = await t.call(generateDesignOp, { id });
+  expect(emptyOutline.status).toBe(400);
+  expect(emptyOutline.raw.json()).toMatchObject({
+    error: { code: ErrorCode.ValidationFailed, details: { issues: [{ path: ['sections'] }] } },
+  });
   expect(await get(id)).toMatchObject({ outlineConfirmedAt: null, status: DesignStatus.OutlineReady });
   await t.call(updateDesignOutlineOp, { id, sections: editedOutline });
+
+  const beforeConfirmation = await t.call(generateDesignOp, { id, sectionId: overview.id });
+  expect(beforeConfirmation.status).toBe(409);
+  expect(beforeConfirmation.raw.json()).toMatchObject({ error: { code: ErrorCode.StateTransitionInvalid } });
+  expect(await get(id)).toMatchObject({ outlineConfirmedAt: null, totalSections: 3, doneSections: 0 });
 
   t.fake.crash();
   const unavailable = await t.call(generateDesignOp, { id });
@@ -166,6 +175,15 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
   expect(stopped.body).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 1 });
   expect(stopped.body.runs.at(-1)?.attempt.status).toBe(AttemptStatus.Aborted);
   await t.fake.settled();
+
+  const skipped = editedOutline.find((item) => !item.selected);
+  if (!skipped) throw new Error('Fixture must have an unchecked section');
+  for (const sectionId of [overview.id, skipped.id]) {
+    const invalidRetry = await t.call(generateDesignOp, { id, sectionId });
+    expect(invalidRetry.status).toBe(409);
+    expect(invalidRetry.raw.json()).toMatchObject({ error: { code: ErrorCode.StateTransitionInvalid } });
+  }
+  expect(await get(id)).toMatchObject({ doneSections: 1, totalSections: 3 });
 
   t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(flow.id, '流程内容')), DESIGNER);
   const retryEnded = ended(AttemptKind.DesignGenerate);
