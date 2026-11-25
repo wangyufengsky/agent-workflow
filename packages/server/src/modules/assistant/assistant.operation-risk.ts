@@ -1,5 +1,6 @@
 import {
   createTaskOp,
+  exportDesignOp,
   functionalTestApproveRevisionOp,
   functionalTestRepairOp,
   functionalTestRerunOp,
@@ -17,6 +18,7 @@ export function assistantOperationRisk(contract: OperationContract, input: Recor
   // 任务创建的常规放行记录不能授权新的测试目标、写入接口或后续动作。
   if (
     (contract.id === createTaskOp.id && input.functionalTest !== undefined) ||
+    (contract.id === exportDesignOp.id && input.overwrite === true) ||
     CONFIRM_EACH_TEST_CALL.has(contract.id)
   ) {
     return OperationRisk.Critical;

@@ -227,8 +227,11 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
       const { roleId: _roleId, permissionBaseline: _baseline, efforts: _efforts, ...rest } = attempt;
       return { ...rest, progress: progress.get(attempt.id) ?? null, queuePosition: slots.position(attempt.id) };
     },
-    onSignal(listener: (signal: AttemptSignal) => void): void {
+    onSignal(listener: (signal: AttemptSignal) => void): () => void {
       listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
 
     record(attempt: Attempt, entries: NewTranscriptEntry[]): void {

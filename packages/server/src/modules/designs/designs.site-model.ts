@@ -1,0 +1,86 @@
+import { type DesignSourceSnapshot, layoutDesignDiagram } from '@aw/shared';
+import type { DesignDiagramRecord, DesignFile, DesignSection, ProjectDesign } from './designs.records.ts';
+
+export type DesignSiteContents = {
+  design: ProjectDesign;
+  sections: readonly DesignSection[];
+  files: readonly DesignFile[];
+  diagrams: readonly DesignDiagramRecord[];
+  exportedAt: number;
+};
+
+export function designSiteModel({ design, sections, files, diagrams, exportedAt }: DesignSiteContents) {
+  const completed = sections.filter(
+    (section): section is DesignSection & { blocks: NonNullable<DesignSection['blocks']> } =>
+      section.selected && section.blocks !== null,
+  );
+  const chapterIds = new Set(completed.map(({ id }) => id));
+  const graphs = diagrams
+    .filter(({ sectionId }) => chapterIds.has(sectionId))
+    .map(({ id, sectionId, kind, title, nodes, edges }) => ({
+      id,
+      sectionId,
+      kind,
+      title,
+      nodes,
+      edges,
+      layout: layoutDesignDiagram(nodes, edges),
+    }));
+  return {
+    schemaVersion: 1,
+    designId: design.id,
+    title: design.title,
+    theme: design.theme,
+    layoutStyle: design.layoutStyle,
+    depth: design.depth,
+    exportedAt,
+    sourceSnapshot: publicSourceSnapshot(design.sourceSnapshot),
+    sections: completed.map(({ id, seq, kind, title, summary, blocks }) => ({
+      id,
+      seq,
+      kind,
+      title,
+      summary,
+      blocks,
+    })),
+    files: files
+      .filter(
+        ({ sectionId, responsibility }) => sectionId !== null && chapterIds.has(sectionId) && responsibility !== null,
+      )
+      .map(({ id, sectionId, relPath, responsibility, symbols }) => ({
+        id,
+        sectionId,
+        relPath,
+        responsibility,
+        symbols,
+      })),
+    diagrams: graphs,
+  };
+}
+
+function publicSourceSnapshot(snapshot: DesignSourceSnapshot): DesignSourceSnapshot {
+  return {
+    branch: snapshot.branch,
+    commitSha: snapshot.commitSha,
+    dirty: snapshot.dirty,
+    scannedAt: snapshot.scannedAt,
+    analyzableCount: snapshot.analyzableCount,
+    skippedCount: snapshot.skippedCount,
+    skippedReasons: snapshot.skippedReasons,
+    techStack: snapshot.techStack,
+  };
+}
+
+export type DesignSiteModel = ReturnType<typeof designSiteModel>;
+
+/** 经典脚本在 file:// 可直接加载。这些转义也防止数据误嵌入 HTML 时闭合 script。 */
+export function scriptJson(json: string): string {
+  return json.replace(
+    /[<>&\u2028\u2029]/gu,
+    (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
+}
+
+export function siteDataScript(modelJson: string): string {
+  return `window.__AW_DESIGN_DATA__ = ${scriptJson(modelJson)};\n`;
+}

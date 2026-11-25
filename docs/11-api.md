@@ -761,5 +761,18 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 
 ## 项目设计
 
-操作路径、请求与风险级别见 [44 §8](44-project-design.md#8-api操作清单与-sse)。阶段一建立设计内容、MCP 和事件契约，HTTP 操作在 DG-04 接入 Operation Registry。
+操作路径、请求与风险级别见 [44 §8](44-project-design.md#8-api操作清单与-sse)。以下操作通过 Operation Registry 注册，专业模式可在助手中调用；项目入口可在两种模式访问。
 `design.updated` 的数据为 `{ designId }`，表示设计或其关联内容有变更。一次尝试的状态和会话内容分别通过 `attempt.updated` 和 `attempt.transcript` 推送。
+
+| 操作 | 路径 | 请求与返回 |
+| --- | --- | --- |
+| designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试 |
+| designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |
+| designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
+| designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
+| designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；可选 AI 优化只在确认前进行 |
+| designs.generate | POST /designs/:id/generate | 首次至少选中一章；之后只补未生成的选中章。带 sectionId 只重试已确认大纲中的一个未完成选中章 |
+| designs.reviseSection / restoreSection | POST /designs/:id/sections/:sectionId/revise 或 /restore | 重写前保存最近一版，恢复一次同时还原正文、文件和图 |
+| designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止保留已提交内容 |
+| designs.export | POST /designs/:id/export | 已完成至少一章且无活动运行时导出。非托管目录须显式确认覆盖；助手发起覆盖时逐次确认 |
+| designs.delete | DELETE /designs/:id | critical，删除关联尝试、会话流及数据库内容，已导出的站点由用户保管 |

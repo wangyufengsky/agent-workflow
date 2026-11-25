@@ -33,3 +33,29 @@ export function orderLayers<T extends { id: string }>(
   for (const list of layers.toReversed()) sortBy(list, downstream);
   for (const list of layers) sortBy(list, upstream);
 }
+
+/** 深度优先遍历按输入顺序选出回边。布局时忽略回边，渲染时将其接回。 */
+export function selectBackEdges<E extends { from: string; to: string }>(
+  nodes: readonly { id: string }[],
+  edges: readonly E[],
+): Set<E> {
+  const back = new Set<E>();
+  const state = new Map<string, 'open' | 'done'>();
+  const outgoing = new Map<string, E[]>();
+  for (const edge of edges) {
+    const list = outgoing.get(edge.from);
+    if (list === undefined) outgoing.set(edge.from, [edge]);
+    else list.push(edge);
+  }
+  function visit(id: string): void {
+    state.set(id, 'open');
+    for (const edge of outgoing.get(id) ?? []) {
+      const seen = state.get(edge.to);
+      if (seen === 'open') back.add(edge);
+      else if (seen === undefined) visit(edge.to);
+    }
+    state.set(id, 'done');
+  }
+  for (const node of nodes) if (!state.has(node.id)) visit(node.id);
+  return back;
+}

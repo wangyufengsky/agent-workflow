@@ -5,7 +5,6 @@ import {
   AttemptKind,
   AttemptStatus,
   DesignReviewState,
-  type DesignSectionVersion,
   ErrorCode,
   ServerEventType,
   type SubmitDesignOutlineInput,
@@ -16,7 +15,8 @@ import type { Clock } from '../../core/clock.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
-import type { createDesignsRepo, DesignDiagramRecord, DesignFile, DesignSection } from './designs.repo.ts';
+import { replaceSectionContent, snapshotSection } from './designs.content.ts';
+import type { createDesignsRepo, DesignSection } from './designs.repo.ts';
 import { validateDesignOutline, validateDesignReview, validateDesignSection } from './designs.validator.ts';
 
 type Dependencies = {
@@ -26,24 +26,6 @@ type Dependencies = {
   unit: UnitOfWork;
   clock: Clock;
 };
-
-function sectionVersion(
-  section: DesignSection,
-  files: readonly DesignFile[],
-  diagrams: readonly DesignDiagramRecord[],
-): DesignSectionVersion | null {
-  if (section.blocks === null) return null;
-  return {
-    summary: section.summary,
-    blocks: section.blocks,
-    files: files.flatMap(({ relPath, responsibility, symbols, sectionId }) =>
-      sectionId === section.id && responsibility !== null ? [{ relPath, responsibility, symbols }] : [],
-    ),
-    diagrams: diagrams.map(
-      ({ designId: _designId, sectionId: _sectionId, updatedAt: _updatedAt, ...diagram }) => diagram,
-    ),
-  };
-}
 
 function invalid(path: (string | number)[], message: string): never {
   throw new AppError(ErrorCode.ValidationFailed, 'Invalid project design submission', { issues: [{ path, message }] });
@@ -134,19 +116,6 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
 
       const now = clock.now();
       const files = repo.listFiles(design.id);
-      const filesByPath = new Map(files.map((file) => [file.relPath, file]));
-      const updates = input.files.map((item, index) => {
-        const file = filesByPath.get(item.relPath);
-        if (file === undefined) invalid(['files', index, 'relPath'], 'Choose a file from the source snapshot');
-        if (file.sectionId !== null && file.sectionId !== section.id)
-          invalid(
-            ['files', index, 'relPath'],
-            'This file already belongs to another section; cite it in the text instead',
-          );
-        return { ...file, ...item, sectionId: section.id, updatedAt: now };
-      });
-      const updatedIds = new Set(updates.map(({ id }) => id));
-      const released = files.filter(({ id, sectionId }) => sectionId === section.id && !updatedIds.has(id));
       const oldDiagrams = repo.listDiagrams(design.id).filter(({ sectionId }) => sectionId === section.id);
       const oldDiagramIds = new Set(oldDiagrams.map(({ id }) => id));
       const diagramIds = new Map(input.diagrams.map(({ id }) => [id, oldDiagramIds.has(id) ? id : randomUUID()]));
@@ -159,31 +128,17 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
       const remainingSectionIds = run.targetSectionIds.filter((id) => !done.includes(id));
 
       unit.transact(() => {
-        repo.updateSection({
-          ...section,
+        const content = {
           summary: input.summary,
+          files: input.files,
           blocks: input.blocks.map((block) =>
             block.type === 'diagram_ref' ? { ...block, diagramId: diagramId(block.diagramId) } : block,
           ),
-          previous:
-            attempt.kind === AttemptKind.DesignRevise ? sectionVersion(section, files, oldDiagrams) : section.previous,
-          reviewState: DesignReviewState.None,
-          reviewNotes: null,
-          updatedAt: now,
-        });
-        for (const file of updates) repo.updateFile(file);
-        for (const file of released)
-          repo.updateFile({ ...file, sectionId: null, responsibility: null, symbols: [], updatedAt: now });
-        repo.deleteSectionDiagrams(design.id, section.id);
-        repo.insertDiagrams(
-          input.diagrams.map((diagram) => ({
-            ...diagram,
-            id: diagramId(diagram.id),
-            designId: design.id,
-            sectionId: section.id,
-            updatedAt: now,
-          })),
-        );
+          diagrams: input.diagrams.map((diagram) => ({ ...diagram, id: diagramId(diagram.id) })),
+        };
+        const previous =
+          attempt.kind === AttemptKind.DesignRevise ? snapshotSection(section, files, oldDiagrams) : section.previous;
+        replaceSectionContent(repo, section, files, content, previous, now);
         repo.updateRunDone(run.id, done);
         if (remainingSectionIds.length === 0) attempts.markSubmitted(attempt.id);
         publish(design.id, now);
@@ -196,20 +151,26 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
       const { run, design } = activeRun(attempt);
       const now = clock.now();
       const sections = new Map(repo.listSections(design.id).map((section) => [section.id, section]));
-      const updates = input.findings.map((item, index) => {
+      const findings = new Map(input.findings.map((item) => [item.sectionId, item]));
+      input.findings.forEach((item, index) => {
         if (!run.targetSectionIds.includes(item.sectionId))
           invalid(['findings', index, 'sectionId'], 'Choose a section targeted by this run');
-        const section = sections.get(item.sectionId);
+      });
+      const updates = run.targetSectionIds.map((sectionId) => {
+        const section = sections.get(sectionId);
         if (section === undefined) throw new AppError(ErrorCode.DesignSectionNotFound);
-        return { ...section, reviewState: item.reviewState, reviewNotes: item.notes, updatedAt: now };
+        const finding = findings.get(sectionId);
+        return {
+          ...section,
+          reviewState: finding?.reviewState ?? DesignReviewState.None,
+          reviewNotes: finding?.notes ?? null,
+          updatedAt: now,
+        };
       });
 
       unit.transact(() => {
         for (const section of updates) repo.updateSection(section);
-        repo.updateRunDone(
-          run.id,
-          updates.map(({ id }) => id),
-        );
+        repo.updateRunDone(run.id, [...findings.keys()]);
         attempts.markSubmitted(attempt.id);
         publish(design.id, now);
       });

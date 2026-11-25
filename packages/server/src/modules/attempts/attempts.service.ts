@@ -523,6 +523,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       return session.delegation.signal;
     },
     onSignal: state.onSignal,
+    waitForSessionRelease: (id: string) => state.sessionOf(id)?.released,
 
     /** A node’s execution, review and delegation attempts, oldest first. */
     listByNode: (nodeId: string): AttemptSummaryDTO[] => repo.listByNode(nodeId).map(state.toSummary),
