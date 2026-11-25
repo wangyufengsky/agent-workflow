@@ -298,7 +298,7 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
   }
 });
 
-it('有进展的上下文溢出只用新会话补剩余章节，下一次无进展溢出停止自动续作', async () => {
+it('有进展的上下文溢出保留已提交章节，单章再次溢出后停止自动续作', async () => {
   const { id } = await createDraft(false);
   const { overview, endpoint, flow } = await optimize(id);
   t.fake.enqueue(
@@ -308,6 +308,7 @@ it('有进展的上下文溢出只用新会话补剩余章节，下一次无进�
     DESIGNER,
   );
   t.fake.enqueue(script().error('ContextOverflowError', '仍然超出窗口'), DESIGNER);
+  t.fake.enqueue(script().error('ContextOverflowError', '单章已经超过窗口'), DESIGNER);
   expect((await t.call(generateDesignOp, { id, model: null })).status).toBe(200);
   await t.fake.settled();
   const design = await get(id);
@@ -325,6 +326,83 @@ it('有进展的上下文溢出只用新会话补剩余章节，下一次无进�
       doneSectionIds: [overview.id],
     },
     { status: AttemptStatus.Failed, targetSectionIds: [endpoint.id, flow.id], doneSectionIds: [] },
+    { status: AttemptStatus.Failed, targetSectionIds: [endpoint.id], doneSectionIds: [] },
   ]);
+  expect(design.sections.find(({ id }) => id === overview.id)?.summary).toBe('已生成');
+  expect(design.runs.at(-1)?.attempt.error?.message).toContain('单章已经超过窗口');
   expect(t.fake.prompts.at(-1)?.sessionId).not.toBe(t.fake.prompts.at(-2)?.sessionId);
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '手动重试完成')), DESIGNER);
+  expect((await t.call(generateDesignOp, { id, sectionId: endpoint.id })).status).toBe(200);
+  await t.fake.settled();
+  const retried = await get(id);
+  expect(retried).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 2 });
+  expect(retried.runs).toHaveLength(design.runs.length + 1);
+  expect(retried.runs.at(-1)?.targetSectionIds).toEqual([endpoint.id]);
+  expect(retried.sections.find(({ id }) => id === flow.id)?.blocks).toBeNull();
+});
+
+it('首章前溢出会缩小新会话的分片，分片成功后继续原目标并独立复审', async () => {
+  const { id } = await createDraft(true);
+  const { overview, endpoint, flow } = await optimize(id);
+  t.fake.enqueue(script().error('ContextOverflowError', '首章前读满窗口'), DESIGNER);
+  t.fake.enqueue(
+    script()
+      .callTool(McpToolName.SubmitDesignSection, section(overview.id, '已缩小分片'))
+      .callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '端点已完成')),
+    DESIGNER,
+  );
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(flow.id, '原请求其余章节')), DESIGNER);
+  t.fake.enqueue(
+    script().callTool(McpToolName.SubmitDesignReview, {
+      findings: [feedback(overview.id), feedback(endpoint.id), feedback(flow.id)],
+    }),
+    DESIGNER,
+  );
+
+  const reviewed = ended(AttemptKind.DesignReview);
+  expect((await t.call(generateDesignOp, { id, model: null })).status).toBe(200);
+  await reviewed;
+  await t.fake.settled();
+  const design = await get(id);
+  expect(design).toMatchObject({ status: DesignStatus.Ready, doneSections: 3, totalSections: 3 });
+  expect(
+    design.runs.slice(1).map(({ kind, attempt, targetSectionIds, doneSectionIds }) => ({
+      kind,
+      status: attempt.status,
+      targetSectionIds,
+      doneSectionIds,
+    })),
+  ).toEqual([
+    {
+      kind: DesignRunKind.Generate,
+      status: AttemptStatus.Failed,
+      targetSectionIds: [overview.id, endpoint.id, flow.id],
+      doneSectionIds: [],
+    },
+    {
+      kind: DesignRunKind.Generate,
+      status: AttemptStatus.Succeeded,
+      targetSectionIds: [overview.id, endpoint.id],
+      doneSectionIds: [overview.id, endpoint.id],
+    },
+    {
+      kind: DesignRunKind.Generate,
+      status: AttemptStatus.Succeeded,
+      targetSectionIds: [flow.id],
+      doneSectionIds: [flow.id],
+    },
+    {
+      kind: DesignRunKind.Review,
+      status: AttemptStatus.Succeeded,
+      targetSectionIds: [overview.id, endpoint.id, flow.id],
+      doneSectionIds: [overview.id, endpoint.id, flow.id],
+    },
+  ]);
+  const [initial, partial, remainder, review] = t.fake.prompts.slice(1);
+  if (!initial || !partial || !remainder || !review) throw new Error('Expected generation and review sessions');
+  expect(new Set([initial, partial, remainder, review].map(({ sessionId }) => sessionId)).size).toBe(4);
+  expect(partial.text.length).toBeLessThan(initial.text.length);
+  expect(partial.text).not.toContain(flow.id);
+  expect(remainder.text).not.toContain(overview.id);
+  expect(remainder.text).not.toContain(endpoint.id);
 });

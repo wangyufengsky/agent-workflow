@@ -1,4 +1,4 @@
-import { ThemeId } from '@aw/shared';
+import { ThemeId } from '../../enums/ui.ts';
 import type { ThemeDefinition } from '../theme-definition.ts';
 
 /**

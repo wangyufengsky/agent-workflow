@@ -10,6 +10,7 @@ import {
   scriptJson,
   siteDataScript,
 } from './designs.site-model.ts';
+import { designSiteStylesheet } from './designs.site-style.ts';
 
 const MARKER = '.aw-design-site.json';
 const EXPORT_FILES = ['index.html', 'design-data.js', 'design-model.json', MARKER] as const;
@@ -247,7 +248,7 @@ async function writeSite(targetDir: string, options: ExportOptions, model: Desig
     await writeFile(join(stage, 'index.html'), entry);
     await writeFile(join(stage, 'design-model.json'), `${json}\n`);
     await writeFile(join(stage, 'design-data.js'), siteDataScript(json));
-    await writeFile(join(stage, 'assets', 'style.css'), stylesheet);
+    await writeFile(join(stage, 'assets', 'style.css'), designSiteStylesheet(model.theme, stylesheet));
     await writeFile(
       join(stage, 'assets', 'viewer.js'),
       `window.__AW_DESIGN_SITE_COPY__ = ${scriptJson(JSON.stringify(copy))};\n${viewer}`,

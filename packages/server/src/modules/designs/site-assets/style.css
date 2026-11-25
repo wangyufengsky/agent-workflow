@@ -1,58 +1,6 @@
 :root {
-  color-scheme: dark;
-  --bg: #0a0a0a;
-  --surface: #111214;
-  --ink: #f5f6f7;
-  --muted: #a1a6ae;
-  --accent: #a9bcff;
-  --line: #36383e;
-  --code: #16181d;
   --sans: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
   --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
-}
-
-:root[data-theme="codex"] {
-  color-scheme: light;
-  --bg: #ffffff;
-  --surface: #f7f7f7;
-  --ink: #0d0d0d;
-  --muted: #5d5d5d;
-  --accent: #0169cc;
-  --line: #d4d4d4;
-  --code: #f4f4f4;
-}
-
-:root[data-theme="claude_code"] {
-  color-scheme: light;
-  --bg: #f8f7f3;
-  --surface: #f3f1eb;
-  --ink: #2b2925;
-  --muted: #655f55;
-  --accent: #89583f;
-  --line: #d0c8ba;
-  --code: #efece4;
-}
-
-:root[data-theme="deepseek"] {
-  color-scheme: light;
-  --bg: #ffffff;
-  --surface: #f3f6ff;
-  --ink: #121a33;
-  --muted: #4a5577;
-  --accent: #2457f5;
-  --line: #c5d1ee;
-  --code: #eef3ff;
-}
-
-:root[data-theme="dracula"] {
-  color-scheme: dark;
-  --bg: #282a36;
-  --surface: #2d2f3d;
-  --ink: #f8f8f2;
-  --muted: #c0c3d8;
-  --accent: #caa6fb;
-  --line: #565a71;
-  --code: #21222c;
 }
 
 * {
@@ -228,13 +176,13 @@ blockquote {
 }
 code {
   font-family: var(--mono);
-  background: var(--code);
+  background: var(--bg-sunken);
   border-radius: 4px;
   padding: 0 0.2em;
 }
 pre {
   overflow: auto;
-  background: var(--code);
+  background: var(--bg-sunken);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.75rem 0.9rem;
@@ -405,7 +353,8 @@ summary {
 }
 .graph-edge-hit {
   fill: none;
-  stroke: transparent;
+  stroke: var(--muted);
+  stroke-opacity: 0;
   stroke-width: 14;
   pointer-events: stroke;
 }
