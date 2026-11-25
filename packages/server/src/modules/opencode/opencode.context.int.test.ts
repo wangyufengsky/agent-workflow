@@ -23,6 +23,7 @@ import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject } from '../../../test/helpers/tasks.ts';
 import { DATABASE_FILE } from '../../core/db/database.ts';
+import { SessionPurpose } from './opencode.dispatch.ts';
 import { OpencodeEventType } from './opencode.events.ts';
 
 const model = 'opencode/fake-model';
@@ -206,7 +207,26 @@ it.each(['attempt', 'assistant'] as const)(
       if (kind === 'assistant') {
         expect((await t.call(deleteConversationOp, { id: ownerId })).status).toBe(204);
         expect(row()).toBeUndefined();
-      } else await t.app.services.attempts.abort(ownerId);
+      } else {
+        const attempts = t.app.services.attempts;
+        await attempts.abort(ownerId);
+        t.fake.enqueue(script().hang());
+        const next = await attempts.dispatchObjectAttempt({
+          purpose: SessionPurpose.Knowledge,
+          previousId: ownerId,
+          first: () => {
+            throw new Error('Expected the research session to be reused');
+          },
+          followUp: () => ({ agent: SessionAgent.Researcher, system: undefined, prompt: 'Follow up' }),
+        });
+        expect(next.id).not.toBe(ownerId);
+        expect(next.opencodeSessionId).toBe(sessionId);
+        expect(await scope(t, directory, sessionId)).toMatchObject({ ownerId: next.id, summary: detail.body.summary });
+        const followUp = await t.call(getAttemptContextOp, { id: next.id });
+        expect(followUp.body.summary).toEqual(detail.body.summary);
+        expect(followUp.body.budget).toBeNull();
+        await attempts.abort(next.id);
+      }
     } finally {
       done.resolve({ error: undefined });
       release.resolve('released');
