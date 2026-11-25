@@ -95,6 +95,25 @@ import {
 } from './decks.ts';
 import type { OperationContract } from './define.ts';
 import {
+  createDesignOp,
+  createDesignTemplateOp,
+  deleteDesignOp,
+  deleteDesignTemplateOp,
+  exportDesignOp,
+  generateDesignOp,
+  getDesignOp,
+  listDesignsOp,
+  listDesignTemplatesOp,
+  restoreDesignSectionOp,
+  reviewDesignOp,
+  reviseDesignOutlineOp,
+  reviseDesignSectionOp,
+  stopDesignOp,
+  updateDesignOp,
+  updateDesignOutlineOp,
+  updateDesignTemplateOp,
+} from './designs.ts';
+import {
   functionalTestApproveRevisionOp,
   functionalTestReadOp,
   functionalTestReportReadOp,
@@ -311,6 +330,7 @@ export * from './databases.ts';
 export * from './debug.ts';
 export * from './decks.ts';
 export * from './define.ts';
+export * from './designs.ts';
 export * from './functional-testing.ts';
 export * from './git.ts';
 export * from './git-reviews.ts';
@@ -627,6 +647,23 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   deleteSlideOp,
   stopDeckOp,
   deleteDeckOp,
+  listDesignsOp,
+  getDesignOp,
+  createDesignOp,
+  updateDesignOp,
+  listDesignTemplatesOp,
+  createDesignTemplateOp,
+  updateDesignTemplateOp,
+  deleteDesignTemplateOp,
+  updateDesignOutlineOp,
+  reviseDesignOutlineOp,
+  generateDesignOp,
+  reviseDesignSectionOp,
+  restoreDesignSectionOp,
+  reviewDesignOp,
+  stopDesignOp,
+  exportDesignOp,
+  deleteDesignOp,
 ];
 
 export * from './skills.ts';

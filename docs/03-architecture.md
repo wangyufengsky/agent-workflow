@@ -290,7 +290,7 @@ export function taskOperations(tasks: TasksService) {
 - **应用配置**（数据目录、opencode 路径覆盖、日志级别）：`core/config.ts` 从环境变量读取一次并校验，其他代码只读 `config` 对象。
 - **导航菜单**：`web/src/app/navigation.ts` 配置项含 `visibleIn: 'simple' | 'pro'`。
 - **文案**：`web/src/copy/*`，组件中不写裸中文字符串（除临时调试）。
-- **主题**：`web/src/theme/themes/*.ts`，见 [14-ui-spec.md](14-ui-spec.md#4-主题配置)。
+- **主题**：`packages/shared/src/theme/themes/*.ts`，见 [14-ui-spec.md](14-ui-spec.md#4-主题配置)。
 - **流程与角色**：`packages/builtin` 下的数据文件 + Markdown 提示词，首启时写入数据库（`kind=builtin`，只读；用户可复制后修改）。
 
 ## 7. 数据目录

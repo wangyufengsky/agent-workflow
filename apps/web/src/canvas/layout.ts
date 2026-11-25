@@ -1,4 +1,4 @@
-import { orderLayers } from '../components/charts/layered-layout.ts';
+import { orderLayers } from '@aw/shared';
 
 /** Canvas sizes (26 §3.2, §4): fixed, so the layout needs no measuring. */
 export const NODE_WIDTH = 208;

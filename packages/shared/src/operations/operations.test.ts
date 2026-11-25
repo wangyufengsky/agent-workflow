@@ -35,6 +35,7 @@ describe('操作清单的标注（M5-10）', () => {
         'credentials.resetMasterPassword',
         'databases.delete',
         'decks.delete',
+        'designs.delete',
         'git.createPullRequest',
         'git.deleteBranch',
         'git.merge',

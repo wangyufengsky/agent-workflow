@@ -1,5 +1,4 @@
-import { FlowNodeShape } from '@aw/shared';
-import { orderLayers } from './layered-layout.ts';
+import { FlowNodeShape, orderLayers, selectBackEdges } from '@aw/shared';
 
 /** Fixed node sizes, so the layout needs no measuring (35 §5.3); labels wrap to two lines inside. */
 export const FLOW_NODE_SIZE: Record<FlowNodeShape, { width: number; height: number }> = {
@@ -29,26 +28,6 @@ export type FlowLayout<N, E> = {
 };
 
 /**
- * Edges that loop back (35 §3.2): a depth-first walk in the nodes' given order; an edge to a node still on the walk's
- * path closes a loop and is left out of the layering.
- */
-function backEdges<E extends FlowLayoutEdge>(nodes: readonly FlowLayoutNode[], edges: readonly E[]): Set<E> {
-  const back = new Set<E>();
-  const state = new Map<string, 'open' | 'done'>();
-  const visit = (id: string) => {
-    state.set(id, 'open');
-    for (const edge of edges.filter((e) => e.from === id)) {
-      const seen = state.get(edge.to);
-      if (seen === 'open') back.add(edge);
-      else if (seen === undefined) visit(edge.to);
-    }
-    state.set(id, 'done');
-  };
-  for (const node of nodes) if (!state.has(node.id)) visit(node.id);
-  return back;
-}
-
-/**
  * Top-to-bottom layered layout of a flowchart (35 §5.3): a node's layer is one past its furthest predecessor along
  * edges that do not loop back; layers are ordered like the plan canvas's columns and centred on one axis.
  */
@@ -56,7 +35,7 @@ export function layoutFlow<N extends FlowLayoutNode, E extends FlowLayoutEdge>(
   nodes: readonly N[],
   edges: readonly E[],
 ): FlowLayout<N, E> {
-  const back = backEdges(nodes, edges);
+  const back = selectBackEdges(nodes, edges);
   const forward = edges.filter((e) => !back.has(e));
   const layerOf = new Map<string, number>();
   const layer = (id: string): number => {

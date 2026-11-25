@@ -62,7 +62,13 @@ import { createDatabasesModule, DB_DRIVERS, type DbDriver } from './modules/data
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
-import { createDesignSubmissions, createDesignsRepo, syncBuiltinDesignTemplates } from './modules/designs/index.ts';
+import {
+  createDesignSubmissions,
+  createDesignsModule,
+  createDesignsRepo,
+  type DesignsService,
+  syncBuiltinDesignTemplates,
+} from './modules/designs/index.ts';
 import { createDocumentProcessor } from './modules/document-processor/index.ts';
 import { createFunctionalTestsModule, type FunctionalTestsService } from './modules/functional-tests/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
@@ -172,6 +178,7 @@ export type App = {
     assistant: AssistantService;
     knowledge: KnowledgeService;
     decks: DecksService;
+    designs: DesignsService;
     schedules: SchedulesService & { settled(): Promise<void> };
     initiatives: InitiativesService;
   };
@@ -762,6 +769,20 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     gitNetwork: network.gitEnv,
   });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
+  const designs = createDesignsModule({
+    repo: designsRepo,
+    attempts: attempts.service,
+    projects: projects.service,
+    inbox: inbox.service,
+    settings: settings.service,
+    assetsDir: config.designSiteAssetsDir,
+    copyFile: config.designSiteCopyFile,
+    unit,
+    clock,
+    log,
+    prompts,
+  });
+  server.addHook('preClose', async () => designs.service.close());
   const designSubmissions = createDesignSubmissions({
     repo: designsRepo,
     attempts: attempts.service,
@@ -889,6 +910,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...schedules.operations,
     ...knowledge.operations,
     ...decks.operations,
+    ...designs.operations,
     ...insights.operations,
     ...team.operations,
     ...plans.operations,
@@ -981,6 +1003,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       assistant: assistant.service,
       knowledge: knowledge.service,
       decks: decks.service,
+      designs: designs.service,
       schedules: { ...schedules.service, settled: schedules.timer.settled },
       initiatives: initiatives.service,
     },

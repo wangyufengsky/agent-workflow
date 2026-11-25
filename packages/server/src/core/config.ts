@@ -10,6 +10,8 @@ const envSchema = z.object({
   /** The bundled backend (out/main/server.js) is passed the packaged migrations folder by the Electron main process. */
   AW_MIGRATIONS_DIR: z.string().min(1).optional(),
   /** Likewise the packaged builtin prompts and the built opencode bridge plugin. */
+  AW_DESIGN_SITE_COPY_FILE: z.string().min(1).optional(),
+  AW_DESIGN_SITE_ASSETS_DIR: z.string().min(1).optional(),
   AW_PROMPTS_DIR: z.string().min(1).optional(),
   AW_OPENCODE_PLUGIN_FILE: z.string().min(1).optional(),
   AW_SKILLS_DIR: z.string().min(1).optional(),
@@ -30,6 +32,8 @@ export type AppConfig = {
   webDir: string | undefined;
   migrationsDir: string;
   promptsDir: string;
+  designSiteAssetsDir: string;
+  designSiteCopyFile: string;
   /** `agent-workflow-bridge.js`, loaded by opencode as a plugin (12 §3). */
   opencodePluginFile: string;
   /** The app's own skills, given to opencode as `skills.paths` (41, D206). */
@@ -46,6 +50,10 @@ export type AppConfig = {
 /** Locations relative to this source file; valid when running from source (development, tests). */
 const SOURCE_MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));
 const SOURCE_PROMPTS_DIR = fileURLToPath(new URL('../../../builtin/prompts', import.meta.url));
+export const SOURCE_DESIGN_SITE_ASSETS_DIR = fileURLToPath(new URL('../modules/designs/site-assets', import.meta.url));
+export const SOURCE_DESIGN_SITE_COPY_FILE = fileURLToPath(
+  new URL('../../../../apps/web/src/copy/design-site.json', import.meta.url),
+);
 const SOURCE_SKILLS_DIR = fileURLToPath(new URL('../../../builtin/skills', import.meta.url));
 /** Node strips the types of the worker's TypeScript source itself. */
 const SOURCE_OFFICE_WORKER_FILE = fileURLToPath(new URL('../modules/office/office.worker.ts', import.meta.url));
@@ -62,6 +70,14 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     port: e.AW_PORT,
     webDir: e.AW_WEB_DIR === undefined ? undefined : path.resolve(e.AW_WEB_DIR),
     migrationsDir: e.AW_MIGRATIONS_DIR === undefined ? SOURCE_MIGRATIONS_DIR : path.resolve(e.AW_MIGRATIONS_DIR),
+    designSiteAssetsDir:
+      e.AW_DESIGN_SITE_ASSETS_DIR === undefined
+        ? SOURCE_DESIGN_SITE_ASSETS_DIR
+        : path.resolve(e.AW_DESIGN_SITE_ASSETS_DIR),
+    designSiteCopyFile:
+      e.AW_DESIGN_SITE_COPY_FILE === undefined
+        ? SOURCE_DESIGN_SITE_COPY_FILE
+        : path.resolve(e.AW_DESIGN_SITE_COPY_FILE),
     promptsDir: e.AW_PROMPTS_DIR === undefined ? SOURCE_PROMPTS_DIR : path.resolve(e.AW_PROMPTS_DIR),
     opencodePluginFile:
       e.AW_OPENCODE_PLUGIN_FILE === undefined ? SOURCE_PLUGIN_FILE : path.resolve(e.AW_OPENCODE_PLUGIN_FILE),

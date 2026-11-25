@@ -1,5 +1,5 @@
 import type { DesignTemplate } from '@aw/shared';
-import { and, asc, desc, eq, lt, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import {
   type DesignDiagramRecord,
@@ -69,6 +69,49 @@ export function createDesignsRepo(db: DbExecutor) {
         .limit(limit)
         .all()
         .map(toDesign);
+    },
+    sectionCounts(designIds: readonly string[]) {
+      if (designIds.length === 0) return [];
+      return db
+        .select({
+          designId: sections.designId,
+          totalSections: sql<number>`count(*)`.mapWith(Number),
+          doneSections: sql<number>`count(${sections.blocks})`.mapWith(Number),
+        })
+        .from(sections)
+        .where(and(inArray(sections.designId, designIds), eq(sections.selected, true)))
+        .groupBy(sections.designId)
+        .all();
+    },
+    analyzedCounts(designIds: readonly string[]) {
+      if (designIds.length === 0) return [];
+      return db
+        .select({
+          designId: files.designId,
+          analyzedCount: sql<number>`count(${files.responsibility})`.mapWith(Number),
+        })
+        .from(files)
+        .where(inArray(files.designId, designIds))
+        .groupBy(files.designId)
+        .all();
+    },
+    latestRuns(designIds: readonly string[]): DesignRun[] {
+      if (designIds.length === 0) return [];
+      const latest = db
+        .select({
+          designId: runs.designId,
+          seq: sql<number>`max(${runs.seq})`.as('latest_seq'),
+        })
+        .from(runs)
+        .where(inArray(runs.designId, designIds))
+        .groupBy(runs.designId)
+        .as('latest_runs');
+      return db
+        .select({ run: runs })
+        .from(runs)
+        .innerJoin(latest, and(eq(latest.designId, runs.designId), eq(latest.seq, runs.seq)))
+        .all()
+        .map(({ run }) => toRun(run));
     },
     updateDesign(
       id: string,
