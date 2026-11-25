@@ -229,7 +229,7 @@ export function DesignToolbar({
               <span>{C.layout}</span>
               <select
                 className="select"
-                disabled={busy || update.isPending || design.projectId === null}
+                disabled={update.isPending || design.projectId === null}
                 value={design.layoutStyle}
                 onChange={(event) =>
                   update.mutate({
@@ -249,7 +249,7 @@ export function DesignToolbar({
               <span>{C.theme}</span>
               <select
                 className="select"
-                disabled={busy || update.isPending || design.projectId === null}
+                disabled={update.isPending || design.projectId === null}
                 value={design.theme}
                 onChange={(event) =>
                   update.mutate({ id: design.id, theme: themeIdSchema.parse(event.currentTarget.value) })
