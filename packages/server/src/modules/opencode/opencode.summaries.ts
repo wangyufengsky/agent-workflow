@@ -54,7 +54,6 @@ export function createContextSummaries({
     get(sessionId: string, owner?: ContextOwner) {
       const row = db
         .select({
-          attemptId: contextSummaries.attemptId,
           conversationId: contextSummaries.conversationId,
           taskId: contextSummaries.taskId,
           updatedAt: contextSummaries.updatedAt,
@@ -65,12 +64,12 @@ export function createContextSummaries({
         .where(eq(contextSummaries.sessionId, sessionId))
         .get();
       if (!row) return undefined;
+      // 追问可换 attempt，已发布的摘要属于同一物理会话。
       if (
         owner &&
         (owner.kind === 'assistant'
           ? row.conversationId !== owner.id
-          : row.conversationId !== null ||
-            (row.attemptId !== null ? row.attemptId !== owner.id : row.taskId !== owner.taskId))
+          : row.conversationId !== null || (row.taskId !== null && row.taskId !== owner.taskId))
       )
         return undefined;
       return { uptoMessageId: row.uptoMessageId, summaryText: row.summaryText, updatedAt: row.updatedAt };
