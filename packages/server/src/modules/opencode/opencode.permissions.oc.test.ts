@@ -533,9 +533,16 @@ it('@opencode 结束命令需要权限时可以授权，保留已提交结果', 
   }
 }, 45_000);
 
-it.each(['折叠', '首步超限', '运行中停用', '新任务关闭'])(
+it.each([
+  ['折叠', { context: 131072 }],
+  ['首步超限', { context: 2048 }],
+  ['运行中停用', { context: 57000 }],
+  ['新任务关闭', { context: 131072 }],
+  ['未知上下文上限', { context: 0 }],
+  ['零输入上限', { context: 131072, input: 0 }],
+] as const)(
   'M1 真实模型请求（%s）',
-  async (scenario) => {
+  async (scenario, limits) => {
     const blocked = scenario === '首步超限';
     const disable = scenario === '运行中停用';
     const native = scenario === '新任务关闭';
@@ -558,7 +565,7 @@ it.each(['折叠', '首步超限', '运行中停用', '新任务关闭'])(
               models: {
                 [MODEL]: {
                   ...spec.models[MODEL],
-                  limit: { context: blocked ? 2048 : disable ? 57000 : 131072, output: 1024 },
+                  limit: { ...limits, output: 1024 },
                 },
               },
             },
@@ -566,10 +573,11 @@ it.each(['折叠', '首步超限', '运行中停用', '新任务关闭'])(
         }),
       },
     });
-    const done = nodeReaches(
-      t,
-      'locate',
-      blocked || disable ? NodeStatus.Failed : NodeStatus.AwaitingAcceptance,
+    const done = waitForEvent(
+      t.app.events,
+      ServerEventType.NodeUpdated,
+      ({ node }) =>
+        node.key === 'locate' && (node.status === NodeStatus.Failed || node.status === NodeStatus.AwaitingAcceptance),
       30000,
     );
     const task = await createTask(t, {
@@ -580,8 +588,19 @@ it.each(['折叠', '首步超限', '运行中停用', '新任务关闭'])(
     });
     try {
       const { node } = await done;
+      expect(node.status).toBe(blocked || disable ? NodeStatus.Failed : NodeStatus.AwaitingAcceptance);
       const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
       expect(detail.attempts).toHaveLength(1);
+      if (scenario === '未知上下文上限' || scenario === '零输入上限') {
+        expect(t.logs).toContainEqual(
+          expect.objectContaining({
+            msg: 'context budget',
+            attemptId: detail.attempts[0]?.id,
+            blocked: false,
+            limit: scenario === '未知上下文上限' ? null : 131072 - 1024,
+          }),
+        );
+      }
       const worktree = t.app.services.worktrees.findByTask(task.id);
       if (!worktree) throw new Error('Missing worktree');
       const sdk = t.app.services.runtime.sdk();
@@ -589,7 +608,14 @@ it.each(['折叠', '首步超限', '运行中停用', '新任务关闭'])(
         (await sdk.config.get({ directory: worktree.path }, { throwOnError: true })).data.compaction,
       ).toMatchObject({ auto: native, prune: native });
       if (blocked || disable) {
-        expect(detail.attempts[0]).toMatchObject({ nudges: 0, error: { code: ErrorCode.AttemptContextBudget } });
+        expect(detail.attempts[0]).toMatchObject({
+          nudges: 0,
+          error: {
+            code: ErrorCode.AttemptContextBudget,
+            message: 'Request exceeded the model context budget before sending',
+          },
+        });
+        expect(detail.retryFeedback).toContain('Reduce the input before retrying');
         expect(providerRequests).toBe(blocked ? 0 : 3);
       }
       if (!blocked) {

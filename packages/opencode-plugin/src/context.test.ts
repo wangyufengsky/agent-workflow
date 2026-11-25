@@ -41,7 +41,7 @@ it('只投影早期普通文件正文，保留标识、最新批次和局部规�
 
 it('规则提醒、失败调用、附件与未完成调用所在的证据保持原样', () => {
   const source = [
-    read('reminder', undefined, [], { output: '<system-reminder>' + 'rule'.repeat(500) }),
+    read('reminder', undefined, [], { output: `<system-reminder>${'rule'.repeat(500)}` }),
     read('failed', undefined, [], { status: 'error', error: 'read failed' }),
     read('attachment', undefined, [], { attachments: [{ mime: 'image/png' }] }),
     read('pending', undefined, [], { status: 'running' }),

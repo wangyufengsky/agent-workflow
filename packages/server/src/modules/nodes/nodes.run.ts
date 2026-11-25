@@ -262,7 +262,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     else if (attempt.error?.code === ErrorCode.AttemptContextBudget) {
       move(node, NodeEvent.AttemptFailed, NodeStatus.Failed, {
         finishedAt: clock.now(),
-        retryFeedback: attempt.error.message,
+        retryFeedback: feedbackFromAttempt(attempt.status, attempt.error),
       });
     } else {
       const submitTool = browserTest ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;

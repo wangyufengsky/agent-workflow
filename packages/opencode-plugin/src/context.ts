@@ -174,9 +174,12 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
       const formatBytes = 'format' in message && message.format ? bytes(message.format) : 0;
       const overhead = estimate.system + estimate.toolBytes + bytes(tools.data) + formatBytes;
       // UTF-8 字节近似，输入上限与上下文减去本次输出预留二者取小。
+      const { context, output } = model.limit;
       const input =
-        'input' in model.limit && typeof model.limit.input === 'number' ? model.limit.input : model.limit.context;
-      const limit = Math.max(0, Math.min(input, model.limit.context - (params.maxOutputTokens ?? model.limit.output)));
+        'input' in model.limit && typeof model.limit.input === 'number' && model.limit.input > 0
+          ? model.limit.input
+          : context;
+      const limit = context > 0 ? Math.max(0, Math.min(input, context - (params.maxOutputTokens ?? output))) : null;
       estimate.knownTokens = Math.ceil((overhead + estimate.after) / BYTES_PER_TOKEN);
       const before = Math.ceil((overhead + estimate.before) / BYTES_PER_TOKEN) + estimate.externalTokens;
       const after = estimate.knownTokens + estimate.externalTokens;

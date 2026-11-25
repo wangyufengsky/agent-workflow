@@ -76,6 +76,8 @@ export function feedbackFromAttempt(
   switch (error?.code) {
     case ErrorCode.AttemptNoResult:
       return `The previous attempt stopped without calling ${MCP_TOOL_PREFIX}${submitTool}. Finish the step and submit its result.`;
+    case ErrorCode.AttemptContextBudget:
+      return 'The previous request exceeded the model context budget. Reduce the input before retrying this step.';
     case ErrorCode.AttemptTimeout:
       return 'The previous attempt ran out of time. Focus on what the step asks and submit the result as soon as it is done.';
     case ErrorCode.AttemptSessionError:

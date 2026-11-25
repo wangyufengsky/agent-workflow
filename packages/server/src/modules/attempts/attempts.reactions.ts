@@ -70,7 +70,7 @@ export function watchSessions(
   function stopForBudget(attempt: Attempt, session: LiveSession): void {
     move(attempt, AttemptEvent.SessionError, {
       code: ErrorCode.AttemptContextBudget,
-      message: '本次输入超过模型上下文预算，已停止发送。',
+      message: 'Request exceeded the model context budget before sending',
     });
     state.releaseSession(session);
   }

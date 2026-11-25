@@ -15,7 +15,7 @@ const report = z.object({
   sessionId: z.string(),
   before: count,
   after: count,
-  limit: count,
+  limit: count.nullable(),
 });
 
 /** 插件在抛错前等待登记完成，idle/error 不再通过错误文案猜测阻断原因。 */
@@ -54,7 +54,7 @@ export function registerContextRoutes(
         if (!taskId || deps.owner(data.sessionId, directory, taskId) !== data.attemptId) return { blocked: true };
         // 开关可在消息转换与最后一次预算检查之间关闭。
         const effective = deps.enabled() ? data.after : data.before;
-        const blocked = effective > data.limit;
+        const blocked = data.limit !== null && effective > data.limit;
         if (blocked) deps.block(data.sessionId, data.attemptId);
         deps.log.info({ ...data, effective, blocked }, 'context budget');
         return { blocked };
