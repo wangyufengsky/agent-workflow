@@ -1,8 +1,11 @@
 import { cp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { layoutDesignDiagram } from '@aw/shared';
+import { layoutDesignDiagram, THEME_IDS, ThemeId } from '@aw/shared';
+import { THEMES } from '@aw/shared/theme';
 import { expect, test } from '@playwright/test';
+
+import { designSiteStylesheet } from '../packages/server/src/modules/designs/designs.site-style.ts';
 
 const assets = fileURLToPath(new URL('../packages/server/src/modules/designs/site-assets', import.meta.url));
 const copy = new URL('../apps/web/src/copy/design-site.json', import.meta.url);
@@ -34,7 +37,6 @@ const edges = [
 ];
 const model = {
   title: '订单设计',
-  theme: 'dracula',
   sections: [
     {
       id: 'overview',
@@ -97,10 +99,12 @@ test('离线图谱置顶并允许键盘查看边证据及下钻符号', async ({
     return route.abort();
   });
   const index = pathToFileURL(join(root, 'index.html')).href;
-  const open = async (layoutStyle: 'arch' | 'doc') => {
+  const stylesheet = await readFile(join(assets, 'style.css'), 'utf8');
+  const open = async (layoutStyle: 'arch' | 'doc', theme: ThemeId = ThemeId.Dracula) => {
+    await writeFile(join(root, 'assets', 'style.css'), designSiteStylesheet(theme, stylesheet));
     await writeFile(
       join(root, 'model.js'),
-      `window.__AW_DESIGN_SITE_COPY__ = ${labels};window.__AW_DESIGN_DATA__ = ${JSON.stringify({ ...model, layoutStyle })};`,
+      `window.__AW_DESIGN_SITE_COPY__ = ${labels};window.__AW_DESIGN_DATA__ = ${JSON.stringify({ ...model, layoutStyle, theme })};`,
     );
     await page.goto(index);
   };
@@ -137,5 +141,18 @@ test('离线图谱置顶并允许键盘查看边证据及下钻符号', async ({
   await expect(page.getByRole('heading', { name: '正文' })).toBeVisible();
   expect(await graphPrecedesText()).toBe(false);
   await expect(page.getByRole('heading', { name: '模块与文件' })).toHaveCount(0);
+  for (const theme of THEME_IDS) {
+    await open('doc', theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    const actual = await page.locator('html').evaluate((root) => {
+      const computed = getComputedStyle(root);
+      return [
+        computed.colorScheme,
+        computed.getPropertyValue('--bg').trim(),
+        computed.getPropertyValue('--ink').trim(),
+      ];
+    });
+    expect(actual).toEqual([THEMES[theme].colorScheme, THEMES[theme].tokens.bg, THEMES[theme].tokens.ink]);
+  }
   expect(external).toEqual([]);
 });

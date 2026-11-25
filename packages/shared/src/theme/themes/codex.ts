@@ -1,4 +1,4 @@
-import { ThemeId } from '@aw/shared';
+import { ThemeId } from '../../enums/ui.ts';
 import type { ThemeDefinition } from '../theme-definition.ts';
 
 /** Codex style: white and neutral greys, black primary actions, one calm blue for links and selection. */

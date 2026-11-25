@@ -450,7 +450,7 @@ packages/builtin/prompts/protocol-slides.md、deck-context.md、deck-outline.md�
 apps/web/src/features/ppt/             列表、新建、工作台（大纲、缩略图栏、预览、这一页面板）、放映、打印视图
 apps/web/src/features/ppt/slide/       十种版式组件、溢出检查
 apps/web/src/features/ppt/export/      pptx 映射（按需加载）、保存
-apps/web/src/theme/themes/*.ts         各主题的 slides 调色板
+packages/shared/src/theme/themes/*.ts         各主题的 slides 调色板
 apps/desktop/src/main/export.ts        exportPdf（隐藏窗口 + printToPDF）、saveFile
 ```
 

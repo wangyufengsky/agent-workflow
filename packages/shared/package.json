@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./context": "./src/context/projection.ts"
+    "./context": "./src/context/projection.ts",
+    "./theme": "./src/theme/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

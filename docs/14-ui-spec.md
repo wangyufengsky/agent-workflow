@@ -281,7 +281,7 @@ AI 写的文字一律经 `components/markdown.tsx` 按 Markdown 显示，不直�
 ### 4.1 结构
 
 ```
-web/src/theme/
+packages/shared/src/theme/（应用与离线项目设计共用，经 @aw/shared/theme 引用）
 ├─ tokens.ts             THEME_TOKEN_NAMES 与 ThemeTokens 类型（键与设计稿 skins.css 变量一一对应）
 ├─ theme-definition.ts   ThemeDefinition 类型
 ├─ themes/
@@ -290,7 +290,9 @@ web/src/theme/
 │  ├─ codex.ts         Codex：白
 │  ├─ deepseek.ts      DeepSeek：蓝白
 │  └─ dracula.ts       Dracula：深紫（D154）
-├─ registry.ts           THEMES: Record<ThemeId, ThemeDefinition>
+└─ registry.ts           THEMES: Record<ThemeId, ThemeDefinition>
+
+apps/web/src/theme/
 ├─ apply-theme.ts        resolveTheme(preference, prefersDark)；applyTheme 把 tokens 写成 :root CSS 变量，设置 color-scheme 与 data-theme
 └─ use-applied-theme.ts  按设置应用主题，system 时跟随 prefers-color-scheme
 ```

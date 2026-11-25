@@ -11,6 +11,7 @@ import {
   ErrorCode,
   ThemeId,
 } from '@aw/shared';
+import { THEMES } from '@aw/shared/theme';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { exportDesignSite } from './designs.exporter.ts';
 import type { DesignSiteContents } from './designs.site-model.ts';
@@ -146,6 +147,10 @@ describe('项目设计离线导出', () => {
     expect(json + script + marker).not.toMatch(/PRIVATE_/);
     expect(json + script + marker).not.toContain(project);
     expect(await readFile(join(site, 'index.html'), 'utf8')).toContain('assets/viewer.js');
+    const style = await readFile(join(site, 'assets', 'style.css'), 'utf8');
+    expect(style).toContain(`--bg: ${THEMES[ThemeId.Codex].tokens.bg};`);
+    expect(style).toContain(`--ink: ${THEMES[ThemeId.Codex].tokens.ink};`);
+    expect(style).toContain(`color-scheme: ${THEMES[ThemeId.Codex].colorScheme};`);
   });
 
   it('显式确认后覆盖同名入口，保留其他文件，并依次处理同目录的导出', async () => {
