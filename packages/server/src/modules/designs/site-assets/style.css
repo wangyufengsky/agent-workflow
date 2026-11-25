@@ -379,3 +379,57 @@ summary {
     border-bottom: 1px solid var(--line);
   }
 }
+
+.architecture-cards {
+  margin-block: 1.45rem;
+}
+.architecture-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.65rem;
+}
+.architecture-card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  text-decoration: none;
+}
+.architecture-card span {
+  font-size: 0.85rem;
+}
+.architecture-card:hover {
+  border-color: var(--accent);
+}
+.graph-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+}
+.graph-edge-target {
+  cursor: pointer;
+}
+.graph-edge-target:focus-visible {
+  outline: none;
+}
+.graph-edge-target:hover .graph-edge,
+.graph-edge-target:focus .graph-edge,
+.graph-edge-target[aria-pressed="true"] .graph-edge {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.graph-inspector {
+  margin-block: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border-inline-start: 3px solid var(--accent);
+  background: var(--surface);
+}
+.graph-inspector strong {
+  display: block;
+}
+.graph-inspector p {
+  margin: 0.25rem 0 0;
+}

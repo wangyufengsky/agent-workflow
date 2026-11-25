@@ -79,6 +79,13 @@ export function createDesignsService({
     if (design === undefined) throw new AppError(ErrorCode.DesignNotFound, 'Design not found', { id });
     return design;
   }
+  function exportProjectRoot(design: ProjectDesign): string | null {
+    if (design.projectId !== null) return projects.getRecord(design.projectId).repoPath;
+    // 删除项目只解除关联，设计尝试仍记录生成内容使用的项目目录。
+    const run = repo.listRuns(design.id).at(-1);
+    return run === undefined ? null : attempts.get(run.attemptId).directory;
+  }
+
   function assertNotExporting(id: string) {
     if (exporting.has(id)) throw new AppError(ErrorCode.DesignBusy, 'An export is in progress', { id });
   }
@@ -234,7 +241,7 @@ export function createDesignsService({
           diagrams: repo.listDiagrams(id),
           targetDir,
           overwrite: overwrite === true,
-          projectRoot: design.projectId === null ? null : projects.getRecord(design.projectId).repoPath,
+          projectRoot: exportProjectRoot(design),
           exportedAt,
           assetsDir,
           copyFile,

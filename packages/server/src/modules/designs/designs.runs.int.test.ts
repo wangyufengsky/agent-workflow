@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   AttemptKind,
@@ -11,6 +12,7 @@ import {
   deleteDesignOp,
   deleteProjectOp,
   ErrorCode,
+  exportDesignOp,
   generateDesignOp,
   getDesignOp,
   McpToolName,
@@ -100,6 +102,7 @@ async function optimize(id: string) {
 it('扫描、优化、确认、增量提交、停止、单章重试、续作、复审和重写共享同一个 HTTP 工作台', async () => {
   const { id, projectId, path } = await createDraft(true);
   const { overview, endpoint, flow } = await optimize(id);
+  const originalSummary = `初版总览 · 源码在 ${join(path, 'src', 'endpoint.ts')}`;
   expect(t.fake.sessions[0]).toMatchObject({ directory: path, ...DESIGNER, permission: readonlyBashRules() });
 
   const editedOutline = (await get(id)).sections.map(({ id, kind, title, scopePaths, selected }) => ({
@@ -127,7 +130,7 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
         ...bad,
         files: [{ relPath: '.env', responsibility: '错误分析', symbols: [] }],
       })
-      .callTool(McpToolName.SubmitDesignSection, section(overview.id, '初版总览'))
+      .callTool(McpToolName.SubmitDesignSection, section(overview.id, originalSummary))
       .hang(),
     DESIGNER,
   );
@@ -238,11 +241,31 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
   let design = await get(id);
   expect(design.sections[0]).toMatchObject({ summary: '重写总览', hasPrevious: true });
   const restored = await t.call(restoreDesignSectionOp, { id, sectionId: overview.id });
-  expect(restored.body.sections[0]?.summary).toBe('初版总览');
+  expect(restored.body.sections[0]?.summary).toBe(originalSummary);
 
   expect((await t.call(deleteProjectOp, { id: projectId })).status).toBe(204);
   design = await get(id);
   expect(design).toMatchObject({ projectId: null, status: DesignStatus.Ready });
+  const protectedDir = join(path, 'docs', 'design');
+  await mkdir(protectedDir, { recursive: true });
+  const handWritten = join(protectedDir, 'notes.md');
+  await writeFile(handWritten, '手写设计内容');
+  const protectedExport = await t.call(exportDesignOp, { id, targetDir: protectedDir, overwrite: true });
+  expect(protectedExport.status).toBe(400);
+  expect(protectedExport.body).toMatchObject({ error: { code: ErrorCode.ValidationFailed } });
+  expect(await readFile(handWritten, 'utf8')).toBe('手写设计内容');
+
+  await rm(path, { recursive: true });
+  const targetDir = join(t.dataDir, '已删除项目的离线站点');
+  const detachedExport = await t.call(exportDesignOp, { id, targetDir });
+  expect(detachedExport.status).toBe(200);
+  for (const name of ['design-model.json', 'design-data.js']) {
+    const contents = await readFile(join(targetDir, name), 'utf8');
+    expect(contents).toContain('初版总览');
+    expect(contents).toContain('[本机路径]');
+    expect(contents).not.toContain(path);
+  }
+
   expect((await t.call(reviseDesignSectionOp, { id, sectionId: overview.id, instruction: '不可再修改' })).status).toBe(
     409,
   );

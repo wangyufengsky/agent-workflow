@@ -259,24 +259,54 @@
     return area;
   }
 
+  function architectureCards(section, files) {
+    const modules =
+      section.kind === 'overview' || section.kind === 'architecture'
+        ? model.sections.filter((candidate) => candidate.kind === 'module')
+        : [];
+    if (modules.length + files.length === 0) return null;
+    const area = el('section', undefined, 'architecture-cards');
+    const grid = el('div', undefined, 'architecture-card-grid');
+    const cards = [
+      ...modules.map((module) => [sectionLink(module), module.summary]),
+      ...files.map((file) => [link(file.relPath, hash('file', file.id)), file.responsibility]),
+    ];
+    for (const [card, description] of cards) {
+      card.className = 'architecture-card';
+      if (description) card.append(el('span', description, 'muted'));
+      grid.append(card);
+    }
+    area.append(el('h2', C.architectureCards), grid);
+    return area;
+  }
+
   function renderSection(section) {
     const content = el('article');
     content.append(el('h1', section.title));
-    if (section.summary) content.append(el('p', section.summary, 'summary'));
     const graphs = model.diagrams.filter(({ sectionId }) => sectionId === section.id);
     const files = model.files.filter(({ sectionId }) => sectionId === section.id);
-    if (model.layoutStyle === 'arch' && graphs.length > 0)
-      content.append(linkList(C.chapterDiagrams, graphs.map(graphLink)));
+    const architecture = model.layoutStyle === 'arch';
+    const rendered = new Set();
+    if (architecture) {
+      for (const graph of graphs) {
+        content.append(renderDiagram(graph, false));
+        rendered.add(graph.id);
+      }
+      const cards = architectureCards(section, files);
+      if (cards !== null) content.append(cards);
+    }
+    if (section.summary) content.append(el('p', section.summary, 'summary'));
     for (const block of section.blocks) {
+      if (block.type === 'diagram_ref') {
+        if (rendered.has(block.diagramId)) continue;
+        rendered.add(block.diagramId);
+      }
       const body = renderBlock(block);
       if (body !== null) content.append(body);
     }
-    const renderedGraphs = new Set(
-      section.blocks.filter(({ type }) => type === 'diagram_ref').map(({ diagramId }) => diagramId),
-    );
-    const extraGraphs = graphs.filter(({ id }) => !renderedGraphs.has(id));
+    const extraGraphs = graphs.filter(({ id }) => !rendered.has(id));
     if (extraGraphs.length > 0) content.append(linkList(C.relatedDiagrams, extraGraphs.map(graphLink)));
-    if (files.length > 0)
+    if (!architecture && files.length > 0)
       content.append(
         linkList(
           C.relatedFiles,
@@ -383,7 +413,7 @@
     );
     let drag;
     element.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0 || event.target.closest('a')) return;
+      if (event.button !== 0 || event.target.closest('a, [role=button]')) return;
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
       element.setPointerCapture(event.pointerId);
     });
@@ -402,9 +432,87 @@
     refresh();
   }
 
-  function graphSvg(diagram, nodes, width, height, controls) {
+  function edgeEvidence(edge, nodes) {
+    const kind = edge.evidenceClass === 'static' ? C.static : C.inference;
+    const label = edge.label || edge.kind;
+    const endpoint = (id) => {
+      const node = nodes.get(id);
+      if (node === undefined) return id;
+      const target = nodeTarget(node);
+      return target === undefined ? node.label : link(node.label, target);
+    };
+    const content = document.createDocumentFragment();
+    content.append(endpoint(edge.from), ` → ${label} → `, endpoint(edge.to), el('span', kind, 'evidence-tag'));
+    if (edge.evidencePath) content.append(' ', pathLink(edge.evidencePath, edge.lineStart, edge.lineEnd));
+    if (edge.rationale) content.append(el('p', edge.rationale, 'muted'));
+    const name = `${nodes.get(edge.from)?.label ?? edge.from} → ${label} → ${nodes.get(edge.to)?.label ?? edge.to} · ${kind}`;
+    return { content, name };
+  }
+
+  function graphInspector(id) {
+    const panel = el('div', undefined, 'graph-inspector');
+    panel.id = id;
+    panel.hidden = true;
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', C.edgeEvidence);
+    let active;
+    function clear() {
+      active?.setAttribute('aria-pressed', 'false');
+      active = undefined;
+      panel.hidden = true;
+      panel.replaceChildren();
+    }
+    return {
+      panel,
+      clear,
+      toggle(control, evidence) {
+        const same = active === control;
+        clear();
+        if (same) return;
+        active = control;
+        active.setAttribute('aria-pressed', 'true');
+        panel.replaceChildren(el('strong', C.edgeEvidence), evidence.cloneNode(true));
+        panel.hidden = false;
+      },
+    };
+  }
+
+  function graphEdge(route, edge, markerId, nodes, inspector) {
+    const evidence = edgeEvidence(edge, nodes);
+    const control = svg('g', {
+      role: 'button',
+      tabindex: 0,
+      'aria-label': evidence.name,
+      'aria-controls': inspector.panel.id,
+      'aria-pressed': 'false',
+      class: 'graph-edge-target',
+    });
+    const title = svg('title');
+    title.textContent = evidence.content.textContent;
+    control.append(
+      title,
+      svg('path', {
+        d: route.path,
+        class: `graph-edge${edge.evidenceClass === 'inferred' ? ' inferred' : ''}`,
+        'marker-end': `url(#${markerId})`,
+      }),
+      svg('path', { d: route.path, class: 'graph-edge-hit' }),
+    );
+    const activate = () => inspector.toggle(control, evidence.content);
+    control.addEventListener('click', activate);
+    control.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        activate();
+      }
+      if (event.key === 'Escape') inspector.clear();
+    });
+    return control;
+  }
+
+  function graphSvg(diagram, nodes, width, height, controls, serial, inspector) {
     const canvas = svg('svg', { role: 'group', 'aria-label': diagram.title, class: 'graph-canvas' });
-    const markerId = `arrow-${++diagramSerial}`;
+    const markerId = `arrow-${serial}`;
     const defs = svg('defs');
     const arrow = svg('marker', { id: markerId, markerWidth: 8, markerHeight: 8, refX: 8, refY: 4, orient: 'auto' });
     arrow.append(svg('path', { d: 'M 0 0 L 8 4 L 0 8 Z', class: 'arrow' }));
@@ -413,15 +521,7 @@
     const edges = new Map(diagram.edges.map((edge) => [edge.id, edge]));
     for (const route of diagram.layout.routes) {
       const edge = edges.get(route.id);
-      const path = svg('path', {
-        d: route.path,
-        class: `graph-edge${edge?.evidenceClass === 'inferred' ? ' inferred' : ''}`,
-        'marker-end': `url(#${markerId})`,
-      });
-      const name = svg('title');
-      name.textContent = edge?.label || edge?.kind || '';
-      path.append(name);
-      canvas.append(path);
+      if (edge !== undefined) canvas.append(graphEdge(route, edge, markerId, nodes, inspector));
     }
     for (const { id, box } of diagram.layout.placed) {
       const node = nodes.get(id);
@@ -457,23 +557,16 @@
     const controls = el('div', undefined, 'graph-controls');
     controls.append(el('span', diagramLabel[diagram.kind], 'muted'));
     const nodes = new Map(diagram.nodes.map((node) => [node.id, node]));
-    article.append(heading, controls, graphSvg(diagram, nodes, diagram.layout.width, diagram.layout.height, controls));
+    const serial = ++diagramSerial;
+    const inspector = graphInspector(`graph-evidence-${serial}`);
+    const graph = graphSvg(diagram, nodes, diagram.layout.width, diagram.layout.height, controls, serial, inspector);
+    article.append(heading, controls, graph, inspector.panel);
     const details = el('details');
     details.append(el('summary', copy('edgeList', { count: diagram.edges.length })));
     const list = el('ul', undefined, 'edge-list');
     for (const edge of diagram.edges) {
       const item = el('li');
-      const endpoint = (id) => {
-        const node = nodes.get(id);
-        if (node === undefined) return id;
-        const target = nodeTarget(node);
-        return target === undefined ? node.label : link(node.label, target);
-      };
-      item.append(endpoint(edge.from), ` → ${edge.label || edge.kind} → `, endpoint(edge.to));
-      const kind = edge.evidenceClass === 'static' ? C.static : C.inference;
-      item.append(el('span', kind, 'evidence-tag'));
-      if (edge.evidencePath) item.append(' ', pathLink(edge.evidencePath, edge.lineStart, edge.lineEnd));
-      if (edge.rationale) item.append(el('p', edge.rationale, 'muted'));
+      item.append(edgeEvidence(edge, nodes).content);
       list.append(item);
     }
     details.append(list);
