@@ -57,8 +57,6 @@ export function registerContextRoutes(
     log: Logger;
   },
 ): void {
-  // 执行 MCP 的工具定义在注册时固定，首次受管请求才计算体积。
-  let toolBytes: number | undefined;
   server.register(
     async (routes) => {
       routes.addHook('onRequest', async (req) => {
@@ -71,8 +69,12 @@ export function registerContextRoutes(
         if (!sessionId) return { enabled };
         const attemptId = taskId && deps.owner(sessionId, directory, taskId);
         if (!attemptId) return { enabled, attemptId: null };
-        toolBytes ??= deps.toolBytes();
-        return { enabled, attemptId, toolBytes, ...(enabled && { summary: deps.summaries.get(sessionId) }) };
+        return {
+          enabled,
+          attemptId,
+          toolBytes: deps.toolBytes(),
+          ...(enabled && { summary: deps.summaries.get(sessionId) }),
+        };
       });
       routes.post('/budget', async (req) => {
         const { directory, summary, receipt, ...data } = parseInput(report, req.body);

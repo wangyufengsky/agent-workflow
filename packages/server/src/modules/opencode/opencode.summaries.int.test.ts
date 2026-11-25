@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { AttemptKind, cancelTaskOp, deleteTaskOp, RoleBaseAgent } from '@aw/shared';
+import { AttemptKind, cancelTaskOp, deleteTaskOp, getAttemptContextOp, RoleBaseAgent } from '@aw/shared';
+import type { Messages } from '@aw/shared/context';
 import { expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp } from '../../../test/helpers/app.ts';
@@ -113,6 +114,39 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     } finally {
       reopened.close();
     }
+    // 工作树已不受管、快照为空，已保存的摘要仍能重建上方分类与下方消息。
+    t.fake.sessionMessages = async () =>
+      [
+        {
+          info: { id: 'msg_a', sessionID: sessionId, role: 'assistant', time: { completed: 1 } },
+          parts: [
+            {
+              type: 'tool',
+              tool: 'grep',
+              id: 'p',
+              messageID: 'msg_a',
+              sessionID: sessionId,
+              state: { status: 'completed', output: 'found '.repeat(900), time: {}, input: {} },
+            },
+          ],
+        },
+        { info: { id: 'latest', role: 'user', agent: 'aw-planner' }, parts: [{ type: 'text', text: 'continue' }] },
+        {
+          info: {
+            id: 'last-tool',
+            role: 'assistant',
+            time: { completed: 2 },
+            tokens: { input: 5, cache: { read: 0, write: 0 } },
+          },
+          parts: [{ type: 'tool', tool: 'grep', state: { status: 'completed', input: {}, output: 'ok' } }],
+        },
+      ] as unknown as Messages;
+    const { body: detail } = await t.call(getAttemptContextOp, { id: next.id });
+    expect(detail).toMatchObject({ budget: null, reconstructed: true, summary: { summaryText: 'msg_a' } });
+    expect(detail.historyParts.summary).toBeGreaterThan(0);
+    expect(detail.historyParts.toolOutput).toBeLessThan(10);
+    expect(detail.historyParts.system).toBeGreaterThan(0);
+    expect(detail.historyParts.tools).toBeGreaterThan(0);
     const waiting = Promise.withResolvers<void>(),
       late = Promise.withResolvers<string>();
     t.fake.promptDocument = async () => {

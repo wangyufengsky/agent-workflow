@@ -8,7 +8,7 @@ export const CONTEXT_COPY = {
   unknown: '未知',
   estimated: '最近一次发送前估算',
   measured: '最近一次活跃窗口的模型账单',
-  historyEstimate: '活跃消息估算（仅历史正文）',
+  historyEstimate: '基于历史消息及基础系统与工具定义估算',
   saved: (n: string) => `已节省 ${n} tokens`,
   warning: '估算超过上限，已放行给模型验证。',
   stopped: '预算保护已停止本次尝试。',

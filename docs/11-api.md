@@ -756,4 +756,4 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 
 `GET /api/v1/attempts/:id/context` 与 `GET /api/v1/assistant/conversations/:id/context` 为只读操作，返回同一 `ContextDetailDTO`。服务端从所属记录定位物理 Session 与目录。无 Session 时返回空历史。按 V1 已完成的原生摘要、父 compaction 标记与保留尾段定位活跃窗口，归档消息的有效 token 为零。
 
-`budget` 是最近一次受管请求发送前的分类估算，最多保留最近 64 个 Session，进程重启清空。账单来自活跃窗口最后完成的普通模型回复。后台摘要来自现有摘要表。每条消息带投影状态、估算 token、原始长度与最多 8192 个 UTF-16 码元的预览。快照不可用时，受管工作树可从活跃窗口按当前规则重建，返回 `reconstructed: true`，下游明确标注重建口径。两端均按需读取，不持久化消息副本。
+`budget` 是最近一次受管请求发送前的分类估算，最多保留最近 64 个 Session，进程重启清空。账单来自活跃窗口最后完成的普通模型回复。后台摘要来自现有摘要表。每条消息带投影状态、估算 token、原始长度与最多 8192 个 UTF-16 码元的预览。快照不可用时，受管工作树或已有落库摘要的任务从活跃窗口按当前规则重建，返回 `reconstructed: true`，下游明确标注重建口径。重建时按投影后的消息统计正文、工具输出与摘要。无快照时，historyParts.system 和 historyParts.tools 估算基础提示词、当前模式的 AW MCP 与可获取的原生工具定义，historyEstimate 为各分类之和。原生工具不可用时仍统计 AW MCP。

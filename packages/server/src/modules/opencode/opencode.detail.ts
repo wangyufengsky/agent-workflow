@@ -1,3 +1,4 @@
+import type { Prompts } from '@aw/builtin';
 import type { ContextDetailDTO } from '@aw/shared';
 import {
   activeWindow,
@@ -11,7 +12,8 @@ import {
   referenceText,
   SUMMARY_LABEL,
 } from '@aw/shared/context';
-import type { OpencodeClient } from './opencode.client.ts';
+import { type OpencodeClient, parseModelRef } from './opencode.client.ts';
+import { contextBasePrompt } from './opencode.config.ts';
 import type { createBudgetSnapshots } from './opencode.context.ts';
 import type { createContextSummaries } from './opencode.summaries.ts';
 
@@ -38,8 +40,24 @@ export function createContextInspector(
   opencode: OpencodeClient,
   snapshots: ReturnType<typeof createBudgetSnapshots>,
   summaries: ReturnType<typeof createContextSummaries>,
+  prompts: Prompts,
+  mcpToolBytes: (execution: boolean) => number,
   canProject: (directory: string, taskId: string) => boolean,
 ) {
+  const nativeSizes = new Map<string, Promise<number>>();
+  function nativeBytes(directory: string, model: string) {
+    const key = JSON.stringify([directory, model]);
+    const known = nativeSizes.get(key);
+    if (known) return known;
+    const size = opencode.nativeToolBytes(directory, parseModelRef(model)).catch(() => {
+      if (nativeSizes.get(key) === size) nativeSizes.delete(key);
+      return 0; // 原生定义暂不可用，仍计入 AW MCP，刷新可重新读取。
+    });
+    nativeSizes.set(key, size);
+    const oldest = nativeSizes.keys().next().value;
+    if (nativeSizes.size > 64 && oldest !== undefined) nativeSizes.delete(oldest);
+    return size;
+  }
   return async function inspect({
     sessionId,
     directory,
@@ -58,18 +76,41 @@ export function createContextInspector(
     const cached = sessionId && attemptId ? snapshots.get(sessionId) : undefined;
     const snapshot = cached?.attemptId === attemptId ? cached : undefined;
     const budget = snapshot ?? null;
-    const history = sessionId ? await opencode.sessionMessages({ sessionId, directory }) : [];
-    const active = activeWindow(history);
-    const live = new Set(active.map((m) => m.info.id));
-    const compacted = history.findLastIndex(
-      (m) => m.info.role === 'assistant' && m.info.summary && m.info.finish && !m.info.error,
-    );
-    const reply = history
-      .slice(compacted + 1)
-      .findLast(
-        (m) =>
-          live.has(m.info.id) && m.info.role === 'assistant' && !m.info.error && m.info.time.completed !== undefined,
-      )?.info;
+    const connected = sessionId && opencode.isConnected();
+    const fallback = connected && !budget;
+    const historyRequest = connected ? opencode.sessionMessages({ sessionId, directory }) : Promise.resolve([]);
+    const windowRequest = historyRequest.then((history) => {
+      const active = activeWindow(history);
+      const live = new Set(active.map((m) => m.info.id));
+      const compacted = history.findLastIndex(
+        (m) => m.info.role === 'assistant' && m.info.summary && m.info.finish && !m.info.error,
+      );
+      const reply = history
+        .slice(compacted + 1)
+        .findLast(
+          (m) =>
+            live.has(m.info.id) && m.info.role === 'assistant' && !m.info.error && m.info.time.completed !== undefined,
+        )?.info;
+      const lastUser = active.findLast((m) => m.info.role === 'user')?.info;
+      const user = lastUser?.role === 'user' ? lastUser : undefined;
+      const model =
+        reply?.role === 'assistant' && reply.providerID && reply.modelID
+          ? `${reply.providerID}/${reply.modelID}`
+          : user?.model
+            ? `${user.model.providerID}/${user.model.modelID}`
+            : configured;
+      return { history, active, live, reply, user, model };
+    });
+    const catalogRequest = fallback ? opencode.listModels(directory) : Promise.resolve(null);
+    const lookup = (model: string | null | undefined) => (model ? nativeBytes(directory, model) : 0);
+    const toolRequest = !fallback
+      ? 0
+      : configured
+        ? lookup(configured)
+        : windowRequest.then(async (w) => lookup(w.model ?? (await catalogRequest)?.defaultModel));
+    const [window, catalog, initialBytes] = await Promise.all([windowRequest, catalogRequest, toolRequest]);
+    const { history, active, live, reply, user } = window;
+    const model = budget?.model ?? window.model ?? catalog?.defaultModel ?? null;
     const lastRequest = active.findLastIndex((m) => m.info === reply);
     const nativeSent = new Set(
       active
@@ -78,22 +119,18 @@ export function createContextInspector(
         .map((m) => m.info.id),
     );
     const billed = reply?.role === 'assistant' ? reply.tokens : null;
-    const user = active.findLast((m) => m.info.role === 'user')?.info;
-    const requested =
-      user?.role === 'user' && user.model ? `${user.model.providerID}/${user.model.modelID}` : configured;
-    const model = budget?.model ?? (reply?.role === 'assistant' ? `${reply.providerID}/${reply.modelID}` : requested);
-    const catalog = sessionId && budget === null ? await opencode.listModels(directory) : null;
     const limit = budget
       ? budget.limit
-      : (catalog?.available.find((m) => `${m.providerId}/${m.modelId}` === (model ?? catalog.defaultModel))
-          ?.contextLimit ?? null);
+      : (catalog?.available.find((m) => `${m.providerId}/${m.modelId}` === model)?.contextLimit ?? null);
     const rate = budget?.bytesPerToken ?? DEFAULT_BYTES_PER_TOKEN;
     const summary = sessionId && attemptId ? (summaries.get(sessionId) ?? null) : null;
     // 进程重启或快照淘汰后只能按当前规则重建，不能把后来发布的摘要冒充历史发送记录。
     let receipt = snapshot?.receipt;
-    const reconstructed = !receipt && !!sessionId && !!taskId && canProject(directory, taskId);
+    let countedWindow = active;
+    const reconstructed = !receipt && !!sessionId && (!!summary || (!!taskId && canProject(directory, taskId)));
     if (reconstructed) {
       const { folded, projected } = projectWindow(active, summary ?? undefined);
+      countedWindow = projected;
       receipt = projectionReceipt(active, folded, projected, summary ?? undefined);
     }
     const sent = new Set(receipt?.sent);
@@ -162,8 +199,20 @@ export function createContextInspector(
         sent: !budget?.blocked && !archived && (receipt ? sent.has(id) : nativeSent.has(id)),
       } satisfies ContextDetailDTO['messages'][number];
     });
-    const raw = historySize(active);
+    const raw = historySize(countedWindow);
+    const native = fallback && configured && model !== configured ? await lookup(model) : initialBytes;
+
     const historyParts = {
+      system:
+        budget?.systemTokens ??
+        Math.ceil(
+          (Buffer.byteLength(contextBasePrompt(prompts, user?.agent, !!attemptId)) +
+            Buffer.byteLength(user?.system ?? '')) /
+            rate,
+        ),
+      tools: budget
+        ? budget.toolTokens + budget.externalTokens
+        : Math.ceil((mcpToolBytes(!!attemptId) + native) / rate),
       dialogue: Math.ceil(raw.dialogue / rate),
       toolOutput: Math.ceil(raw.toolOutput / rate),
       summary: Math.ceil(raw.summary / rate),
@@ -174,7 +223,7 @@ export function createContextInspector(
       budget,
       historyEstimate: Object.values(historyParts).reduce((a, b) => a + b, 0),
       historyParts,
-      model: model ?? catalog?.defaultModel ?? null,
+      model,
       limit,
       cacheRead: billed?.cache.read ?? null,
       measuredInput: billed ? billed.input + billed.cache.read + billed.cache.write : null,
