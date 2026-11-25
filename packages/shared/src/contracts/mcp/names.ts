@@ -34,6 +34,9 @@ export const McpToolName = {
   SubmitAnswer: 'submit_answer',
   SubmitOutline: 'submit_outline',
   SubmitSlide: 'submit_slide',
+  SubmitDesignOutline: 'submit_design_outline',
+  SubmitDesignSection: 'submit_design_section',
+  SubmitDesignReview: 'submit_design_review',
   SubmitFindings: 'submit_findings',
   SubmitCommitMessage: 'submit_commit_message',
   SubmitMemberAnalysis: 'submit_member_analysis',
@@ -86,12 +89,34 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.DeckOutline]: McpToolName.SubmitOutline,
   // Called once per page; the attempt is submitted with the last of its pages (23 §4.1).
   [AttemptKind.DeckSlides]: McpToolName.SubmitSlide,
+  [AttemptKind.DesignOutline]: McpToolName.SubmitDesignOutline,
+  [AttemptKind.DesignGenerate]: McpToolName.SubmitDesignSection,
+  [AttemptKind.DesignRevise]: McpToolName.SubmitDesignSection,
+  [AttemptKind.DesignReview]: McpToolName.SubmitDesignReview,
   [AttemptKind.GitReview]: McpToolName.SubmitFindings,
   [AttemptKind.CommitMessage]: McpToolName.SubmitCommitMessage,
   [AttemptKind.TeamAnalysis]: McpToolName.SubmitMemberAnalysis,
   [AttemptKind.Breakdown]: McpToolName.SubmitBreakdown,
   [AttemptKind.Delegation]: McpToolName.SubmitDelegation,
 } as const satisfies Record<AttemptKind, McpToolName>;
+
+export const DESIGN_ATTEMPT_KINDS = [
+  AttemptKind.DesignOutline,
+  AttemptKind.DesignGenerate,
+  AttemptKind.DesignRevise,
+  AttemptKind.DesignReview,
+] as const;
+
+export type DesignAttemptKind = (typeof DESIGN_ATTEMPT_KINDS)[number];
+
+export function isDesignAttemptKind(kind: AttemptKind): kind is DesignAttemptKind {
+  return DESIGN_ATTEMPT_KINDS.some((candidate) => candidate === kind);
+}
+
+export const DESIGN_MCP_TOOLS: readonly McpToolName[] = [
+  ...new Set(DESIGN_ATTEMPT_KINDS.map((kind) => ATTEMPT_SUBMIT_TOOL[kind])),
+  McpToolName.ReportProgress,
+];
 
 export function isAttemptSubmitTool(name: McpToolName): boolean {
   return name === McpToolName.BrowserSubmitReport || Object.values(ATTEMPT_SUBMIT_TOOL).some((tool) => tool === name);

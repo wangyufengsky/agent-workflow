@@ -1,6 +1,7 @@
 import {
   API_PREFIX,
   AttemptKind,
+  isDesignAttemptKind,
   type ServerEvent,
   ServerEventType,
   serverEventSchema,
@@ -59,6 +60,7 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       if (event.data.attempt.kind === AttemptKind.Research) await refreshKnowledge(qc);
       // A PPT's progress line and status come from its AI work's attempt (23 §4.3).
       if (DECK_ATTEMPT_KINDS.includes(event.data.attempt.kind)) await refreshDecks(qc);
+      if (isDesignAttemptKind(event.data.attempt.kind)) await qc.invalidateQueries({ queryKey: queryKeys.designs });
       // A task's active attempts (and their progress line) are part of its detail, their status of its preview's
       // sessions (29 §8.1).
       if (event.data.taskId !== null) {
@@ -105,6 +107,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return refreshKnowledge(qc);
     case ServerEventType.DeckUpdated:
       return refreshDecks(qc);
+    case ServerEventType.DesignUpdated:
+      return qc.invalidateQueries({ queryKey: queryKeys.designs });
     case ServerEventType.GitReviewUpdated:
       return refreshGitReview(qc, event.data.projectId, event.data.reviewId);
     case ServerEventType.TeamAnalysisUpdated:

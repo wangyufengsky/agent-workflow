@@ -22,6 +22,7 @@ export const SessionPurpose = {
   Attempt: 'attempt',
   Knowledge: 'knowledge',
   Deck: 'deck',
+  Design: 'design',
   Initiative: 'initiative',
   PlanningRevision: 'planning-revision',
   Assistant: 'assistant',
@@ -37,6 +38,7 @@ const dispatchPolicies = {
   [SessionPurpose.Attempt]: { lifetime: 'attempt', slot: 'owner' },
   [SessionPurpose.Knowledge]: { lifetime: 'attempt', slot: 'owner', reuse: 'when_available' },
   [SessionPurpose.Deck]: { lifetime: 'attempt', slot: 'owner', reuse: 'when_available' },
+  [SessionPurpose.Design]: { lifetime: 'attempt', slot: 'owner', reuse: 'fresh' },
   [SessionPurpose.Initiative]: { lifetime: 'attempt', slot: 'owner', reuse: 'when_available' },
   [SessionPurpose.PlanningRevision]: { lifetime: 'attempt', slot: 'owner', reuse: 'required' },
   [SessionPurpose.Assistant]: { lifetime: 'object', slot: 'owner', agent: OPENCODE_ASSISTANT_AGENT },
@@ -85,6 +87,7 @@ type RetainedPurpose =
 export type ObjectAttemptPurpose =
   | typeof SessionPurpose.Knowledge
   | typeof SessionPurpose.Deck
+  | typeof SessionPurpose.Design
   | typeof SessionPurpose.Initiative
   | typeof SessionPurpose.PlanningRevision;
 type Owner = { purpose: RetainedPurpose; ownerId: string };
@@ -317,7 +320,8 @@ export function createSessionDispatcher({
   return {
     bind,
     shouldContinueAttempt(purpose: ObjectAttemptPurpose, previousSessionId: string | null) {
-      return dispatchPolicies[purpose].reuse === 'required' || previousSessionId !== null;
+      const { reuse } = dispatchPolicies[purpose];
+      return reuse === 'required' || (reuse === 'when_available' && previousSessionId !== null);
     },
     call<T>(input: Call, run: (session: Session) => Promise<T>) {
       return callPrepared(input, run, async () => undefined);

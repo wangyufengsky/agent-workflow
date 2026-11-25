@@ -134,6 +134,16 @@ describe('opencode 配置生成', () => {
     expect(rules).toMatchSnapshot();
   });
 
+  it('设计会话使用独立的只读 Bash 规则，项目授权和测试命令不会扩大权限', () => {
+    expect(
+      sessionPermissionRules(SessionAgent.Designer, BashPolicy.Auto, {
+        allowedBash: ['node *'],
+        checkCommands: ['pnpm test'],
+        web: true,
+      }),
+    ).toEqual(readonlyBashRules());
+  });
+
   it('数据库分析员是专职只读节点，委派调查会话禁止直接工具访问', () => {
     const { agent } = config(undefined);
     expect(agent[OPENCODE_DATABASE_INVESTIGATOR_AGENT].permission).toEqual({ '*': 'deny' });

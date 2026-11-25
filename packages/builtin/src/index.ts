@@ -1,4 +1,9 @@
 export { loadBuiltinRoles, loadBuiltinWorkflows, type RoleSeed, type WorkflowSeed } from './builtins.ts';
+export {
+  type BuiltinDesignTemplate,
+  BuiltinDesignTemplateKey,
+  loadBuiltinDesignTemplates,
+} from './design-templates.ts';
 export { createFunctionalTestTemplate } from './functional-testing.ts';
 export {
   BUILTIN_INITIATIVE_TEMPLATES,

@@ -61,6 +61,7 @@ export const OPENCODE_AGENT_NAME = {
   [SessionAgent.Reviewer]: 'aw-reviewer',
   [SessionAgent.Researcher]: 'aw-researcher',
   [SessionAgent.SlidesWriter]: 'aw-slides',
+  [SessionAgent.Designer]: 'aw-designer',
   [SessionAgent.CodeReviewer]: 'aw-code-reviewer',
   [SessionAgent.Delegate]: 'aw-readonly-delegate',
 } as const satisfies Record<SessionAgent, string>;

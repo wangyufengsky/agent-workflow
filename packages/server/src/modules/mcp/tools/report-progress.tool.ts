@@ -1,4 +1,10 @@
-import { AttemptKind, McpToolName, reportProgressInputSchema, reportProgressOutputSchema } from '@aw/shared';
+import {
+  AttemptKind,
+  DESIGN_ATTEMPT_KINDS,
+  McpToolName,
+  reportProgressInputSchema,
+  reportProgressOutputSchema,
+} from '@aw/shared';
 import type { AttemptsService } from '../../attempts/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
@@ -14,6 +20,7 @@ export const reportProgressTool = (attempts: AttemptsService, tasks: TasksServic
       AttemptKind.Research,
       AttemptKind.DeckOutline,
       AttemptKind.DeckSlides,
+      ...DESIGN_ATTEMPT_KINDS,
       AttemptKind.GitReview,
       AttemptKind.TeamAnalysis,
       AttemptKind.CommitMessage,

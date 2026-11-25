@@ -40,6 +40,7 @@ export const SessionAgent = {
   ...RoleBaseAgent,
   Researcher: 'researcher',
   SlidesWriter: 'slides_writer',
+  Designer: 'designer',
   /** Reviews diffs and drafts commit messages in the Git workbench, read-only (27 §4.3). */
   CodeReviewer: 'code_reviewer',
   Delegate: 'delegate',

@@ -6,6 +6,7 @@ import {
   BROWSER_TEST_TOOLS,
   type BrowserTestSubmitTool,
   DATABASE_ANALYST_TOOLS,
+  DESIGN_MCP_TOOLS,
   FUNCTIONAL_TEST_NODE,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
   type FunctionalTestNode,
@@ -97,6 +98,17 @@ const READ_ONLY_WRITER = {
   [ASSISTANT_TOOLS]: 'deny',
 } as const;
 
+const DESIGNER_PERMISSION = {
+  '*': 'deny',
+  ...READ_ONLY_WRITER,
+  read: 'allow',
+  glob: 'allow',
+  grep: 'allow',
+  bash: 'ask',
+  [EXEC_TOOLS]: 'deny',
+  ...Object.fromEntries(DESIGN_MCP_TOOLS.map((tool) => [`${MCP_TOOL_PREFIX}${tool}`, 'allow' as const])),
+} as const;
+
 /**
  * Agent permissions that never change with settings (12 §2). The native question tool is denied: questions go
  * through MCP `ask_user` (D36). Bash rules are per session, see `sessionPermissionRules`. Sessions working on a task
@@ -132,6 +144,7 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
   [SessionAgent.Researcher]: READ_ONLY_WRITER,
   // The PPT writer reads like the researcher and never uses the web (23 §7.1).
   [SessionAgent.SlidesWriter]: READ_ONLY_WRITER,
+  [SessionAgent.Designer]: DESIGNER_PERMISSION,
   // The Git workbench's reviewer reads the user's repository and never uses the web (27 §4.3).
   [SessionAgent.CodeReviewer]: READ_ONLY_WRITER,
   // 只读委派通过 MCP 读取固定 Git 提交，避免原生工具读到工作区外的文件。
@@ -167,6 +180,7 @@ const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.DatabaseAnalyst]: PromptName.ProtocolDatabaseAnalyst,
   [SessionAgent.Researcher]: PromptName.ProtocolResearch,
   [SessionAgent.SlidesWriter]: PromptName.ProtocolSlides,
+  [SessionAgent.Designer]: PromptName.ProtocolDesign,
   [SessionAgent.CodeReviewer]: PromptName.ProtocolCodeReview,
   [SessionAgent.Delegate]: PromptName.ProtocolDelegate,
 };
@@ -390,6 +404,7 @@ export function sessionPermissionRules(
       })),
     ];
   }
+  if (base === SessionAgent.Designer) return readonlyBashRules();
   if (base === SessionAgent.Delegate)
     return Object.entries(DELEGATE_PERMISSION).map(([permission, action]) => ({ permission, action, pattern: '*' }));
   if (base === SessionAgent.Executor) {

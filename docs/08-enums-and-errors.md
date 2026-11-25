@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3）· `breakdown`（需求计划的 AI 拆解、重新拆解与细化，不属于任务，由 `initiative_runs` 指向，34 §8）· `delegation`（步骤的只读委派，12 §6.18） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3）· `breakdown`（需求计划的 AI 拆解、重新拆解与细化，不属于任务，由 `initiative_runs` 指向，34 §8）· `delegation`（步骤的只读委派，12 §6.18）· `design_outline` · `design_generate` · `design_revise` · `design_review`（项目设计，44 §7） |
 | `AttemptStatus` | `queued`（等模型额度，D186）· `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted`；未结束的三种为 `ACTIVE_ATTEMPT_STATUSES` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
@@ -135,7 +135,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ExternalMcpStatus` | `connected` · `disabled` · `failed` · `needs_auth` · `needs_client_registration` | opencode `mcp.status` 报告的用户自己的 MCP 服务器状态（28 §4）；设置「助手」分组显示，语气见 §3 |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` · `read_attachment` · `browser_read` · `show_chart` · `show_flowchart`（35） · `export_deck`（28 §4） | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `task_preview`（任务页的预览页签，v1.3 B3，29 §2.6） · `node` · `inbox` · `projects` · `project` · `assistant_memory` · `settings` · `git` · `git_project` · `git_review`（某次 AI 审查，27 §4；地址跳到工作台里显示它的视图） · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_new` · `ppt_deck`（23 §9） · `batches` · `batch_new` · `batch` · `schedules` · `schedule_new` · `schedule` · `schedule_edit` · `environment`（28 §4） · `initiatives` · `initiative`（34 §10） · `initiative_templates` · `initiative_template_new` · `initiative_template`（34 §15.6，专业） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId` / `initiativeId` / `templateKey` / `gitReviewId` / `teamMember`；PPT 工作台另可带选中的页 `slideId`）。界面里除引导页、只做跳转的团队入口 `/team`、全屏的放映与打印页、开发用组件页之外，每个路由都对应一个页面（`assistant-page.ts` 编译期检查），否则用户会被当成在主页 |
-| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） · `initiative`（34 §10） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
+| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `design`（44 §9） · `git_review`（27 §7.1） · `initiative`（34 §10） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 | `ChartType` | `bar` · `line` · `pie` · `flow` | 助手画的图（35，D138）：前三种来自 `show_chart`，`flow` 来自 `show_flowchart`；会话流 `chart` 条目的 `chart.type` |
@@ -148,7 +148,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KnowledgeTurnStatus` | `researching` · `answered` · `stopped` · `failed` | 一轮的状态，由其 `research` 尝试的状态推导（`knowledgeTurnStatusOf`，18 §3），不存储 |
 | `KnowledgeSourceKind` | `code` · `docs` · `database` · `web` | 资料范围与引用的来源类别；文件按 `classifySource(path)` 分为代码或文档（`KNOWLEDGE_DOC_DIRS`、`KNOWLEDGE_DOC_EXTENSIONS`） |
 | `CitationType` | `file` · `database` · `web` | `submit_answer` 的引用类型（18 §6.1） |
-| `SessionAgent` | `planner` · `executor` · `reviewer` · `database_analyst` · `researcher` · `slides_writer` · `code_reviewer` · `delegate` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型包括规划、执行、审查与数据库分析；`slides_writer` 为 PPT 写作者（23 §7.1）；`code_reviewer` 为 Git 工作台的只读审查与草拟提交信息（27 §4.3） |
+| `SessionAgent` | `planner` · `executor` · `reviewer` · `database_analyst` · `researcher` · `slides_writer` · `designer` · `code_reviewer` · `delegate` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型包括规划、执行、审查与数据库分析；`slides_writer` 为 PPT 写作者（23 §7.1）；`code_reviewer` 为 Git 工作台的只读审查与草拟提交信息（27 §4.3） |
 
 ### 2.9 质量与用量（v1.1，`enums/insights.ts`）
 
@@ -199,7 +199,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeckMaterialKind` | `text` · `file` · `task` · `artifact` · `knowledge` · `web` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
 | `SlideLayout` | `cover` · `section` · `bullets` · `two_column` · `cards` · `steps` · `stats` · `table` · `code` · `quote` | 内置版式（23 §5.1，D93）；每种版式的字段与字数上限为 `slideContentSchema`（`shared/contracts/deck/slide.ts`） |
 
-`ServerEventType` 另有 `deck.updated`（11 §11）。
+`ServerEventType` 另有 `deck.updated` 与 `design.updated`（11 §11）。
 
 ### 2.13 页面预览与浏览器（v1.3，`enums/browser.ts`，29）
 
@@ -254,7 +254,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `APP_ID` | `agent-workflow` | 数据目录名、MCP server 名 |
 | `OPENCODE_VERSION` | `1.19.0` | 构建与测试所用的版本（SDK、事件样本、引导页的安装命令） |
 | `OPENCODE_SUPPORTED_VERSIONS` | `{ min: [1, 18, 0], max: [1, 90] }` | 可托管的版本：1.18.0 起到 1.90 的所有补丁版本，其他为 `version_mismatch`（D156）；`isSupportedOpencodeVersion` 判断，`OPENCODE_SUPPORTED_RANGE` 为显示用的 `1.18.0 – 1.90.x` |
-| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1），`code_reviewer: 'aw-code-reviewer'` 为 Git 工作台的审查员（v1.2，27 §4.3） |
+| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1），`designer: 'aw-designer'` 为项目设计分析员（44 §7.1），`code_reviewer: 'aw-code-reviewer'` 为 Git 工作台的审查员（v1.2，27 §4.3） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
 | `OPENCODE_COMPANION_AGENT` / `COMPANION_WHISPER_TIMEOUT_MS` / `COMPANION_WHISPER_MAX_CHARS` | `aw-companion` / `60000` / `120` | 独立无工具碎碎念与单次超时（32 §3.4） |
@@ -707,3 +707,25 @@ class AppError extends Error {
 ### 模型思考强度
 
 专业设置 `ai.defaultEffort` 默认为 null，使用模型默认。显式选择保存声明该档位的 `provider/model` 和 OpenCode 的原始 `variant` 字符串。切换默认模型时同步清空旧选择；不属于当前模型的档位在写入前返回 VALIDATION_FAILED。
+
+## 项目设计（44）
+
+设计深度为 `quick / standard / deep`，阅读风格为 `doc / arch`。章节类型为
+`overview / architecture / module / flow / custom`，图类型为
+`architecture / call_graph / business_flow`，证据为 `static / inferred`，复审结果为
+`none / passed / needs_attention`。显示状态由选中章节的完成数、大纲确认时间和最近一次尝试推导，
+取值为 `outlining / outline_ready / generating / reviewing / incomplete / ready / failed`。
+
+`designer` 对应 `aw-designer`。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
+`design_review`。实体类型为 `design`，设计更新事件为 `design.updated`。
+
+| 错误码 | HTTP | 含义 |
+| --- | --- | --- |
+| DESIGN_NOT_FOUND | 404 | 设计或指定模板不存在 |
+| DESIGN_SECTION_NOT_FOUND | 404 | 指定设计没有该章 |
+| DESIGN_BUSY | 409 | 设计仍有活动尝试 |
+| DESIGN_EXPORT_DIR_NOT_EMPTY | 409 | 导出目录包含其他文件，需用户确认 |
+| DESIGN_TEMPLATE_READONLY | 403 | 内置模板只读 |
+
+标题 160 字，设计最多 64 章，补充要求与模板分析指引最多 8000 字，可分析文件最多 512 KiB。
+每张图最多 100 个节点和 250 条边。常量在 `shared/constants/limits.ts` 定义。

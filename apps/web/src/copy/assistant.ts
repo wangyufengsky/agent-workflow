@@ -243,6 +243,7 @@ export const ENTITY_COPY = {
     [EntityKind.KnowledgeConversation]: '知识问答对话',
     [EntityKind.Batch]: '批量任务',
     [EntityKind.Deck]: 'PPT',
+    [EntityKind.Design]: '项目设计',
     [EntityKind.GitReview]: 'Git 审查',
     [EntityKind.Schedule]: '定时任务',
     [EntityKind.Initiative]: '需求计划',
