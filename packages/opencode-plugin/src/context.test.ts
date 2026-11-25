@@ -1,6 +1,7 @@
 import { MCP_TOOL_PREFIX, McpToolName } from '@aw/shared';
 import type { Hooks } from '@opencode-ai/plugin';
 import { expect, it } from 'vitest';
+import { historyBytes } from './context.ts';
 import { applySummary, freezePrefix, projectHistory } from './projection.ts';
 
 type Messages = Parameters<NonNullable<Hooks['experimental.chat.messages.transform']>>[1]['messages'];
@@ -94,4 +95,19 @@ it('后一轮摘要继承已发布摘要并包含新增证据，只有原摘要�
   expect(next?.source).toContain('"partId":"pb"');
   expect(next?.source).not.toContain('"partId":"pz"');
   expect(freezePrefix(applySummary(history.slice(0, 2), prior), prior.uptoMessageId)).toBeUndefined();
+});
+
+it('内联图片按张估算，直接附件和工具截图的预算独立于 base64 长度', () => {
+  const estimate = (encoded: string, tool: boolean, count = 1, output = '') => {
+    const image = { type: 'file', mime: 'image/png', url: `data:image/png;base64,${encoded}` };
+    const files = Array.from({ length: count }, () => image);
+    const parts = tool ? read('shot', undefined, [], { attachments: files, output }).parts : files;
+    return historyBytes([{ info: { role: 'user' }, parts }] as unknown as Messages);
+  };
+  for (const tool of [true, false]) {
+    const one = estimate('AAAA', tool);
+    expect(estimate('AAAA'.repeat(102400), tool)).toBe(one);
+    expect(estimate('AAAA', tool, 2) - one).toBeGreaterThan(100);
+  }
+  expect(estimate('AAAA', true, 1, 'a'.repeat(10000)) - estimate('AAAA', true)).toBe(10000);
 });

@@ -5,16 +5,26 @@ import { applySummary, freezePrefix, type Messages, projectHistory, type Summary
 const SUMMARY_BUDGET_RATIO = 0.75;
 const BYTES_PER_TOKEN = 3;
 const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value));
-function historyBytes(messages: Messages): number {
+// Provider 的视觉分词取决于分辨率和模型。每张图片预留估算额度，传输编码长度不参与视觉计费。
+const IMAGE_TOKEN_ESTIMATE = 2048;
+function fileBytes(file: Extract<Messages[number]['parts'][number], { type: 'file' }>): number {
+  return file.mime.startsWith('image/')
+    ? bytes({ ...file, url: '' }) + IMAGE_TOKEN_ESTIMATE * BYTES_PER_TOKEN
+    : bytes(file);
+}
+
+export function historyBytes(messages: Messages): number {
   let size = 0;
   for (const { info, parts } of messages) {
     size += bytes(info.role);
     for (const p of parts) {
       // read.display 和 preview 只供界面显示，V1 不发给模型。
-      size +=
-        p.type === 'tool' && p.state.status === 'completed'
-          ? bytes([p.tool, p.callID, p.state.input, p.state.output, p.state.attachments, p.metadata])
-          : bytes(p);
+      if (p.type === 'tool' && p.state.status === 'completed') {
+        size += bytes([p.tool, p.callID, p.state.input, p.state.output, p.metadata]);
+        for (const file of p.state.attachments ?? []) size += fileBytes(file);
+      } else {
+        size += p.type === 'file' ? fileBytes(p) : bytes(p);
+      }
     }
   }
   return size;
