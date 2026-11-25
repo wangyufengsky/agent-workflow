@@ -1,0 +1,39 @@
+import type { ContextDetailDTO } from '@aw/shared';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, it } from 'vitest';
+import { ContextContents } from './context-drawer.tsx';
+
+it('原生助手显示账单与归档状态，受管模式显示摘要', () => {
+  const detail: ContextDetailDTO = {
+    reconstructed: false,
+    budget: null,
+    historyEstimate: 12,
+    historyParts: { dialogue: 12, toolOutput: 0, summary: 0, media: 0 },
+    model: 'native',
+    limit: 500,
+    measuredInput: 100,
+    cacheRead: 80,
+    compactions: 1,
+    compactionRequests: 1,
+    managed: false,
+    stopped: false,
+    summary: null,
+    folded: [],
+    messages: [],
+  };
+  const native = renderToStaticMarkup(<ContextContents data={detail} />);
+  expect(native).toContain('20%');
+  expect(native).toContain('原生压缩已完成 1 次');
+  expect(native).not.toContain('后台语义摘要');
+  const managed = renderToStaticMarkup(
+    <ContextContents
+      data={{
+        ...detail,
+        managed: true,
+        summary: { summaryText: 'Published evidence', uptoMessageId: 'earlier-message', updatedAt: 0 },
+      }}
+    />,
+  );
+  expect(managed).toContain('Published evidence');
+  expect(managed).toContain('earlier-message');
+});

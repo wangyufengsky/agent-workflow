@@ -98,6 +98,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.databases.test': '测试数据库连接',
   'op.databases.schema': '浏览表结构',
   'op.databases.query': '只读查询数据库',
+  'op.attempts.context': '查看步骤上下文',
+  'op.assistant.context': '查看助手上下文',
   'op.attempts.get': '查看 AI 会话',
   'op.attempts.abort': '中止 AI 会话',
   'op.attachments.get': '查看资料',

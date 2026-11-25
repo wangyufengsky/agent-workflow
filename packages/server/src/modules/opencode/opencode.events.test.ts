@@ -65,6 +65,7 @@ describe('opencode 全局事件解析', () => {
       sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ',
       messageId: 'msg_1538b5d19001aSulM6ndvCetJc',
       partId: 'prt_1538b723d001f2I80CqDGxK1Ua',
+      reason: 'tool-calls',
       tokens: { input: 9736, output: 63 },
       cost: 0,
     });

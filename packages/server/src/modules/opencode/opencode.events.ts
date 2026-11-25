@@ -61,7 +61,7 @@ const E = OpencodeEventType;
 const SSE_READ_TIMED_OUT = 'SSE read timed out';
 
 /** The session error opencode reports when a reply still generating is aborted. */
-export const MESSAGE_ABORTED_ERROR = 'MessageAbortedError';
+export { MESSAGE_ABORTED_ERROR } from '@aw/shared/context';
 export const CONTEXT_OVERFLOW_ERROR = 'ContextOverflowError';
 export type OpencodeEvent =
   | {
@@ -95,6 +95,7 @@ export type OpencodeEvent =
     }
   | {
       type: typeof E.StepFinished;
+      reason?: string;
       sessionId: string;
       messageId: string;
       partId: string;
@@ -146,6 +147,7 @@ const partSchema = z.discriminatedUnion('type', [
   z.object({
     ...partBase,
     type: z.literal('step-finish'),
+    reason: z.string().optional(),
     cost: z.number(),
     tokens: z.object({ input: z.number(), output: z.number() }),
   }),
@@ -244,7 +246,13 @@ function toPartEvent(raw: unknown): OpencodeEvent | undefined {
         ...(part.state.error === undefined ? {} : { error: part.state.error }),
       };
     case 'step-finish':
-      return { type: E.StepFinished, ...ids, tokens: part.tokens, cost: part.cost };
+      return {
+        type: E.StepFinished,
+        ...ids,
+        ...(part.reason && { reason: part.reason }),
+        tokens: part.tokens,
+        cost: part.cost,
+      };
   }
 }
 

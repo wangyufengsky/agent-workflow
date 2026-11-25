@@ -155,7 +155,7 @@ export function Composer({
           )}
         </div>
       </div>
-      {conversation !== undefined && <UsageButton usage={conversation.usage} />}
+      {conversation !== undefined && <UsageButton conversationId={conversation.id} usage={conversation.usage} />}
       {pickers.elements}
       {context.elements}
     </form>

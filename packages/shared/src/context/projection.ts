@@ -1,8 +1,10 @@
-import type { Hooks } from '@opencode-ai/plugin';
-export type Messages = Parameters<NonNullable<Hooks['experimental.chat.messages.transform']>>[1]['messages'];
+import type { ProjectionReceipt } from '../contracts/api/context.ts';
+import { historyBytes, SUMMARY_LABEL } from './budget.ts';
+import { hasModelContent, type Messages } from './messages.ts';
+
 type Part = Messages[number]['parts'][number];
 
-function referenceText(part: Part, messageId: string): string | undefined {
+export function referenceText(part: Part, messageId: string): string | undefined {
   if (
     part.type !== 'tool' ||
     part.tool !== 'read' ||
@@ -49,6 +51,7 @@ export function projectHistory(messages: Messages): Messages {
     if (
       i >= latest ||
       m.info.role !== 'assistant' ||
+      m.info.summary ||
       m.info.error ||
       m.info.time.completed === undefined ||
       m.parts.some(
@@ -65,13 +68,13 @@ export function projectHistory(messages: Messages): Messages {
 }
 
 export type Summary = { uptoMessageId: string; summaryText: string };
-const SUMMARY_LABEL = '[AW prior work]\n';
+
 const MIN_SOURCE_BYTES = 1024;
 const MAX_SOURCE_BYTES = 192 * 1024;
 
 // 只投影闭合的普通文本和工具批次。规则、附件、带签名的消息留在原位。
-function eligible({ info, parts }: Messages[number]): boolean {
-  if (info.role === 'assistant' && (info.error || info.time.completed === undefined)) return false;
+export function eligible({ info, parts }: Messages[number]): boolean {
+  if (info.role === 'assistant' && (info.summary || info.error || info.time.completed === undefined)) return false;
   if (!parts.some((p) => p.type === 'text' || p.type === 'tool')) return false;
   return parts.every((p) => {
     if (
@@ -146,7 +149,7 @@ export function freezePrefix(messages: Messages, previousEnd?: string) {
         parts.push({ partId: p.id, tool: p.tool, input: p.state.input, output: p.state.output });
     }
     const line = JSON.stringify({ role: m.info.role, messageId: m.info.id, parts });
-    const length = Buffer.byteLength(line) + 1;
+    const length = new TextEncoder().encode(line).length + 1;
     // 首条任务指令永久保留；特大的首条消息不占用整个 Worker 的源文本预算。
     if (i === firstUser && length > MAX_SOURCE_BYTES) continue;
     if (size + length > MAX_SOURCE_BYTES) break;
@@ -161,4 +164,52 @@ export function freezePrefix(messages: Messages, previousEnd?: string) {
   return uptoMessageId && uptoMessageId !== previousEnd
     ? { uptoMessageId, source: lines.slice(0, end).join('\n') }
     : undefined;
+}
+
+export function projectWindow(messages: Messages, summary?: Summary) {
+  const folded = projectHistory(messages);
+  const candidate = applySummary(folded, summary);
+  return {
+    folded,
+    projected: candidate !== folded && historyBytes(candidate) < historyBytes(folded) ? candidate : folded,
+  };
+}
+
+export {
+  bytes,
+  calibrate,
+  DEFAULT_BYTES_PER_TOKEN,
+  historyBytes,
+  historySize,
+  type Sample,
+  SOFT_BUDGET_RATIO,
+  SUMMARY_LABEL,
+} from './budget.ts';
+
+export { activeWindow, hasModelContent, MESSAGE_ABORTED_ERROR, type Messages } from './messages.ts';
+
+export function projectionReceipt(
+  messages: Messages,
+  folded: Messages,
+  candidate: Messages,
+  summary?: Summary,
+): ProjectionReceipt {
+  const ids = new Set(candidate.map((m) => m.info.id));
+  const sent = candidate.filter(hasModelContent).map((m) => m.info.id);
+  const anchor = candidate === folded ? null : (summary?.uptoMessageId ?? null);
+  const latestTool = messages.findLast((m) => m.parts.some((p) => p.type === 'tool'))?.info.id;
+  return {
+    sent,
+    folded: folded.flatMap((m, i) =>
+      m.parts
+        .filter((p, j) => p !== messages[i]?.parts[j] && ids.has(m.info.id) && m.info.id !== anchor)
+        .map((p) => p.id),
+    ),
+    summarized: messages.filter((m) => !ids.has(m.info.id)).map((m) => m.info.id),
+    anchor,
+    summaryText: anchor ? (summary?.summaryText ?? null) : null,
+    protected: messages
+      .filter((m) => m.info.role === 'user' || m.info.id === latestTool || !eligible(m))
+      .map((m) => m.info.id),
+  };
 }

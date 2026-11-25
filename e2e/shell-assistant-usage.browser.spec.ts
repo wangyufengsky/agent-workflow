@@ -31,6 +31,16 @@ test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分�
   await expect(usage).toContainText('此前未知');
   await expect(usage).toContainText('时限 60 分钟（不含权限等待）');
 
+  await usage.getByRole('button', { name: '查看详细上下文' }).click();
+  const context = page.getByRole('dialog', { name: '上下文详情' });
+  await expect(context.getByRole('heading', { name: '会话消息' })).toBeVisible();
+  await context.getByRole('checkbox', { name: '仅看实际发给模型' }).check();
+  await context.getByRole('button', { name: '原生已归档' }).click();
+  await expect(context.getByText('没有符合条件的消息')).toBeVisible();
+  await context.getByRole('button', { name: '刷新' }).click();
+  await page.keyboard.press('Escape');
+  await expect(context).not.toBeVisible();
+
   // 通过站内导航保留当前对话，侧栏复用同一份用量。
   await page.getByRole('link', { name: '设置', exact: true }).click();
   await page.keyboard.press('ControlOrMeta+j');

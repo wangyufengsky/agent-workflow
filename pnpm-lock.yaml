@@ -242,6 +242,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@opencode-ai/sdk':
+        specifier: 1.19.0
+        version: 1.19.0
 
 packages:
 

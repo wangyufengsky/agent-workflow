@@ -193,7 +193,7 @@ function HomeConversation({
           </header>
           <div className={styles.stream} data-testid="home-messages">
             <MessageList key={conversation.id} conversation={conversation} />
-            <UsageButton usage={conversation.usage} />
+            <UsageButton conversationId={conversation.id} usage={conversation.usage} />
           </div>
           {composer}
         </div>

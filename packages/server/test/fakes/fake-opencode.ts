@@ -540,6 +540,12 @@ export function createFakeOpencode() {
     async promptImage() {
       throw new Error('This test did not configure an image reader response');
     },
+    async sessionMessages() {
+      return [];
+    },
+    async summarizeSession({ sessionId }) {
+      emit({ type: E.Compacted, sessionId });
+    },
     async readToolOutput({ sessionId, directory, messageId, partId }) {
       const part = toolParts.get(partId);
       if (

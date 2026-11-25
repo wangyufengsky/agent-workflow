@@ -11,6 +11,7 @@ import {
   BashPolicy,
   cancelTaskOp,
   ErrorCode,
+  getAttemptContextOp,
   getNodeOp,
   InboxKind,
   listInboxOp,
@@ -52,7 +53,7 @@ const workerTools: string[][] = [];
 const RECALL_PROBE = 'AW_CHECK_PAGED_RECALL';
 const FOREIGN_PROBE = 'AW_CHECK_FOREIGN_RECALL';
 const coordinates = /messageId=(msg_\w+) partId=(prt_\w+)/;
-const BUDGET_PROBE = 'AW_CHECK_BUDGET_STOP';
+let overflowStage = 0;
 const contextRequests: ChatMessage[][] = [];
 let providerRequests = 0;
 const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
@@ -147,19 +148,53 @@ function scriptedModel(): Server {
         replyText = messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))
           ? 'Verified the early finding in bulk.txt.'
           : 'Source missing';
-      } else if (hasProbe(SUMMARY_PROBE)) {
-        contextRequests.push(messages);
-        const count = messages.filter((m) => m.role === 'tool').length;
-        if (messages.some((m) => textOf(m).includes('[AW prior work]'))) {
-          calls = [
-            operation(McpToolName.SubmitResult, { summary: 'Finished with summary', notes: last ? textOf(last) : '' }),
-          ];
-        } else if (count === 0) calls = [{ name: 'grep', args: { pattern: 'EARLY_FINDING', include: 'bulk.txt' } }];
-        else if (count === 1) calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
-        else if (count === 2) {
-          await workerStarted.promise;
-          calls = [{ name: 'read', args: { filePath: 'new.txt' } }];
-        } else calls = [operation(McpToolName.SubmitResult, { summary: 'Missing summary' })];
+      } else if (overflowStage === 2 && names.length === 0) {
+        overflowStage = 3;
+        replyText = `${SUMMARY_PROBE} Continue the task using new evidence.`;
+      } else if (messages.some((m) => textOf(m).includes(SUMMARY_PROBE))) {
+        if (overflowStage === 0) {
+          overflowStage = 1;
+          calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
+        } else if (overflowStage === 1) {
+          overflowStage = 2;
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: {
+                message: "This model's maximum context length is 32000 tokens. Please reduce your input.",
+                code: 'context_length_exceeded',
+                type: 'invalid_request_error',
+              },
+            }),
+          );
+          return;
+        } else {
+          contextRequests.push(messages);
+          const count = messages.filter((m) => m.role === 'tool').length;
+          if (messages.some((m) => textOf(m).includes('[AW prior work]'))) {
+            const result = last ? textOf(last) : '';
+            const ref = coordinates.exec(messages.map(textOf).join('\n'));
+            if (ref && !result.includes('Latest batch before worker')) {
+              calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2], limit: 1024 })];
+            } else {
+              calls = [
+                operation(McpToolName.SubmitResult, {
+                  summary: 'Finished with summary',
+                  notes:
+                    messages.some((m) => textOf(m).includes('EVIDENCE_AFTER_FREEZE')) &&
+                    result.includes('Latest batch before worker')
+                      ? 'EVIDENCE_AFTER_FREEZE and recalled earlier read'
+                      : 'missing evidence',
+                }),
+              ];
+            }
+          } else if (count === 0) calls = [{ name: 'grep', args: { pattern: 'EARLY_FINDING', include: 'bulk.txt' } }];
+          else if (count === 1) calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
+          else if (count === 2) {
+            await workerStarted.promise;
+            calls = [{ name: 'read', args: { filePath: 'new.txt' } }];
+          } else calls = [operation(McpToolName.SubmitResult, { summary: 'Missing summary' })];
+        }
       } else if (hasProbe(FOREIGN_PROBE)) {
         const ref = coordinates.exec(prompt);
         if (ref) calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2] })];
@@ -600,14 +635,14 @@ it('@opencode 结束命令需要权限时可以授权，保留已提交结果', 
 it.each([
   ['折叠', { context: 131072 }],
   ['首步超限', { context: 2048 }],
-  ['运行中停用', { context: 57000 }],
+  ['运行中停用', { context: 27000 }],
   ['新任务关闭', { context: 131072 }],
   ['未知上下文上限', { context: 0 }],
   ['零输入上限', { context: 131072, input: 0 }],
 ] as const)(
   'M1 真实模型请求（%s）',
   async (scenario, limits) => {
-    const blocked = scenario === '首步超限';
+    const warning = scenario === '首步超限';
     const disable = scenario === '运行中停用';
     const native = scenario === '新任务关闭';
     contextRequests.length = 0;
@@ -647,12 +682,12 @@ it.each([
     const task = await createTask(t, {
       projectId: project.id,
       workflow: 'bugfix',
-      requirement: blocked ? BUDGET_PROBE : disable ? DISABLE_PROBE : CONTEXT_PROBE,
+      requirement: disable ? DISABLE_PROBE : CONTEXT_PROBE,
       checkpoints: { accept_each_node: true },
     });
     try {
       const { node } = await done;
-      expect(node.status).toBe(blocked || disable ? NodeStatus.Failed : NodeStatus.AwaitingAcceptance);
+      expect(node.status).toBe(disable ? NodeStatus.Failed : NodeStatus.AwaitingAcceptance);
       const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
       expect(detail.attempts).toHaveLength(1);
       if (scenario === '未知上下文上限' || scenario === '零输入上限') {
@@ -671,7 +706,7 @@ it.each([
       expect(
         (await sdk.config.get({ directory: worktree.path }, { throwOnError: true })).data.compaction,
       ).toMatchObject({ auto: native, prune: native });
-      if (blocked || disable) {
+      if (disable) {
         expect(detail.attempts[0]).toMatchObject({
           nudges: 0,
           error: {
@@ -680,9 +715,13 @@ it.each([
           },
         });
         expect(detail.retryFeedback).toContain('Reduce the input before retrying');
-        expect(providerRequests).toBe(blocked ? 0 : 3);
+        expect(providerRequests).toBe(3);
       }
-      if (!blocked) {
+      if (warning)
+        expect(t.logs).toContainEqual(
+          expect.objectContaining({ attemptId: detail.attempts[0]?.id, blocked: false, overBudgetWarning: true }),
+        );
+      {
         const last = contextRequests.at(-1) ?? [];
         expect(last.filter((m) => m.role === 'tool').map(textOf)).toEqual([
           native
@@ -769,14 +808,14 @@ it('M2 真实 Session 从折叠引用分页回查并提交证据，其他 Sessio
   }
 }, 90000);
 
-it('M3 真实主请求在途时生成无工具摘要，同一 Session 下一请求带新证据并完成', async () => {
+it('M3 真实溢出压缩恢复后，主请求在途时生成无工具摘要，同一 Session 下一请求带新证据并完成', async () => {
   contextRequests.length = 0;
   const spec = providerFor(model);
   const { project } = await addProject(t, {
     checkCommand: null,
     files: {
       'bulk.txt': Array.from({ length: 90 }, (_, i) => `EARLY_FINDING ${i} ${'sample '.repeat(65)}`).join('\n'),
-      'latest.txt': 'Latest batch before worker',
+      'latest.txt': 'Latest batch before worker '.repeat(100),
       'new.txt': 'EVIDENCE_AFTER_FREEZE',
       // 测试屏障：read 已取得新证据，此时允许 Worker 回答，再让主循环进入下一次真实 transform。
       '.opencode/plugins/read-barrier.js': `export const barrier = async () => ({
@@ -787,10 +826,11 @@ it('M3 真实主请求在途时生成无工具摘要，同一 Session 下一请�
       })`,
       'opencode.json': JSON.stringify({
         model: `${PROJECT_PROVIDER}/${MODEL}`,
+        compaction: { tail_turns: 0 },
         provider: {
           [PROJECT_PROVIDER]: {
             ...spec,
-            models: { [MODEL]: { ...spec.models[MODEL], limit: { context: 60000, output: 1024 } } },
+            models: { [MODEL]: { ...spec.models[MODEL], limit: { context: 30000, output: 1024 } } },
           },
         },
       }),
@@ -829,19 +869,34 @@ it('M3 真实主请求在途时生成无工具摘要，同一 Session 下一请�
     expect(detail.result?.summary, JSON.stringify(t.logs.filter((l) => String(l.msg).startsWith('context ')))).toBe(
       'Finished with summary',
     );
-    expect(detail.result?.notes).toContain('EVIDENCE_AFTER_FREEZE');
+    expect(detail.result?.notes).toBe('EVIDENCE_AFTER_FREEZE and recalled earlier read');
     expect(detail.attempts).toHaveLength(1);
-    expect(contextRequests).toHaveLength(4);
+    expect(contextRequests).toHaveLength(5);
     expect(workerTools).toEqual([[]]);
     const before = (contextRequests[2] ?? []).map(textOf).join('');
     const after = (contextRequests[3] ?? []).map(textOf).join('');
     expect(before).toContain('EARLY_FINDING');
     expect(after).toContain('Verified the early finding');
+    expect(after).toContain('agent-workflow_recall]');
     expect(after).not.toContain('EARLY_FINDING');
     expect(after.length).toBeLessThan(before.length * 0.7);
     const owner = detail.attempts[0];
     if (!owner) throw new Error('Missing attempt');
     const attempt = t.app.services.attempts.get(owner.id);
+    const view = (await t.call(getAttemptContextOp, { id: owner.id })).body;
+    expect(attempt.nudges).toBe(0);
+    expect(view.compactionRequests).toBe(1);
+    expect(view.compactions).toBe(1);
+    expect(view.messages.some((m) => m.status === 'archived' && !m.sent && m.projectedTokens === 0)).toBe(true);
+    expect(view.budget?.calibrated).toBe(true);
+    expect(view.messages.some((m) => m.status === 'folded')).toBe(true);
+    const recovered = t.logs.findIndex((l) => l.msg === 'context overflow recovery continued');
+    expect(recovered).toBeGreaterThan(0);
+    const budgets = t.logs
+      .slice(recovered + 1)
+      .filter((l) => l.msg === 'context budget' && 'sessionId' in l && l.sessionId === attempt.opencodeSessionId);
+    expect(budgets[0]).toMatchObject({ calibrated: false, bytesPerToken: 3 });
+    expect(budgets.at(-1)).toMatchObject({ calibrated: true });
     const storage = new DatabaseSync(join(t.dataDir, 'app.db'), { readOnly: true });
     try {
       expect(

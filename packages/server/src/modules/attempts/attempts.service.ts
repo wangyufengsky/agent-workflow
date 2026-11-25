@@ -564,7 +564,24 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     },
     contextOwner(sessionId: string, directory: string, taskId: string): string | undefined {
       const session = state.live.get(sessionId);
-      return session?.directory === directory && session.taskId === taskId ? session.attemptId : undefined;
+      return session?.directory === directory && session.taskId === taskId && session.recovery?.phase !== 'compacting'
+        ? session.attemptId
+        : undefined;
+    },
+    contextSource(id: string) {
+      const a = mustFind(id);
+      return {
+        attemptId: id,
+        sessionId: a.opencodeSessionId,
+        taskId: a.taskId,
+        directory: a.directory,
+        model: a.model,
+        stopped: a.error?.code === ErrorCode.AttemptContextBudget,
+      };
+    },
+    manageContext(sessionId: string, model: string) {
+      const s = state.live.get(sessionId);
+      if (s) s.contextModel = parseModelRef(model);
     },
     blockContext: reactions.blockContext,
     liveAgentOf: (attemptId: string): string | undefined => state.sessionOf(attemptId)?.agent,

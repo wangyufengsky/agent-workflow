@@ -153,6 +153,121 @@ describe('尝试的结束条件（12 §4.2）', () => {
     });
   });
 
+  it.each(['summary-fails', 'overflows-again'])('原生恢复失败后原尝试干净停止（%s）', async (scenario) => {
+    await t.call(updateSettingsOp, { 'ai.contextEngine': true });
+    t.fake.enqueue(script().hang());
+    const started = await startAttempt();
+    const sessionId = started.opencodeSessionId;
+    if (!sessionId) throw new Error('Missing session');
+    let summaries = 0;
+    t.fake.summarizeSession = async () => {
+      summaries++;
+      if (scenario === 'summary-fails') throw new Error('Compaction failed');
+      t.fake.replay([
+        { type: OpencodeEventType.Compacted, sessionId },
+        { type: OpencodeEventType.Idle, sessionId },
+      ]);
+    };
+    t.app.services.attempts.manageContext(sessionId, 'opencode/fake-model');
+    t.fake.enqueue(script().error('ContextOverflowError', 'context length exceeded'));
+    const failed = reaches('failed');
+    t.fake.replay([
+      {
+        type: OpencodeEventType.Error,
+        sessionId,
+        error: { name: 'ContextOverflowError', data: { message: 'context length exceeded' } },
+      },
+      { type: OpencodeEventType.Idle, sessionId },
+    ]);
+    expect((await failed).attempt).toMatchObject({
+      id: started.id,
+      nudges: 0,
+      error: { code: ErrorCode.AttemptContextBudget },
+    });
+    expect(summaries).toBe(1);
+    expect(t.fake.prompts.map((p) => p.sessionId)).toEqual(
+      scenario === 'summary-fails' ? [sessionId] : [sessionId, sessionId],
+    );
+    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(0);
+  });
+
+  it('续跑得到成功工具步骤后，下一次真实超窗可再次恢复', async () => {
+    await t.call(updateSettingsOp, { 'ai.contextEngine': true });
+    t.fake.enqueue(script().hang());
+    const started = await startAttempt(),
+      sessionId = started.opencodeSessionId;
+    if (!sessionId) throw new Error('Missing session');
+    const resumed = Promise.withResolvers<string>();
+    const unwatch = t.fake.subscribe((e) => {
+      if (
+        e.type === OpencodeEventType.Message &&
+        e.sessionId === sessionId &&
+        e.role === 'assistant' &&
+        e.parentMessageId
+      )
+        resumed.resolve(e.messageId);
+    });
+    const overflow = () =>
+      t.fake.replay([
+        {
+          type: OpencodeEventType.Error,
+          sessionId,
+          error: { name: 'ContextOverflowError', data: { message: 'overflow' } },
+        },
+        { type: OpencodeEventType.Idle, sessionId },
+      ]);
+    t.app.services.attempts.manageContext(sessionId, 'opencode/fake-model');
+    t.fake.enqueue(script().hang());
+    overflow();
+    const messageId = await resumed.promise;
+    unwatch();
+    t.fake.replay([
+      {
+        type: OpencodeEventType.StepFinished,
+        sessionId,
+        messageId,
+        partId: 'progress',
+        reason: 'tool-calls',
+        tokens: { input: 24, output: 5 },
+        cost: 0,
+      },
+    ]);
+    const done = reaches('succeeded');
+    t.fake.enqueue(script().callTool('submit_result', submit));
+    overflow();
+    expect((await done).attempt).toMatchObject({ id: started.id, nudges: 0 });
+    expect(t.fake.prompts.map((p) => p.sessionId)).toEqual([sessionId, sessionId, sessionId]);
+  });
+  it('原生恢复期间取消立即释放会话，迟到的摘要不能再发送', async () => {
+    await t.call(updateSettingsOp, { 'ai.contextEngine': true });
+    t.fake.enqueue(script().hang());
+    const started = await startAttempt(),
+      sessionId = started.opencodeSessionId;
+    if (!sessionId) throw new Error('Missing session');
+    const entered = Promise.withResolvers<void>(),
+      reply = Promise.withResolvers<void>();
+    t.fake.summarizeSession = async () => {
+      entered.resolve();
+      return reply.promise;
+    };
+    t.app.services.attempts.manageContext(sessionId, 'opencode/fake-model');
+    t.fake.replay([
+      {
+        type: OpencodeEventType.Error,
+        sessionId,
+        error: { name: 'ContextOverflowError', data: { message: 'overflow' } },
+      },
+      { type: OpencodeEventType.Idle, sessionId },
+    ]);
+    await entered.promise;
+    await t.call(abortAttemptOp, { id: started.id });
+    reply.resolve();
+    await t.fake.settled();
+    expect(t.app.services.attempts.liveAgentOf(started.id)).toBeUndefined();
+    expect(t.fake.prompts).toHaveLength(1);
+    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(0);
+  });
+
   it.each(['idle-first', 'error-first'])('预算阻断后只结束当前尝试（%s）', async (order) => {
     t.fake.enqueue(script().hang());
     const started = await startAttempt();

@@ -1,8 +1,10 @@
 import { type AssistantTurnDTO, AssistantTurnEvent, AssistantTurnStatus, type AssistantUsageDTO } from '@aw/shared';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Elapsed } from '../../components/elapsed.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_USAGE_COPY as C } from '../../copy/assistant.ts';
+import { CONTEXT_COPY } from '../../copy/context.ts';
+import { ContextDrawer } from '../context/context-drawer.tsx';
 import styles from './assistant.module.css';
 
 /** 「最近一轮 · 已完成 · 输入 … · 输出 … tokens」: the turn's line without its time. */
@@ -20,7 +22,8 @@ function turnLine(turn: AssistantTurnDTO): string {
  * 三个聊天入口共用的「助手用量」按钮（15 §6.2、36 §3）：只展示模型实际报告的用量，缺失与中断都有明确标签；悬停看最近一轮的一句
  * 摘要，点开在浮层里看完整三行。还没有用量记录时不显示。
  */
-export function UsageButton({ usage }: { usage: AssistantUsageDTO }) {
+export function UsageButton({ usage, conversationId }: { usage: AssistantUsageDTO; conversationId: string }) {
+  const [open, setOpen] = useState(false);
   const id = useId();
   const turn = usage.latest;
   if (turn === null || usage.recordedFrom === null) return null;
@@ -44,7 +47,17 @@ export function UsageButton({ usage }: { usage: AssistantUsageDTO }) {
           {C.total(usage.tokensInput, usage.tokensOutput, usage.unknownTurns)} · {C.recordedSince(usage.recordedFrom)}
         </div>
         <div>{C.limit(turn.timeoutMs)}</div>
+        <button
+          type="button"
+          onClick={() => {
+            document.getElementById(id)?.hidePopover();
+            setOpen(true);
+          }}
+        >
+          {CONTEXT_COPY.open}
+        </button>
       </div>
+      <ContextDrawer source="assistant" id={conversationId} open={open} onOpenChange={setOpen} />
     </>
   );
 }
