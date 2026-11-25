@@ -65,7 +65,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.NodeAttemptsExhausted]: '有一个步骤多次尝试仍没有完成。',
   [ErrorCode.CheckCommandUnrunnable]: '有一个步骤的检查命令在应用环境里无法运行。',
   [ErrorCode.AttemptNotFound]: '这次尝试不存在。',
-  [ErrorCode.AttemptContextBudget]: '本次输入超过模型上下文预算，已停止发送。',
+  [ErrorCode.AttemptContextBudget]: '上下文预算保护已停止本次尝试。请减少输入后重试。',
   [ErrorCode.AttemptNoResult]: 'AI 停下来了，但没有给出结果。',
   [ErrorCode.AttemptTimeout]: 'AI 会话超过了时限。',
   [ErrorCode.AttemptSessionError]: 'AI 会话出错了，模型服务返回了错误。',

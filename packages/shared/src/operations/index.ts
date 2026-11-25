@@ -58,6 +58,7 @@ import {
   takeBrowserCaseHandoffOp,
   updateBrowserCaseOp,
 } from './browser-cases.ts';
+import { getAssistantContextOp, getAttemptContextOp } from './context.ts';
 import {
   changeMasterPasswordOp,
   resetMasterPasswordOp,
@@ -304,6 +305,7 @@ export * from './attempts.ts';
 export * from './batches.ts';
 export * from './browser.ts';
 export * from './browser-cases.ts';
+export * from './context.ts';
 export * from './credentials.ts';
 export * from './databases.ts';
 export * from './debug.ts';
@@ -432,6 +434,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   queryDbOp,
   getAttemptOp,
   abortAttemptOp,
+  getAttemptContextOp,
+  getAssistantContextOp,
   getAttachmentOp,
   previewAttachmentSheetOp,
   removeAttachmentOp,

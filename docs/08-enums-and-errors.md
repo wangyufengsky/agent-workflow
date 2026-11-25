@@ -425,7 +425,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
-`ai.contextEngine` 在 OpenCode 1.19.0 初始化 AW 专用任务工作树时生效。关闭后，新任务沿用原配置，已受管会话下次发送前按完整历史检查预算。输入按 UTF-8 字节估算，计入系统提示、历史和工具定义，并为本次输出预留空间。V1 的工具清单接口未提供第三方 MCP 的完整 schema，其首轮按 AW 执行 MCP 的工具定义体积估算，连续执行时用 Provider 报告的输入用量修正。
+`ai.contextEngine` 在 OpenCode 1.19.0 初始化 AW 专用任务工作树时生效。关闭后，新任务沿用原配置，已受管会话下次发送前按完整历史检查预算。输入按 UTF-8 字节估算，计入系统提示、历史和工具定义，并为本次输出预留空间。V1 的工具清单接口未提供第三方 MCP 的完整 schema，其首轮按 AW 执行 MCP 的工具定义体积估算，连续执行时用 Provider 报告的输入与缓存账单修正。首轮按 3 字节/token，后续在 1.5–6 之间校准；图片单独估算。受管模式估算超限只预警。收到真实超窗并结束当前生成后，原会话至多显式压缩一次，待下一成功步骤才恢复重试资格。
 
 ## 5. 错误码
 
@@ -514,7 +514,7 @@ class AppError extends Error {
 | `CHECK_COMMAND_UNRUNNABLE` | — | 节点的检查命令在应用环境里无法运行（D116，记录在任务的 `failure` 上，不作为 HTTP 错误，不消耗预算）；`details: { nodeKey, nodeTitle, command, program, reason }`，`reason` 为 `CheckUnrunnableReason` |
 | **尝试 / opencode** | | |
 | `ATTEMPT_NOT_FOUND` | 404 | |
-| `ATTEMPT_CONTEXT_BUDGET` | — | 发送前超出上下文预算，尝试停止，节点等待手动重试 |
+| `ATTEMPT_CONTEXT_BUDGET` | — | 停用后的原文超限，或真实超窗恢复失败／立即再次超窗；节点等待手动重试 |
 | `ATTEMPT_NO_RESULT` | — | 会话结束但未提交结果（记录在尝试上，不作为 HTTP 错误） |
 | `ATTEMPT_TIMEOUT` | — | 超过 `attempt.timeoutMinutes` |
 | `ATTEMPT_SESSION_ERROR` | — | opencode `session.error`；`message` 为「错误类名: 模型服务的原话」（外部原文，界面直接显示，D163），`details` 为原始错误。模型服务连不上、5xx、限流时 opencode 只重试、不报错，尝试等待而不是失败 |

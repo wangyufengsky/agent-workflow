@@ -831,6 +831,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       if (sessions.get(sessionId) !== id || state?.busy !== true || signal?.aborted !== false) return undefined;
       return signal;
     },
+    contextSource(id: string) {
+      const c = get(id);
+      return { sessionId: c.opencodeSessionId, directory: filesDir(id) };
+    },
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
     /** The MCP servers the user added to opencode themself (28 §4); the app's own two are not theirs to manage. */
     async externalMcp(): Promise<ExternalMcpServerDTO[]> {

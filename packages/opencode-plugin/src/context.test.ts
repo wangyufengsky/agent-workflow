@@ -1,8 +1,8 @@
 import { MCP_TOOL_PREFIX, McpToolName } from '@aw/shared';
+import { applySummary, freezePrefix, projectHistory } from '@aw/shared/context';
 import type { Hooks } from '@opencode-ai/plugin';
 import { expect, it } from 'vitest';
 import { historyBytes } from './context.ts';
-import { applySummary, freezePrefix, projectHistory } from './projection.ts';
 
 type Messages = Parameters<NonNullable<Hooks['experimental.chat.messages.transform']>>[1]['messages'];
 function read(id: string, path = '/repo/large.txt', loaded: string[] = [], state: Record<string, unknown> = {}) {

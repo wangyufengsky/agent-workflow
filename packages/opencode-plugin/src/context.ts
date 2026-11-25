@@ -1,45 +1,38 @@
+import type { ProjectionReceipt } from '@aw/shared';
+import {
+  bytes,
+  calibrate,
+  DEFAULT_BYTES_PER_TOKEN,
+  freezePrefix,
+  historySize,
+  projectionReceipt,
+  projectWindow,
+  type Sample,
+  SOFT_BUDGET_RATIO,
+  type Summary,
+} from '@aw/shared/context';
 import type { Hooks, PluginInput } from '@opencode-ai/plugin';
 
-import { applySummary, freezePrefix, type Messages, projectHistory, type Summary } from './projection.ts';
+export { historyBytes } from '@aw/shared/context';
 
-const SUMMARY_BUDGET_RATIO = 0.75;
-const BYTES_PER_TOKEN = 3;
-const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value));
-// Provider 的视觉分词取决于分辨率和模型。每张图片预留估算额度，传输编码长度不参与视觉计费。
-const IMAGE_TOKEN_ESTIMATE = 2048;
-function fileBytes(file: Extract<Messages[number]['parts'][number], { type: 'file' }>): number {
-  return file.mime.startsWith('image/')
-    ? bytes({ ...file, url: '' }) + IMAGE_TOKEN_ESTIMATE * BYTES_PER_TOKEN
-    : bytes(file);
-}
-
-export function historyBytes(messages: Messages): number {
-  let size = 0;
-  for (const { info, parts } of messages) {
-    size += bytes(info.role);
-    for (const p of parts) {
-      // read.display 和 preview 只供界面显示，V1 不发给模型。
-      if (p.type === 'tool' && p.state.status === 'completed') {
-        size += bytes([p.tool, p.callID, p.state.input, p.state.output, p.metadata]);
-        for (const file of p.state.attachments ?? []) size += fileBytes(file);
-      } else {
-        size += p.type === 'file' ? fileBytes(p) : bytes(p);
-      }
-    }
-  }
-  return size;
-}
-
+type Size = ReturnType<typeof historySize>;
 type RequestEstimate = {
+  receipt: ProjectionReceipt;
   userId: string;
   agent: string;
   attemptId: string;
-  before: number;
-  after: number;
+  before: Size;
+  after: Size;
   system: number;
   toolBytes: number;
   externalTokens: number;
-  knownTokens?: number;
+  ratio: number;
+  calibrated: boolean;
+  model: string;
+  lastReply?: string;
+  sentBytes?: number;
+  previousBill?: Sample;
+  cacheRead: number;
   freeze?: () => ReturnType<typeof freezePrefix>;
 };
 
@@ -58,7 +51,8 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
   }
   return {
     event: async ({ event }) => {
-      if (event.type === 'session.idle') estimates.delete(event.properties.sessionID);
+      if (event.type === 'session.compacted') estimates.delete(event.properties.sessionID);
+      if (event.type === 'session.deleted') estimates.delete(event.properties.info.id);
     },
     config: async (cfg) => {
       managed = (await scope()).enabled;
@@ -81,28 +75,50 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
       const sessionId = user.sessionID;
       const owner = await scope(sessionId);
       if (!owner.attemptId || messages.some((m) => m.info.sessionID !== sessionId)) return;
-      const folded = owner.enabled ? projectHistory(messages) : messages;
-      const projected = applySummary(folded, owner.enabled ? owner.summary : undefined);
-      const before = historyBytes(messages);
-      const foldedBytes = folded === messages ? before : historyBytes(folded);
-      const projectedBytes = projected === folded ? foldedBytes : historyBytes(projected);
-      const candidate = projectedBytes < foldedBytes ? projected : folded;
-      const after = Math.min(foldedBytes, projectedBytes);
-      // V1 只公开原生/插件工具清单。额外 MCP 首轮按执行 MCP 的目录体积估算，
-      // 同轮续跑可从 Provider 返回的实际输入中扣掉上一请求已计入的部分。
+      const { folded, projected: candidate } = owner.enabled
+        ? projectWindow(messages, owner.summary)
+        : { folded: messages, projected: messages };
+      const before = historySize(messages);
+      const after = historySize(candidate);
       const toolBytes = owner.toolBytes ?? 0;
-      let externalTokens = Math.ceil((externalServers * toolBytes) / BYTES_PER_TOKEN);
-      if (externalServers) {
-        const previous = estimates.get(sessionId);
-        const reply = messages.findLast(
-          (m) => m.info.role === 'assistant' && m.info.time.completed !== undefined,
-        )?.info;
-        if (previous?.knownTokens !== undefined && reply?.role === 'assistant' && reply.parentID === previous.userId) {
-          const used = reply.tokens.input + reply.tokens.cache.read + reply.tokens.cache.write;
-          if (used > 0) externalTokens = Math.max(0, used - previous.knownTokens);
+      const model = `${user.model.providerID}/${user.model.modelID}`;
+      const prior = estimates.get(sessionId);
+      const previous = prior?.model === model ? prior : undefined;
+      let ratio = previous?.ratio ?? DEFAULT_BYTES_PER_TOKEN;
+      let calibrated = previous?.calibrated ?? false;
+      let externalTokens =
+        previous?.externalTokens ?? Math.ceil((externalServers * toolBytes) / DEFAULT_BYTES_PER_TOKEN);
+      let previousBill = previous?.previousBill;
+      let lastReply = previous?.lastReply;
+      let cacheRead = previous?.cacheRead ?? 0;
+      const reply = messages.findLast((m) => m.info.role === 'assistant' && m.info.time.completed !== undefined)?.info;
+      if (
+        previous?.sentBytes !== undefined &&
+        reply?.role === 'assistant' &&
+        !reply.error &&
+        !reply.summary &&
+        reply.parentID === previous.userId &&
+        reply.id !== lastReply &&
+        model === `${reply.providerID}/${reply.modelID}`
+      ) {
+        const used = reply.tokens.input + reply.tokens.cache.read + reply.tokens.cache.write;
+        if (used > 0) {
+          const sample = { bytes: previous.sentBytes, tokens: used - previous.after.media };
+          const next = calibrate(sample, previousBill, externalServers > 0);
+          if (next !== undefined) {
+            ratio = next;
+            calibrated = true;
+          }
+          if (externalServers && (!previousBill || next !== undefined))
+            externalTokens = Math.max(0, Math.round(sample.tokens - sample.bytes / ratio));
+          previousBill = sample;
+          cacheRead = reply.tokens.cache.read;
+          lastReply = reply.id;
         }
       }
+      const receipt = projectionReceipt(messages, folded, candidate, owner.summary);
       estimates.set(sessionId, {
+        receipt,
         attemptId: owner.attemptId,
         userId: user.id,
         agent: user.agent,
@@ -111,11 +127,17 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         system: 0,
         toolBytes,
         externalTokens,
+        ratio,
+        calibrated,
+        model,
+        cacheRead,
+        ...(lastReply && { lastReply }),
+        ...(previousBill && { previousBill }),
         ...(owner.enabled && {
           freeze: () => freezePrefix(candidate, candidate === folded ? undefined : owner.summary?.uptoMessageId),
         }),
       });
-      if (candidate !== messages && after < before) {
+      if (candidate !== messages && after.text < before.text) {
         // V1 持有原数组的引用。此处没有 await，下一步转换只能看到完整投影。
         Object.assign(messages, candidate);
         messages.length = candidate.length;
@@ -142,11 +164,36 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
           ? model.limit.input
           : context;
       const limit = context > 0 ? Math.max(0, Math.min(input, context - (params.maxOutputTokens ?? output))) : null;
-      estimate.knownTokens = Math.ceil((overhead + estimate.after) / BYTES_PER_TOKEN);
-      const before = Math.ceil((overhead + estimate.before) / BYTES_PER_TOKEN) + estimate.externalTokens;
-      const after = estimate.knownTokens + estimate.externalTokens;
-      const prefix =
-        limit !== null && after <= limit && after > limit * SUMMARY_BUDGET_RATIO ? estimate.freeze?.() : undefined;
+      const ratio = estimate.ratio;
+      const tokens = (value: number) => Math.ceil(value / ratio);
+      const systemTokens = tokens(estimate.system + formatBytes);
+      const toolTokens = tokens(estimate.toolBytes + bytes(tools.data));
+      const total = (size: Size) =>
+        systemTokens +
+        toolTokens +
+        tokens(size.dialogue) +
+        tokens(size.toolOutput) +
+        tokens(size.summary) +
+        size.media +
+        estimate.externalTokens;
+      estimate.sentBytes = overhead + estimate.after.text;
+      const before = total(estimate.before),
+        after = total(estimate.after);
+      const breakdown = {
+        systemTokens,
+        toolTokens,
+        dialogueTokens: tokens(estimate.after.dialogue),
+        toolOutputTokens: tokens(estimate.after.toolOutput),
+        summaryTokens: tokens(estimate.after.summary),
+        mediaTokens: estimate.after.media,
+        externalTokens: estimate.externalTokens,
+        outputReserve: params.maxOutputTokens ?? output,
+        bytesPerToken: ratio,
+        calibrated: estimate.calibrated,
+        cacheRead: estimate.cacheRead,
+        overBudgetWarning: limit !== null && after > limit,
+      };
+      const prefix = limit !== null && after > limit * SOFT_BUDGET_RATIO ? estimate.freeze?.() : undefined;
       delete estimate.freeze;
       const res = await fetch(new URL('budget', api), {
         method: 'POST',
@@ -155,6 +202,9 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
           directory: ctx.directory,
           sessionId: sessionID,
           attemptId: estimate.attemptId,
+          ...breakdown,
+          model: `${model.providerID}/${model.id}`,
+          receipt: estimate.receipt,
           before,
           after,
           limit,

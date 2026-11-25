@@ -70,6 +70,8 @@ export type LiveSession = {
   idle: boolean;
   /** 发送已被预算阻断。未决审批完成后结束尝试。 */
   budgetBlocked: boolean;
+  contextModel?: ModelRef;
+  recovery?: { phase: 'compacting' | 'resuming' | 'spent'; messageId: string; replyId?: string };
   /** OpenCode may recover from this error by compacting before the session goes idle. */
   contextOverflow: Extract<OpencodeEvent, { type: typeof OpencodeEventType.Error }> | null;
   /** Answers to send at the next opportunity (the session was busy, or other questions are still open). */

@@ -16,7 +16,8 @@ export {
   opencodeLaunchEnv,
   sessionPermissionRules,
 } from './opencode.config.ts';
-export { registerContextRoutes } from './opencode.context.ts';
+export { createBudgetSnapshots, registerContextRoutes } from './opencode.context.ts';
+export { createContextInspector } from './opencode.detail.ts';
 export {
   createSessionDispatcher,
   type ObjectAttemptPurpose,

@@ -168,7 +168,7 @@ stateDiagram-v2
 | 依赖变化 | `deps_unmet`：暂停调整使 `ready` 节点多了未完成的依赖 → `pending` |
 | 重启恢复 | `running`/`verifying` 的节点：其尝试标 `interrupted`，节点回 `ready`（不消耗预算）；等待阻塞问题答案的 `waiting_input` 保持不变（opencode 会话持久化，回答后在同一会话继续）；等待权限的 `waiting_input` 回 `ready`（权限请求随 opencode 进程失效，条目 dismiss） |
 
-受管会话发送前触发 `ATTEMPT_CONTEXT_BUDGET` 时，经 `session_error` 结束尝试，节点经 `attempt_failed` 直接进入 `failed`，等待手动重试。有未决审批时先保持等待，已接受的提交继续生效。
+受管会话的估算超限只预警。Provider 返回 `ContextOverflowError` 后，在原会话空闲且没有未决审批时等待旧 runner 释放、显式调用 `session.summarize(auto:false)`，核对新的原生摘要后发送一次续跑指令。压缩期间的 idle 不催办。恢复失败、下一成功步骤前再次真实超窗，或手动停用后原文超限时触发 `ATTEMPT_CONTEXT_BUDGET`，经 `session_error` 结束尝试，节点经 `attempt_failed` 直接进入 `failed`，等待手动重试。有未决审批时先保持等待，已接受的提交继续生效。
 
 **`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；除上述上下文阻断外，`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`check_unrunnable` → `failed`；`recheck` → `verifying`；`interrupted`（重启恢复）→ `ready`。
 

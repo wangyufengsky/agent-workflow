@@ -1,8 +1,11 @@
 import { AttemptStatus } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ATTEMPT_COPY as C, STREAM_COPY } from '../../copy/attempts.ts';
+import { CONTEXT_COPY } from '../../copy/context.ts';
+import { ContextDrawer } from '../context/context-drawer.tsx';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { attemptQuery, useAbortAttempt } from './attempt.queries.ts';
 
@@ -21,6 +24,7 @@ export function AttemptView({
   canAbort?: boolean;
   foldOnEnd?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const attempt = useQuery(attemptQuery(attemptId)).data;
   const abort = useAbortAttempt();
   if (attempt === undefined) return <ConversationStream attemptId={attemptId} title="" pro size="page" />;
@@ -36,17 +40,22 @@ export function AttemptView({
         title={title ?? STREAM_COPY.attemptTitle(attempt.kind, attempt.seq)}
         meta={STREAM_COPY.pro(attempt.model ?? C.defaultModel, tokens, attempt.nudges)}
         actions={
-          canAbort &&
-          attempt.status === AttemptStatus.Running && (
-            <Button size="sm" variant="danger" pending={abort.isPending} onClick={() => abort.mutate(attempt.id)}>
-              {C.abort}
+          <>
+            <Button size="sm" onClick={() => setOpen(true)}>
+              {CONTEXT_COPY.attempt}
             </Button>
-          )
+            {canAbort && attempt.status === AttemptStatus.Running && (
+              <Button size="sm" variant="danger" pending={abort.isPending} onClick={() => abort.mutate(attempt.id)}>
+                {C.abort}
+              </Button>
+            )}
+          </>
         }
         pro
         size="page"
         foldOnEnd={foldOnEnd}
       />
+      <ContextDrawer source="attempt" id={attemptId} open={open} onOpenChange={setOpen} />
       {abort.isError && <ErrorState error={abort.error} />}
     </div>
   );

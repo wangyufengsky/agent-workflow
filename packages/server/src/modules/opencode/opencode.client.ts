@@ -90,6 +90,8 @@ export type OpencodeClient = {
   /** Returns the new session id. */
   createSession(input: CreateSessionInput): Promise<string>;
   readToolOutput(input: SessionRequest & { messageId: string; partId: string }): Promise<string | undefined>;
+  sessionMessages(input: SessionRequest): Promise<import('@aw/shared/context').Messages>;
+  summarizeSession(input: SessionRequest & { model: ModelRef }): Promise<void>;
   sessionRules(input: SessionRequest): Promise<PermissionRule[]>;
   setPermissions(input: SessionRequest & { permission: PermissionRule[] }): Promise<void>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
@@ -287,6 +289,41 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         }
         return undefined;
       });
+    },
+    async sessionMessages({ sessionId, directory, signal }) {
+      return (
+        await request('session.messages', () =>
+          runtime.sdk().session.messages({ sessionID: sessionId, directory }, requestOptions(signal)),
+        )
+      ).data;
+    },
+    async summarizeSession({ sessionId, directory, model, signal }) {
+      const params = { sessionID: sessionId, directory };
+      await request('session.summarize', () =>
+        runtime
+          .sdk()
+          .session.summarize(
+            { ...params, providerID: model.providerId, modelID: model.modelId, auto: false },
+            requestOptions(signal),
+          ),
+      );
+      // V1 的 HTTP true 也可能是摘要模型失败，须核对本次 compaction 标记对应的结果。
+      const { data } = await request('session.messages', () =>
+        runtime.sdk().session.messages({ ...params, limit: 2 }, requestOptions(signal)),
+      );
+      const marker = data.findLast((m) => m.parts.some((p) => p.type === 'compaction'));
+      if (
+        !marker ||
+        !data.some(
+          (m) =>
+            m.info.role === 'assistant' &&
+            m.info.parentID === marker.info.id &&
+            m.info.summary &&
+            m.info.finish &&
+            !m.info.error,
+        )
+      )
+        throw new AppError(ErrorCode.AttemptContextBudget, 'Native compaction did not produce a completed summary');
     },
     async sessionRules({ sessionId, directory, signal }) {
       const { data } = await request('session.get', () =>

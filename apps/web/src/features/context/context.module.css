@@ -1,0 +1,113 @@
+.content {
+  display: grid;
+  gap: var(--s-5);
+  color: var(--ink);
+}
+.content section {
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--hairline);
+}
+.content h3,
+.content h4 {
+  margin: var(--s-3) 0;
+}
+.content small,
+.content dt {
+  color: var(--sub);
+}
+.amount {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.amount small {
+  font-size: var(--fs-sm);
+}
+.track,
+.stack {
+  display: flex;
+  position: relative;
+  height: var(--s-2);
+  margin: var(--s-2) 0;
+  background: var(--fill-2);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.track span,
+.stack span {
+  background: var(--accent);
+}
+.track i {
+  position: absolute;
+  left: 75%;
+  height: 100%;
+  border-left: 2px solid var(--ink);
+}
+.stack span:nth-child(2) {
+  background: var(--done);
+}
+.stack span:nth-child(3) {
+  background: var(--sub);
+}
+.stack span:nth-child(4) {
+  background: var(--wait);
+}
+.stack span:nth-child(5) {
+  background: var(--danger);
+}
+.stack span:nth-child(6) {
+  background: var(--muted);
+}
+.content dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: var(--s-3);
+  font-size: var(--fs-sm);
+}
+.content dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.content details {
+  padding: var(--s-2) 0;
+  border-top: 1px solid var(--hairline);
+  overflow-wrap: anywhere;
+}
+.content summary {
+  cursor: pointer;
+}
+.content pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--fs-sm) var(--font-mono);
+  max-height: 22rem;
+  overflow: auto;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  margin: var(--s-3) 0;
+}
+.filters button,
+.badge {
+  font: inherit;
+  color: var(--sub);
+  border: 1px solid var(--hairline);
+  background: var(--raised);
+  border-radius: var(--r-pill);
+  padding: var(--s-1) var(--s-2);
+}
+.filters button[aria-pressed="true"],
+.badge {
+  color: var(--accent);
+  background: var(--accent-fill);
+}
+.badge {
+  display: inline-block;
+}
+.alert {
+  color: var(--danger);
+  background: var(--danger-fill);
+  padding: var(--s-2);
+}

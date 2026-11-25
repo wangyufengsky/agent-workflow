@@ -1,4 +1,11 @@
-import { AppError, ErrorCode } from '@aw/shared';
+import {
+  AppError,
+  budgetSnapshotSchema,
+  type ContextBudgetSnapshot,
+  ErrorCode,
+  type ProjectionReceipt,
+  projectionReceiptSchema,
+} from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parseInput } from '../../core/http/errors.ts';
@@ -10,23 +17,36 @@ import { OPENCODE_CONTEXT_PATH } from './opencode.config.ts';
 import type { createContextSummaries } from './opencode.summaries.ts';
 
 const directoryQuery = z.object({ directory: z.string().min(1), sessionId: z.string().optional() });
-const count = z.number().int().nonnegative();
-const report = z.object({
+const report = budgetSnapshotSchema.omit({ blocked: true }).extend({
+  receipt: projectionReceiptSchema,
   directory: z.string(),
   attemptId: z.string(),
   sessionId: z.string(),
-  before: count,
-  after: count,
-  limit: count.nullable(),
   summary: z
     .object({ uptoMessageId: z.string().min(1), source: z.string().min(1), model: z.string().min(1) })
     .optional(),
 });
 
+export function createBudgetSnapshots() {
+  const values = new Map<string, ContextBudgetSnapshot & { receipt: ProjectionReceipt; attemptId: string }>();
+  return {
+    get: (id: string) => values.get(id),
+    delete: (id: string) => values.delete(id),
+    set(id: string, data: ContextBudgetSnapshot & { receipt: ProjectionReceipt; attemptId: string }) {
+      values.delete(id);
+      values.set(id, data);
+      const oldest = values.keys().next().value;
+      if (values.size > 64 && oldest !== undefined) values.delete(oldest);
+    },
+  };
+}
+
 /** 插件在抛错前等待登记完成，idle/error 不再通过错误文案猜测阻断原因。 */
 export function registerContextRoutes(
   server: FastifyInstance,
   deps: {
+    snapshots: ReturnType<typeof createBudgetSnapshots>;
+    manage(sessionId: string, model: string): void;
     token: string;
     enabled(): boolean;
     taskAt(path: string): string | undefined;
@@ -55,12 +75,15 @@ export function registerContextRoutes(
         return { enabled, attemptId, toolBytes, ...(enabled && { summary: deps.summaries.get(sessionId) }) };
       });
       routes.post('/budget', async (req) => {
-        const { directory, summary, ...data } = parseInput(report, req.body);
+        const { directory, summary, receipt, ...data } = parseInput(report, req.body);
         const taskId = deps.taskAt(directory);
         if (!taskId || deps.owner(data.sessionId, directory, taskId) !== data.attemptId) return { blocked: true };
         // 开关可在消息转换与最后一次预算检查之间关闭。
         const effective = deps.enabled() ? data.after : data.before;
-        const blocked = data.limit !== null && effective > data.limit;
+        const overBudgetWarning = data.limit !== null && effective > data.limit;
+        const blocked = !deps.enabled() && overBudgetWarning;
+        if (deps.enabled()) deps.manage(data.sessionId, data.model);
+        deps.snapshots.set(data.sessionId, { ...data, receipt, overBudgetWarning, blocked });
         if (blocked) deps.block(data.sessionId, data.attemptId);
         else if (summary && deps.enabled())
           void deps.summaries.generate({
@@ -70,7 +93,7 @@ export function registerContextRoutes(
             taskId,
             directory,
           });
-        deps.log.info({ ...data, effective, blocked }, 'context budget');
+        deps.log.info({ ...data, effective, overBudgetWarning, blocked }, 'context budget');
         return { blocked };
       });
     },

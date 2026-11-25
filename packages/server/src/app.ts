@@ -11,6 +11,8 @@ import {
   AppError,
   DB_QUERY_TIMEOUT_MS,
   ErrorCode,
+  getAssistantContextOp,
+  getAttemptContextOp,
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
@@ -32,7 +34,7 @@ import { createEventBus, type EventBus } from './core/event-bus.ts';
 import { registerTokenAuth } from './core/http/auth.ts';
 import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
-import { mountOperations, type OperationImpl } from './core/operations/operations.ts';
+import { implement, mountOperations, type OperationImpl } from './core/operations/operations.ts';
 import { host } from './core/platform.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { applyStartupEnvironment, scopedStartupEnvironment } from './core/startup-environment.ts';
@@ -75,11 +77,14 @@ import { createNetworkModule, validateNetworkSettings } from './modules/network/
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import { createOffice } from './modules/office/index.ts';
 import {
+  createBudgetSnapshots,
+  createContextInspector,
   createContextSummaries,
   createOpencodeRuntime,
   createRuntimeClient,
   createSessionDispatcher,
   type OpencodeClient,
+  OpencodeEventType,
   type OpencodeRuntime,
   opencodeLaunchEnv,
   registerContextRoutes,
@@ -790,7 +795,23 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('preClose', async () => {
     summaries.close();
   });
+  const snapshots = createBudgetSnapshots();
+  const inspectContext = createContextInspector(
+    opencode,
+    snapshots,
+    summaries,
+    (directory, taskId) => contextEnabled() && worktrees.service.taskAt(directory) === taskId,
+  );
+  const stopWatchingContext = opencode.subscribe((event) => {
+    if (event.type === OpencodeEventType.Compacted || event.type === OpencodeEventType.Deleted)
+      snapshots.delete(event.sessionId);
+  });
+  server.addHook('preClose', async () => {
+    stopWatchingContext();
+  });
   registerContextRoutes(server, {
+    manage: attempts.service.manageContext,
+    snapshots,
     summaries,
     token: mcpToken,
     enabled: contextEnabled,
@@ -805,6 +826,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   browser.registerRoutes(server);
   attachments.registerRoutes(server);
   const operations: OperationImpl[] = [
+    implement(getAssistantContextOp, ({ id }) => inspectContext(assistant.service.contextSource(id))),
+    implement(getAttemptContextOp, ({ id }) => inspectContext(attempts.service.contextSource(id))),
     ...settings.operations,
     ...startupEnvironment.operations,
     ...system.operations,

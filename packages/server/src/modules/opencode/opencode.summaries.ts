@@ -41,7 +41,7 @@ export function createContextSummaries({
 }) {
   const jobs = new Map<string, AbortController>();
   const unsubscribe = opencode.subscribe((event) => {
-    if (event.type !== OpencodeEventType.Deleted) return;
+    if (event.type !== OpencodeEventType.Deleted && event.type !== OpencodeEventType.Compacted) return;
     jobs.get(event.sessionId)?.abort();
     db.delete(contextSummaries).where(eq(contextSummaries.sessionId, event.sessionId)).run();
   });
@@ -49,7 +49,11 @@ export function createContextSummaries({
     close: unsubscribe,
     get(sessionId: string) {
       return db
-        .select({ uptoMessageId: contextSummaries.uptoMessageId, summaryText: contextSummaries.summaryText })
+        .select({
+          updatedAt: contextSummaries.updatedAt,
+          uptoMessageId: contextSummaries.uptoMessageId,
+          summaryText: contextSummaries.summaryText,
+        })
         .from(contextSummaries)
         .where(eq(contextSummaries.sessionId, sessionId))
         .get();

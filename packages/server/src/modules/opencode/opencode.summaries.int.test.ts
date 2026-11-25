@@ -109,10 +109,25 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
       await summaries.generate({ ...job, attemptId: next.id, uptoMessageId: id, source: `${id} evidence` });
     const reopened = createContextSummaries(deps);
     try {
-      expect(reopened.get(sessionId)).toEqual({ uptoMessageId: 'msg_a', summaryText: 'msg_a' });
+      expect(reopened.get(sessionId)).toMatchObject({ uptoMessageId: 'msg_a', summaryText: 'msg_a' });
     } finally {
       reopened.close();
     }
+    const waiting = Promise.withResolvers<void>(),
+      late = Promise.withResolvers<string>();
+    t.fake.promptDocument = async () => {
+      waiting.resolve();
+      return late.promise;
+    };
+    const stale = summaries.generate({ ...job, attemptId: next.id, uptoMessageId: 'old-window' });
+    await waiting.promise;
+    t.fake.replay([{ type: 'compacted', sessionId }]);
+    await stale;
+    late.resolve('late result from old window');
+    expect(summaries.get(sessionId)).toBeUndefined();
+    t.fake.promptDocument = async () => 'new window';
+    await summaries.generate({ ...job, attemptId: next.id, uptoMessageId: 'new-window' });
+    expect(summaries.get(sessionId)?.summaryText).toBe('new window');
     await t.fake.deleteSession({ sessionId, directory: repo.path });
     expect(summaries.get(sessionId)).toBeUndefined();
     await attempts.abort(next.id);

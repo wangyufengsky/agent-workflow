@@ -20,6 +20,7 @@ import type { Logger } from '../../core/logger.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
 import {
   CONTEXT_OVERFLOW_ERROR,
+  createMessageId,
   describeOpencodeError,
   MESSAGE_ABORTED_ERROR,
   type OpencodeClient,
@@ -46,6 +47,7 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
 export function watchSessions(
   state: AttemptState,
   deps: {
+    settings: { get(key: 'ai.contextEngine'): boolean };
     taskPolicy(id: string): TaskPermissionPolicy;
     permissionReviewer: PermissionReviewer;
     opencode: OpencodeClient;
@@ -70,7 +72,9 @@ export function watchSessions(
   function stopForBudget(attempt: Attempt, session: LiveSession): void {
     move(attempt, AttemptEvent.SessionError, {
       code: ErrorCode.AttemptContextBudget,
-      message: 'Request exceeded the model context budget before sending',
+      message: session.recovery
+        ? 'Session exceeded the context budget during recovery'
+        : 'Request exceeded the model context budget before sending',
     });
     state.releaseSession(session);
   }
@@ -93,6 +97,17 @@ export function watchSessions(
       return;
     }
     if (session.budgetBlocked) return stopForBudget(attempt, session);
+    if (session.contextOverflow) {
+      if (session.contextModel) {
+        if (session.recovery || !deps.settings.get('ai.contextEngine'))
+          return blockContext(session.sessionId, attempt.id);
+        await recover(attempt, session, session.contextModel);
+      } else {
+        failSession(attempt, session, session.contextOverflow);
+        state.releaseSession(session);
+      }
+      return;
+    }
     const { stall } = session;
     if (stall !== null) {
       stall.idled = true;
@@ -316,6 +331,35 @@ export function watchSessions(
     });
   }
 
+  async function recover(attempt: Attempt, session: LiveSession, model: NonNullable<LiveSession['contextModel']>) {
+    const { sessionId, directory } = session;
+    const signal = session.delegation.signal;
+    const messageId = createMessageId(deps.clock.now());
+    session.recovery = { phase: 'compacting', messageId };
+    session.contextOverflow = null;
+    deps.log.info({ attemptId: attempt.id, sessionId }, 'context overflow recovery started');
+    try {
+      // V1 在失败的 runner 退出前已发布 idle；先等待其释放，否则 summarize.loop 会加入旧 runner。
+      await state.stopSession(session, signal);
+      if (signal.aborted) return;
+      await deps.opencode.summarizeSession({ sessionId, directory, model, signal });
+      if (signal.aborted) return;
+      if (!deps.settings.get('ai.contextEngine')) return blockContext(sessionId, attempt.id);
+      session.recovery.phase = 'resuming';
+      session.contextOverflow = null;
+      const continuation = [
+        'Continue the original task from the compacted context.',
+        ...session.pendingAnswers.splice(0),
+      ];
+      await state.send(session, continuation.join('\n\n'), messageId);
+      deps.log.info({ attemptId: attempt.id, sessionId }, 'context overflow recovery continued');
+    } catch (err) {
+      if (signal.aborted) return;
+      deps.log.warn({ err, attemptId: attempt.id, sessionId }, 'context overflow recovery failed');
+      blockContext(sessionId, attempt.id);
+    }
+  }
+
   function onEvent(event: OpencodeEvent): void {
     if (event.type === OpencodeEventType.RuntimeLost) {
       interruptActive(true);
@@ -336,9 +380,23 @@ export function watchSessions(
     if (event.type === OpencodeEventType.Busy && session.stall?.continued === true) session.stall = null;
     switch (event.type) {
       case OpencodeEventType.StepFinished:
+        if (
+          session.recovery?.phase === 'spent' &&
+          event.messageId === session.recovery.replyId &&
+          (event.reason === 'stop' || event.reason === 'tool-calls') &&
+          !session.contextOverflow
+        )
+          delete session.recovery;
         repo.addUsage(attempt.id, { ...event.tokens, cost: event.cost });
         return;
       case OpencodeEventType.Message:
+        if (session.recovery && event.parentMessageId === session.recovery.messageId)
+          session.recovery.replyId = event.messageId;
+        if (
+          session.recovery?.phase === 'resuming' &&
+          (event.messageId === session.recovery.messageId || event.parentMessageId === session.recovery.messageId)
+        )
+          session.recovery.phase = 'spent';
         if (event.messageId === session.firstPrompt?.messageId) session.firstPrompt = null;
         return;
       case OpencodeEventType.Compacted:
@@ -347,17 +405,19 @@ export function watchSessions(
       case OpencodeEventType.Idle:
         if (session.finishingCommand) return;
         if (running) {
-          if (session.firstPrompt !== null) return;
-          if (!session.budgetBlocked && session.contextOverflow !== null) {
-            failSession(attempt, session, session.contextOverflow);
-            state.releaseSession(session);
-          } else state.inBackground(attempt.id, () => onIdle(attempt, session));
+          if (
+            session.firstPrompt !== null ||
+            session.recovery?.phase === 'compacting' ||
+            session.recovery?.phase === 'resuming'
+          )
+            return;
+          state.inBackground(attempt.id, () => onIdle(attempt, session));
         } else if (session.stopAfterSubmit && session.endCommand !== null) {
           finishSubmitted(attempt, session);
         } else state.releaseSession(session);
         return;
       case OpencodeEventType.Error:
-        if (session.budgetBlocked) return;
+        if (session.budgetBlocked || session.recovery?.phase === 'compacting') return;
         // OpenCode emits this before trying compaction. Keep the attempt active until recovery or idle.
         if (event.error?.name === CONTEXT_OVERFLOW_ERROR) {
           if (session.contextOverflow === null) {
