@@ -75,6 +75,7 @@ import { createNetworkModule, validateNetworkSettings } from './modules/network/
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import { createOffice } from './modules/office/index.ts';
 import {
+  createContextSummaries,
   createOpencodeRuntime,
   createRuntimeClient,
   createSessionDispatcher,
@@ -776,9 +777,23 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
   });
   mcp.register(server);
+  const contextEnabled = () => settings.service.get('ai.contextEngine');
+  const summaries = createContextSummaries({
+    db: database.db,
+    clock,
+    log,
+    sessions,
+    opencode,
+    enabled: contextEnabled,
+    ownerSignal: attempts.service.delegationSignal,
+  });
+  server.addHook('preClose', async () => {
+    summaries.close();
+  });
   registerContextRoutes(server, {
+    summaries,
     token: mcpToken,
-    enabled: () => settings.service.get('ai.contextEngine'),
+    enabled: contextEnabled,
     taskAt: worktrees.service.taskAt,
     owner: attempts.service.contextOwner,
     block: attempts.service.blockContext,

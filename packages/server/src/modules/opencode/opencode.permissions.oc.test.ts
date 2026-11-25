@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   AttemptKind,
   AttemptStatus,
@@ -43,6 +44,11 @@ const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
 const CONTEXT_PROBE = 'AW_CHECK_REQUEST_PROJECTION';
 const DISABLE_PROBE = 'AW_DISABLE_AFTER_PROJECTION';
+const SUMMARY_PROBE = 'AW_CHECK_BACKGROUND_SUMMARY';
+const workerStarted = Promise.withResolvers<void>();
+const newReadProduced = Promise.withResolvers<void>();
+const summarySaved = Promise.withResolvers<void>();
+const workerTools: string[][] = [];
 const RECALL_PROBE = 'AW_CHECK_PAGED_RECALL';
 const FOREIGN_PROBE = 'AW_CHECK_FOREIGN_RECALL';
 const coordinates = /messageId=(msg_\w+) partId=(prt_\w+)/;
@@ -111,6 +117,11 @@ async function recordCommand(req: IncomingMessage) {
 
 function scriptedModel(): Server {
   return createServer((req, res) => {
+    if (req.url === '/summary-read-produced') {
+      newReadProduced.resolve();
+      void summarySaved.promise.then(() => res.end());
+      return;
+    }
     if (req.url === '/session-command-probe') {
       void recordCommand(req).then(() => res.end());
       return;
@@ -128,7 +139,28 @@ function scriptedModel(): Server {
       });
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
       providerRequests++;
-      if (hasProbe(FOREIGN_PROBE)) {
+      let replyText = 'done';
+      if (messages.some((m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'))) {
+        workerTools.push(names);
+        workerStarted.resolve();
+        await newReadProduced.promise;
+        replyText = messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))
+          ? 'Verified the early finding in bulk.txt.'
+          : 'Source missing';
+      } else if (hasProbe(SUMMARY_PROBE)) {
+        contextRequests.push(messages);
+        const count = messages.filter((m) => m.role === 'tool').length;
+        if (messages.some((m) => textOf(m).includes('[AW prior work]'))) {
+          calls = [
+            operation(McpToolName.SubmitResult, { summary: 'Finished with summary', notes: last ? textOf(last) : '' }),
+          ];
+        } else if (count === 0) calls = [{ name: 'grep', args: { pattern: 'EARLY_FINDING', include: 'bulk.txt' } }];
+        else if (count === 1) calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
+        else if (count === 2) {
+          await workerStarted.promise;
+          calls = [{ name: 'read', args: { filePath: 'new.txt' } }];
+        } else calls = [operation(McpToolName.SubmitResult, { summary: 'Missing summary' })];
+      } else if (hasProbe(FOREIGN_PROBE)) {
         const ref = coordinates.exec(prompt);
         if (ref) calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2] })];
         else if (last?.role === 'tool')
@@ -187,7 +219,7 @@ function scriptedModel(): Server {
       }
       const delta =
         calls.length === 0
-          ? { role: 'assistant', content: 'done' }
+          ? { role: 'assistant', content: replyText }
           : {
               role: 'assistant',
               tool_calls: calls.map(({ name, args }, index) => ({
@@ -736,3 +768,111 @@ it('M2 真实 Session 从折叠引用分页回查并提交证据，其他 Sessio
     await t.call(updateSettingsOp, { 'ai.contextEngine': false });
   }
 }, 90000);
+
+it('M3 真实主请求在途时生成无工具摘要，同一 Session 下一请求带新证据并完成', async () => {
+  contextRequests.length = 0;
+  const spec = providerFor(model);
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'bulk.txt': Array.from({ length: 90 }, (_, i) => `EARLY_FINDING ${i} ${'sample '.repeat(65)}`).join('\n'),
+      'latest.txt': 'Latest batch before worker',
+      'new.txt': 'EVIDENCE_AFTER_FREEZE',
+      // 测试屏障：read 已取得新证据，此时允许 Worker 回答，再让主循环进入下一次真实 transform。
+      '.opencode/plugins/read-barrier.js': `export const barrier = async () => ({
+        'tool.execute.after': async ({tool}, result) => {
+          if (tool === 'read' && result.output.includes('EVIDENCE_AFTER_FREEZE'))
+            await fetch('http://127.0.0.1:${(model.address() as AddressInfo).port}/summary-read-produced');
+        }
+      })`,
+      'opencode.json': JSON.stringify({
+        model: `${PROJECT_PROVIDER}/${MODEL}`,
+        provider: {
+          [PROJECT_PROVIDER]: {
+            ...spec,
+            models: { [MODEL]: { ...spec.models[MODEL], limit: { context: 60000, output: 1024 } } },
+          },
+        },
+      }),
+    },
+  });
+  await t.call(updateSettingsOp, {
+    'ai.contextEngine': true,
+    'ai.defaultModel': null,
+    'scheduler.maxConcurrentAttempts': 3,
+  });
+  const unsubscribe = t.app.services.opencode.subscribe((e) => {
+    if (
+      e.type === OpencodeEventType.Deleted &&
+      t.logs.some(
+        (l) => l.msg === 'context summary usage' && 'workerSessionId' in l && l.workerSessionId === e.sessionId,
+      )
+    )
+      summarySaved.resolve();
+  });
+  const done = waitForEvent(
+    t.app.events,
+    ServerEventType.NodeUpdated,
+    ({ node }) =>
+      node.key === 'locate' && [NodeStatus.AwaitingAcceptance, NodeStatus.Failed].some((s) => s === node.status),
+    25000,
+  );
+  const task = await createTask(t, {
+    projectId: project.id,
+    workflow: 'bugfix',
+    requirement: SUMMARY_PROBE,
+    checkpoints: { accept_each_node: true },
+  });
+  try {
+    const { node } = await done;
+    const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+    expect(detail.result?.summary, JSON.stringify(t.logs.filter((l) => String(l.msg).startsWith('context ')))).toBe(
+      'Finished with summary',
+    );
+    expect(detail.result?.notes).toContain('EVIDENCE_AFTER_FREEZE');
+    expect(detail.attempts).toHaveLength(1);
+    expect(contextRequests).toHaveLength(4);
+    expect(workerTools).toEqual([[]]);
+    const before = (contextRequests[2] ?? []).map(textOf).join('');
+    const after = (contextRequests[3] ?? []).map(textOf).join('');
+    expect(before).toContain('EARLY_FINDING');
+    expect(after).toContain('Verified the early finding');
+    expect(after).not.toContain('EARLY_FINDING');
+    expect(after.length).toBeLessThan(before.length * 0.7);
+    const owner = detail.attempts[0];
+    if (!owner) throw new Error('Missing attempt');
+    const attempt = t.app.services.attempts.get(owner.id);
+    const storage = new DatabaseSync(join(t.dataDir, 'app.db'), { readOnly: true });
+    try {
+      expect(
+        storage.prepare('SELECT summary_text FROM context_summaries WHERE session_id=?').all(attempt.opencodeSessionId),
+      ).toEqual([{ summary_text: 'Verified the early finding in bulk.txt.' }]);
+    } finally {
+      storage.close();
+    }
+    expect(
+      t.logs.filter(
+        (l) =>
+          l.msg === 'mcp tool called' &&
+          'tool' in l &&
+          l.tool === McpToolName.SubmitResult &&
+          'attemptId' in l &&
+          l.attemptId === attempt.id,
+      ),
+    ).toHaveLength(1);
+    expect(t.logs).toContainEqual(
+      expect.objectContaining({
+        msg: 'context summary usage',
+        sessionId: attempt.opencodeSessionId,
+        tokens: expect.objectContaining({ output: 1 }),
+      }),
+    );
+  } finally {
+    workerStarted.resolve();
+    newReadProduced.resolve();
+    summarySaved.resolve();
+    unsubscribe();
+    await t.call(cancelTaskOp, { id: task.id });
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+  }
+}, 40000);

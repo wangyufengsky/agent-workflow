@@ -553,7 +553,10 @@ export function createFakeOpencode() {
     },
     async deleteSession({ sessionId }) {
       const index = sessions.findIndex((s) => s.id === sessionId);
-      if (index >= 0) sessions.splice(index, 1);
+      if (index >= 0) {
+        sessions.splice(index, 1);
+        emit({ type: E.Deleted, sessionId });
+      }
     },
     async abort({ sessionId }) {
       aborts.push(sessionId);

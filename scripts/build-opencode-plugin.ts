@@ -5,7 +5,7 @@ import ts from 'typescript';
 const source = new URL('../packages/opencode-plugin/src/', import.meta.url);
 const dist = new URL('../packages/opencode-plugin/dist/', import.meta.url);
 await mkdir(dist, { recursive: true });
-for (const name of ['agent-workflow-bridge', 'context']) {
+for (const name of ['agent-workflow-bridge', 'context', 'projection']) {
   const { outputText } = ts.transpileModule(await readFile(new URL(`${name}.ts`, source), 'utf8'), {
     compilerOptions: {
       target: ts.ScriptTarget.ESNext,

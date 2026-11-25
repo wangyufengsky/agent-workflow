@@ -155,6 +155,7 @@ export function createSessionView() {
         case E.Busy:
         case E.PermissionReplied:
         case E.Idle:
+        case E.Deleted:
         case E.RuntimeLost:
           return [];
       }

@@ -35,3 +35,4 @@ export {
 } from './opencode.events.ts';
 export { createMessageId } from './opencode.message-id.ts';
 export { createOpencodeRuntime, type OpencodeRuntime, type OpencodeRuntimeDeps } from './opencode.runtime.ts';
+export { createContextSummaries } from './opencode.summaries.ts';

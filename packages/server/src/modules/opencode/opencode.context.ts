@@ -7,6 +7,8 @@ import type { Logger } from '../../core/logger.ts';
 
 import { OPENCODE_CONTEXT_PATH } from './opencode.config.ts';
 
+import type { createContextSummaries } from './opencode.summaries.ts';
+
 const directoryQuery = z.object({ directory: z.string().min(1), sessionId: z.string().optional() });
 const count = z.number().int().nonnegative();
 const report = z.object({
@@ -16,6 +18,9 @@ const report = z.object({
   before: count,
   after: count,
   limit: count.nullable(),
+  summary: z
+    .object({ uptoMessageId: z.string().min(1), source: z.string().min(1), model: z.string().min(1) })
+    .optional(),
 });
 
 /** 插件在抛错前等待登记完成，idle/error 不再通过错误文案猜测阻断原因。 */
@@ -27,6 +32,7 @@ export function registerContextRoutes(
     taskAt(path: string): string | undefined;
     owner(sessionId: string, directory: string, taskId: string): string | undefined;
     block(sessionId: string, attemptId: string): void;
+    summaries: ReturnType<typeof createContextSummaries>;
     toolBytes(): number;
     log: Logger;
   },
@@ -46,16 +52,24 @@ export function registerContextRoutes(
         const attemptId = taskId && deps.owner(sessionId, directory, taskId);
         if (!attemptId) return { enabled, attemptId: null };
         toolBytes ??= deps.toolBytes();
-        return { enabled, attemptId, toolBytes };
+        return { enabled, attemptId, toolBytes, ...(enabled && { summary: deps.summaries.get(sessionId) }) };
       });
       routes.post('/budget', async (req) => {
-        const { directory, ...data } = parseInput(report, req.body);
+        const { directory, summary, ...data } = parseInput(report, req.body);
         const taskId = deps.taskAt(directory);
         if (!taskId || deps.owner(data.sessionId, directory, taskId) !== data.attemptId) return { blocked: true };
         // 开关可在消息转换与最后一次预算检查之间关闭。
         const effective = deps.enabled() ? data.after : data.before;
         const blocked = data.limit !== null && effective > data.limit;
         if (blocked) deps.block(data.sessionId, data.attemptId);
+        else if (summary && deps.enabled())
+          void deps.summaries.generate({
+            ...summary,
+            sessionId: data.sessionId,
+            attemptId: data.attemptId,
+            taskId,
+            directory,
+          });
         deps.log.info({ ...data, effective, blocked }, 'context budget');
         return { blocked };
       });

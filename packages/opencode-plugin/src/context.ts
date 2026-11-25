@@ -1,65 +1,8 @@
 import type { Hooks, PluginInput } from '@opencode-ai/plugin';
 
-type Messages = Parameters<NonNullable<Hooks['experimental.chat.messages.transform']>>[1]['messages'];
-type Part = Messages[number]['parts'][number];
+import { applySummary, freezePrefix, type Messages, projectHistory, type Summary } from './projection.ts';
 
-function reference(part: Part, messageId: string): Part {
-  if (
-    part.type !== 'tool' ||
-    part.tool !== 'read' ||
-    part.messageID !== messageId ||
-    !part.callID ||
-    !part.id ||
-    part.state.status !== 'completed' ||
-    Object.keys(part.metadata ?? {}).length
-  )
-    return part;
-  const { state } = part;
-  const { loaded, display } = state.metadata;
-  if (Object.keys(state.metadata).some((key) => !['loaded', 'display', 'preview', 'truncated'].includes(key)))
-    return part;
-  if (
-    !Array.isArray(loaded) ||
-    loaded.length ||
-    typeof display !== 'object' ||
-    display === null ||
-    !('type' in display) ||
-    display.type !== 'file' ||
-    !('path' in display) ||
-    typeof display.path !== 'string' ||
-    typeof state.output !== 'string' ||
-    state.attachments?.length ||
-    state.time.compacted !== undefined ||
-    state.output.includes('<system-reminder>') ||
-    /(?:^|[/\\])(?:agents\.md|claude\.md|context\.md|copilot-instructions\.md)$/i.test(display.path)
-  )
-    return part;
-  const output = `[AW read messageId=${messageId} partId=${part.id} path=${display.path} → agent-workflow_recall]`;
-  return output.length < state.output.length ? { ...part, state: { ...state, output } } : part;
-}
-
-/** 只替换结果正文，保留原消息顺序、调用参数与 callID。最新工具批次包括同消息的所有兄弟调用。 */
-export function projectHistory(messages: Messages): Messages {
-  const latest = messages.findLastIndex((m) => m.parts.some((p) => p.type === 'tool'));
-  return messages.map((m, i) => {
-    if (
-      i >= latest ||
-      m.info.role !== 'assistant' ||
-      m.info.error ||
-      m.info.time.completed === undefined ||
-      m.parts.some(
-        (p) =>
-          p.messageID !== m.info.id ||
-          p.sessionID !== m.info.sessionID ||
-          (p.type === 'reasoning' && Object.keys(p.metadata ?? {}).length > 0) ||
-          (p.type === 'tool' && p.state.status !== 'completed'),
-      )
-    )
-      return m;
-    return { ...m, parts: m.parts.map((p) => reference(p, m.info.id)) };
-  });
-}
-
+const SUMMARY_BUDGET_RATIO = 0.75;
 const BYTES_PER_TOKEN = 3;
 const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value));
 function historyBytes(messages: Messages): number {
@@ -87,6 +30,7 @@ type RequestEstimate = {
   toolBytes: number;
   externalTokens: number;
   knownTokens?: number;
+  freeze?: () => ReturnType<typeof freezePrefix>;
 };
 
 export function contextHooks(ctx: PluginInput, api: string, token: string): Hooks {
@@ -100,7 +44,7 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
     if (sessionId) url.searchParams.set('sessionId', sessionId);
     const res = await fetch(url, { headers });
     if (!res.ok) throw new Error(`AW context scope unavailable: ${res.status}`);
-    return (await res.json()) as { enabled: boolean; attemptId?: string | null; toolBytes?: number };
+    return (await res.json()) as { enabled: boolean; attemptId?: string | null; toolBytes?: number; summary?: Summary };
   }
   return {
     event: async ({ event }) => {
@@ -127,9 +71,13 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
       const sessionId = user.sessionID;
       const owner = await scope(sessionId);
       if (!owner.attemptId || messages.some((m) => m.info.sessionID !== sessionId)) return;
-      const candidate = owner.enabled ? projectHistory(messages) : messages;
+      const folded = owner.enabled ? projectHistory(messages) : messages;
+      const projected = applySummary(folded, owner.enabled ? owner.summary : undefined);
       const before = historyBytes(messages);
-      const after = candidate === messages ? before : historyBytes(candidate);
+      const foldedBytes = folded === messages ? before : historyBytes(folded);
+      const projectedBytes = projected === folded ? foldedBytes : historyBytes(projected);
+      const candidate = projectedBytes < foldedBytes ? projected : folded;
+      const after = Math.min(foldedBytes, projectedBytes);
       // V1 只公开原生/插件工具清单。额外 MCP 首轮按执行 MCP 的目录体积估算，
       // 同轮续跑可从 Provider 返回的实际输入中扣掉上一请求已计入的部分。
       const toolBytes = owner.toolBytes ?? 0;
@@ -153,10 +101,14 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         system: 0,
         toolBytes,
         externalTokens,
+        ...(owner.enabled && {
+          freeze: () => freezePrefix(candidate, candidate === folded ? undefined : owner.summary?.uptoMessageId),
+        }),
       });
       if (candidate !== messages && after < before) {
         // V1 持有原数组的引用。此处没有 await，下一步转换只能看到完整投影。
         Object.assign(messages, candidate);
+        messages.length = candidate.length;
       }
     },
     'experimental.chat.system.transform': async ({ sessionID }, { system }) => {
@@ -183,6 +135,9 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
       estimate.knownTokens = Math.ceil((overhead + estimate.after) / BYTES_PER_TOKEN);
       const before = Math.ceil((overhead + estimate.before) / BYTES_PER_TOKEN) + estimate.externalTokens;
       const after = estimate.knownTokens + estimate.externalTokens;
+      const prefix =
+        limit !== null && after <= limit && after > limit * SUMMARY_BUDGET_RATIO ? estimate.freeze?.() : undefined;
+      delete estimate.freeze;
       const res = await fetch(new URL('budget', api), {
         method: 'POST',
         headers,
@@ -193,6 +148,7 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
           before,
           after,
           limit,
+          ...(prefix && { summary: { ...prefix, model: `${model.providerID}/${model.id}` } }),
         }),
       });
       if (!res.ok) throw new Error(`AW context budget unavailable: ${res.status}`);

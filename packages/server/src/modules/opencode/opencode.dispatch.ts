@@ -26,6 +26,7 @@ export const SessionPurpose = {
   PlanningRevision: 'planning-revision',
   Assistant: 'assistant',
   Approval: 'approval',
+  ContextSummary: 'context-summary',
   Document: 'document',
   Image: 'image',
   Companion: 'companion',
@@ -39,6 +40,12 @@ const dispatchPolicies = {
   [SessionPurpose.Initiative]: { lifetime: 'attempt', slot: 'owner', reuse: 'when_available' },
   [SessionPurpose.PlanningRevision]: { lifetime: 'attempt', slot: 'owner', reuse: 'required' },
   [SessionPurpose.Assistant]: { lifetime: 'object', slot: 'owner', agent: OPENCODE_ASSISTANT_AGENT },
+  [SessionPurpose.ContextSummary]: {
+    lifetime: 'call',
+    slot: 'exclusive',
+    agent: OPENCODE_DOCUMENT_AGENT,
+    prefix: 'aw-summary-',
+  },
   [SessionPurpose.Approval]: {
     lifetime: 'call',
     slot: 'borrowOrExclusive',
@@ -86,6 +93,7 @@ type DispatchPolicy = { slot: Slot; signal?: AbortSignal };
 type Session = { sessionId: string; directory: string; signal: AbortSignal };
 type Call = { title: string; signal?: AbortSignal; parentSignal?: AbortSignal } & (
   | { purpose: typeof SessionPurpose.Approval | typeof SessionPurpose.Document | typeof SessionPurpose.Image }
+  | { purpose: typeof SessionPurpose.ContextSummary; sourceDirectory: string; sourceSessionId: string; model: string }
   | { purpose: typeof SessionPurpose.Companion; directory: string }
 );
 
@@ -200,6 +208,7 @@ export function createSessionDispatcher({
 
   function slotFor(purpose: Purpose, parentSignal: AbortSignal | undefined): Slot {
     const slot = dispatchPolicies[purpose].slot;
+    if (slot === 'exclusive') return { kind: 'exclusive' };
     if (slot === 'optional') return { kind: 'optional' };
     if (slot === 'borrowOrExclusive')
       return parentSignal === undefined ? { kind: 'exclusive' } : { kind: 'delegated', parentSignal };
@@ -263,6 +272,17 @@ export function createSessionDispatcher({
         'directory' in input ? input.directory : await mkdtemp(join(tmpdir(), dispatchPolicies[input.purpose].prefix));
       try {
         signal.throwIfAborted();
+        if (input.purpose === SessionPurpose.ContextSummary) {
+          await opencode.prepareDelegationModel({
+            sourceDirectory: input.sourceDirectory,
+            sourceSessionId: input.sourceSessionId,
+            model: input.model,
+            targetDirectory: directory,
+            signal,
+            privateSession: true,
+          });
+          signal.throwIfAborted();
+        }
         const sessionId = await opencode.createSession({
           directory,
           title: input.title,
