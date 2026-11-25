@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ARTIFACT_WORKFLOW_KEY,
@@ -452,7 +452,7 @@ describe('PPT', () => {
       201,
     );
 
-    expect(t.fake.sessions[0]?.directory).toBe(join(t.dataDir, 'ppt', 'blank'));
+    expect(t.fake.sessions[0]?.directory).toBe(realpathSync(join(t.dataDir, 'ppt', 'blank')));
     expect(t.fake.prompts[0]?.text).toContain(
       '<material index="1" kind="text" title="第一行">\n第一行\n第二行\n</material>',
     );
