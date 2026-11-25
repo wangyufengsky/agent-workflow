@@ -113,6 +113,9 @@ export const AssistantPage = {
   Ppt: 'ppt',
   PptNew: 'ppt_new',
   PptDeck: 'ppt_deck',
+  Designs: 'designs',
+  DesignNew: 'design_new',
+  DesignWorkbench: 'design_workbench',
   /** Batches (20), scheduled tasks (22) and the environment checks (14 §3.1a), D111. */
   Batches: 'batches',
   BatchNew: 'batch_new',
@@ -141,6 +144,7 @@ export type AssistantPageParam =
   | 'workflowKey'
   | 'knowledgeConversationId'
   | 'deckId'
+  | 'designId'
   | 'slideId'
   | 'batchId'
   | 'scheduleId'
@@ -182,6 +186,9 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Ppt]: [],
   [AssistantPage.PptNew]: [],
   [AssistantPage.PptDeck]: ['deckId'],
+  [AssistantPage.Designs]: [],
+  [AssistantPage.DesignNew]: [],
+  [AssistantPage.DesignWorkbench]: ['designId'],
   [AssistantPage.Batches]: [],
   [AssistantPage.BatchNew]: [],
   [AssistantPage.Batch]: ['batchId'],

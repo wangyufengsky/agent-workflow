@@ -97,6 +97,7 @@ export const assistantPageRefSchema = z
         workflowKey: z.string().min(1).optional(),
         knowledgeConversationId: z.string().min(1).optional(),
         deckId: z.string().min(1).optional(),
+        designId: z.string().min(1).optional(),
         /** On a PPT's workspace: the selected page. */
         slideId: z.string().min(1).optional(),
         batchId: z.string().min(1).optional(),

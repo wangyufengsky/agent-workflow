@@ -604,3 +604,6 @@ IDEA 联调组可由应用助手通过 `projects_modules` 读取，`tasks_create
 范围只能引用本次扫描得到的文件和目录。静态关系需提供文件及有效行号，推断关系需提供理由。
 业务流程中显式标记为 `kind: retry` 的边可以指向自身。无效提交返回 `VALIDATION_FAILED` 和
 `details.issues`，模型可在同一尝试中订正。设计尝试调用其他执行工具返回 `MCP_TOOL_NOT_ALLOWED`。
+
+应用助手通过既有 `open_page` 工具跳转到 `designs`（列表）、`design_new`（新建）或
+`design_workbench`（`params.designId` 必填）。使用与其他助手页面相同的 `assistant.navigate` 事件。

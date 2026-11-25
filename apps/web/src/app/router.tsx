@@ -1,8 +1,9 @@
-import { COMPANION_PATH, taskDisplayGroupSchema } from '@aw/shared';
+import { COMPANION_PATH, ErrorCode, taskDisplayGroupSchema } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Link, Outlet, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { z } from 'zod';
+import { ApiError } from '../api/client.ts';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
@@ -15,6 +16,10 @@ import { CompanionPage } from '../features/companion/companion.page.tsx';
 import { CompanionNoticeHost } from '../features/companion/companion-notice.tsx';
 import { useCompanionSync } from '../features/companion/use-companion-sync.ts';
 import { DatabasesPage } from '../features/databases/databases.page.tsx';
+import { DesignNewPage } from '../features/designs/design-new.page.tsx';
+import { DesignWorkbenchPage } from '../features/designs/design-workbench.page.tsx';
+import { designPagesQuery, designQuery } from '../features/designs/designs.queries.ts';
+import { DesignsListPage } from '../features/designs/designs-list.page.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
 import { GitConsolePage, GitReviewRedirect } from '../features/git/git-console.page.tsx';
 import { DETAIL_TABS, GIT_VIEWS, GitProjectPage } from '../features/git/git-project.page.tsx';
@@ -110,14 +115,35 @@ const onboardingRoute = createRoute({
   },
 });
 
-/** Everything with the sidebar; without any project the first run goes through onboarding (14 §3.1). */
+async function canReadRetainedDesign(client: QueryClient, pathname: string): Promise<boolean> {
+  const path = pathname.replace(/\/$/u, '');
+  if (path === ROUTES.designs) {
+    const list = await client.fetchInfiniteQuery(designPagesQuery({}));
+    return list.pages.some((page) => page.items.length > 0);
+  }
+  const prefix = `${ROUTES.designs}/`;
+  if (!path.startsWith(prefix) || path === ROUTES.designNew) return false;
+  const designId = path.slice(prefix.length);
+  if (designId.includes('/')) return false;
+  try {
+    await client.fetchQuery(designQuery(designId));
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.code === ErrorCode.DesignNotFound) return false;
+    throw error;
+  }
+}
+
+/** 首次使用进入引导。最后一个项目移除后，仍可从设计列表与工作台访问保留设计（44 §2.3）。 */
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_shell',
   component: AppShell,
-  beforeLoad: async ({ context }) => {
+  beforeLoad: async ({ context, location }) => {
     const projects = await context.queryClient.ensureQueryData(projectsQuery);
-    if (projects.length === 0) throw redirect({ to: ROUTES.onboarding });
+    if (projects.length === 0 && !(await canReadRetainedDesign(context.queryClient, location.pathname))) {
+      throw redirect({ to: ROUTES.onboarding });
+    }
   },
 });
 
@@ -339,6 +365,30 @@ const teamMemberRoute = createRoute({
   validateSearch: teamSearchSchema,
   component: TeamMemberPage,
 });
+const designsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.designs,
+  validateSearch: z.object({ projectId: z.string().optional(), tab: z.literal('templates').optional() }),
+  component: DesignsListPage,
+});
+const designNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.designNew,
+  validateSearch: z.object({ projectId: z.string().optional(), template: z.string().optional() }),
+  component: DesignNewPage,
+});
+const designWorkbenchRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.designWorkbench,
+  validateSearch: z.object({
+    model: z
+      .string()
+      .regex(/^(?:[^/]+\/.+)?$/)
+      .optional(),
+  }),
+  component: DesignWorkbenchPage,
+});
+
 // PPT (23 §2): a new PPT keeps the material it was opened with (「做成 PPT」); the workspace keeps the selected page
 // and the pro view of simple mode. The show and the print view are full pages outside the sidebar.
 const pptNewRoute = createRoute({
@@ -402,6 +452,9 @@ const routeTree = rootRoute.addChildren([
     teamIndexRoute,
     teamRoute,
     teamMemberRoute,
+    designsRoute,
+    designNewRoute,
+    designWorkbenchRoute,
     page(ROUTES.ppt, PptListPage),
     pptNewRoute,
     pptDeckRoute,

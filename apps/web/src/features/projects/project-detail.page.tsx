@@ -12,6 +12,7 @@ import { toast } from '../../components/toast.tsx';
 import { PREVIEW_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DATABASES_COPY } from '../../copy/databases.ts';
+import { DESIGNS_COPY } from '../../copy/designs.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { AGENTS_MD_COPY, PROJECTS_COPY as C, PROJECT_RUNTIME_COPY } from '../../copy/projects.ts';
 import { ProjectBrowserCases } from '../browser-cases/project-browser-cases.tsx';
@@ -161,12 +162,20 @@ export function ProjectDetailPage() {
           <h1 className="title">{p.name}</h1>
           <p className="lede mono">{p.repoPath}</p>
         </div>
-        <div className="row">
+        <div className="row wrap">
           <Link to={ROUTES.home} search={{ projectId: p.id, workflow: DEFAULT_START_WORKFLOW }} className="btn primary">
             {C.startTask}
           </Link>
           <Link to={ROUTES.home} search={{ assistantProjectId: p.id }} className="btn secondary">
             {C.askProject}
+          </Link>
+          <Link to={ROUTES.designs} search={{ projectId: p.id }} className="btn secondary">
+            <Icon name="book" />
+            {DESIGNS_COPY.openDesigns}
+          </Link>
+          <Link to={ROUTES.designNew} search={{ projectId: p.id }} className="btn secondary">
+            <Icon name="plus" />
+            {DESIGNS_COPY.newDesign}
           </Link>
         </div>
       </div>

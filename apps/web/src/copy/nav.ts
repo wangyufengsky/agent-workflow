@@ -9,6 +9,7 @@ export const NAV_COPY = {
   projects: '项目',
   knowledge: '知识问答',
   ppt: 'PPT',
+  designs: '项目设计',
   insights: '质量与用量',
   team: '团队',
   git: 'Git',
