@@ -89,10 +89,10 @@ export function createDesignsService({
   function assertNotExporting(id: string) {
     if (exporting.has(id)) throw new AppError(ErrorCode.DesignBusy, 'An export is in progress', { id });
   }
-  function writableDesign(id: string) {
+  function writableDesign(id: string, { allowDuringRun = false } = {}) {
     const design = designById(id);
     assertNotExporting(id);
-    runs.assertIdle(id);
+    if (!allowDuringRun) runs.assertIdle(id);
     if (design.projectId === null) throw new AppError(ErrorCode.StateTransitionInvalid, 'The project was deleted');
     return design;
   }
@@ -164,7 +164,9 @@ export function createDesignsService({
       return queries.get(id);
     },
     update({ id, title, layoutStyle, theme, aiReviewEnabled }: UpdateDesignRequest) {
-      writableDesign(id);
+      const readingOnly =
+        (layoutStyle !== undefined || theme !== undefined) && title === undefined && aiReviewEnabled === undefined;
+      writableDesign(id, { allowDuringRun: readingOnly });
       return change(id, () =>
         repo.updateDesign(id, {
           ...(title === undefined ? {} : { title }),

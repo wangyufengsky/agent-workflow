@@ -45,12 +45,15 @@ type ReviseSectionInput = ModelInput & {
   focusDiagramId?: string | undefined;
 };
 type PromptSection = Omit<DesignSection, 'reviewState' | 'reviewNotes' | 'previous' | 'updatedAt' | 'designId'>;
+type GenerationPlan = { sectionIds: string[]; batchSize: number };
+type FollowUp = { kind: 'generate'; plan: GenerationPlan } | { kind: 'review' };
 type Work = {
   kind: DesignAttemptKind;
   targets: DesignSection[];
   prompt: string;
   instruction?: string | undefined;
   model: string | null;
+  generation?: GenerationPlan;
 };
 
 const overflowDetailsSchema = z.object({ error: z.object({ name: z.literal(CONTEXT_OVERFLOW_ERROR) }) });
@@ -84,6 +87,8 @@ function invalidState(message: string): never {
 
 export function createDesignRuns({ repo, attempts, projects, unit, clock, settings, prompts, log }: Dependencies) {
   const handoffs = new Map<string, DesignRun>();
+  // A split only governs the current generation request. Restart recovery uses the saved chapters and runs.
+  const generations = new Map<string, GenerationPlan>();
   const stopping = new Set<string>();
   let closed = false;
 
@@ -186,19 +191,25 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
           ? { outlineConfirmedAt: now }
           : {}),
       });
+      if (work.generation !== undefined) generations.set(id, work.generation);
       publish(design.id);
       return started;
     });
   }
 
-  function generateWork(design: ProjectDesign, targets: DesignSection[], model: string | null) {
-    const outline = repo.listSections(design.id).map((section) => ({ ...promptSection(section), blocks: null }));
+  function generateWork(
+    design: ProjectDesign,
+    targets: DesignSection[],
+    model: string | null,
+    plan: GenerationPlan = { sectionIds: targets.map(({ id }) => id), batchSize: targets.length },
+  ) {
     return run(design, {
       kind: AttemptKind.DesignGenerate,
       targets,
       model,
+      generation: plan,
       prompt:
-        promptFor(design, PromptName.DesignSection, targets, outline) +
+        promptFor(design, PromptName.DesignSection, targets) +
         `\n目标章节 ID（依次提交）：${JSON.stringify(targets.map((section) => section.id))}`,
     });
   }
@@ -217,7 +228,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     });
   }
 
-  async function handoff(runRecord: DesignRun, model: string | null, continuation: 'generate' | 'review') {
+  async function handoff(runRecord: DesignRun, model: string | null, next: FollowUp) {
     await attempts.waitForSessionRelease(runRecord.attemptId);
     if (handoffs.get(runRecord.designId) !== runRecord) return;
     handoffs.delete(runRecord.designId);
@@ -225,16 +236,42 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     if (closed || !design?.projectId || latestRun(design.id)?.id !== runRecord.id || !attempts.isReady()) return;
     const selected = selectedSections(design.id);
     const remaining = selected.filter((section) => section.blocks === null);
-    if (continuation === 'generate') {
-      const targets = remaining.filter((section) => runRecord.targetSectionIds.includes(section.id));
-      if (targets.length > 0) await generateWork(design, targets, model);
+    if (next.kind === 'generate') {
+      const { plan } = next;
+      const targets = remaining.filter((section) => plan.sectionIds.includes(section.id)).slice(0, plan.batchSize);
+      if (targets.length > 0) await generateWork(design, targets, model, plan);
     } else if (design.aiReviewEnabled && selected.length > 0 && remaining.length === 0) {
       await reviewWork(design, selected, model);
     }
   }
 
+  function generationFollowUp(
+    work: DesignRun,
+    plan: GenerationPlan,
+    pending: readonly DesignSection[],
+    attempt: Pick<ReturnType<AttemptsService['get']>, 'status' | 'error'>,
+  ): FollowUp | undefined {
+    const remaining = pending.filter(({ id }) => plan.sectionIds.includes(id));
+    if (remaining.length === 0) return undefined;
+    if (attempt.status === AttemptStatus.Succeeded) return { kind: 'generate', plan };
+
+    const overflow =
+      attempt.error?.code === ErrorCode.AttemptContextBudget ||
+      (attempt.error?.code === ErrorCode.AttemptSessionError &&
+        overflowDetailsSchema.safeParse(attempt.error.details).success);
+    if (attempt.status !== AttemptStatus.Failed || !overflow || work.targetSectionIds.length === 1) return undefined;
+
+    // A retry must send fewer chapters. Keep the rest of the original selection for later batches.
+    const remainingInBatch = remaining.filter(({ id }) => work.targetSectionIds.includes(id)).length;
+    const batchSize =
+      remainingInBatch < work.targetSectionIds.length ? remainingInBatch : Math.ceil(remainingInBatch / 2);
+    return { kind: 'generate', plan: { ...plan, batchSize } };
+  }
+
   const unsubscribe = attempts.onSignal(({ type, attempt }) => {
     if (!isDesignAttemptKind(attempt.kind)) return;
+    const generation = generations.get(attempt.id);
+    if (type === 'ended') generations.delete(attempt.id);
     const work = repo.findRunByAttempt(attempt.id);
     if (work === undefined) return;
     if (type === 'ended') repo.updateDesign(work.designId, { updatedAt: clock.now() });
@@ -242,7 +279,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     if (
       closed ||
       type !== 'ended' ||
-      attempt.kind !== AttemptKind.DesignGenerate ||
+      generation === undefined ||
       stopping.has(work.designId) ||
       latestRun(work.designId)?.id !== work.id
     )
@@ -250,23 +287,18 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     const design = repo.findDesign(work.designId);
     if (design?.projectId == null) return;
     const selected = selectedSections(design.id);
-    const overflow =
-      attempt.error?.code === ErrorCode.AttemptContextBudget ||
-      (attempt.error?.code === ErrorCode.AttemptSessionError &&
-        overflowDetailsSchema.safeParse(attempt.error.details).success);
-    const needsContinuation =
-      overflow &&
-      attempt.status === AttemptStatus.Failed &&
-      work.doneSectionIds.length > 0 &&
-      selected.some((section) => section.blocks === null && work.targetSectionIds.includes(section.id));
-    const needsReview =
-      attempt.status === AttemptStatus.Succeeded &&
+    const remaining = selected.filter((section) => section.blocks === null);
+    const next =
+      generationFollowUp(work, generation, remaining, attempt) ??
+      (attempt.status === AttemptStatus.Succeeded &&
       design.aiReviewEnabled &&
       selected.length > 0 &&
-      selected.every((section) => section.blocks !== null);
-    if (!needsContinuation && !needsReview) return;
+      remaining.length === 0
+        ? { kind: 'review' as const }
+        : undefined);
+    if (next === undefined) return;
     handoffs.set(design.id, work);
-    void handoff(work, attempt.model, needsContinuation ? 'generate' : 'review').catch((error: unknown) => {
+    void handoff(work, attempt.model, next).catch((error: unknown) => {
       log.error({ err: error, designId: design.id, attemptId: attempt.id }, 'design follow-up failed');
     });
   });
@@ -370,6 +402,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     close() {
       closed = true;
       handoffs.clear();
+      generations.clear();
       unsubscribe();
     },
   };
