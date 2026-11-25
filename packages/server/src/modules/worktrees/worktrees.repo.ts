@@ -1,4 +1,4 @@
-import { AppError, ErrorCode, type WorktreeStatus } from '@aw/shared';
+import { AppError, ErrorCode, WorktreeStatus } from '@aw/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { worktreesTable } from './worktrees.table.ts';
@@ -27,6 +27,13 @@ export function createWorktreesRepo(db: DbExecutor) {
             .from(worktreesTable)
             .where(inArray(worktreesTable.taskId, [...taskIds]))
             .all();
+    },
+    taskAt(path: string): string | undefined {
+      return db
+        .select({ taskId: worktreesTable.taskId })
+        .from(worktreesTable)
+        .where(and(eq(worktreesTable.path, path), eq(worktreesTable.status, WorktreeStatus.Ready)))
+        .get()?.taskId;
     },
     findByTask(taskId: string): Worktree | undefined {
       return db.select().from(worktreesTable).where(eq(worktreesTable.taskId, taskId)).get();

@@ -215,6 +215,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       browserWaiting: false,
       // A session re-attached after a restart waits idle for its answer.
       idle: parked,
+      budgetBlocked: false,
       contextOverflow: null,
       pendingAnswers: [],
       stall: null,
@@ -532,6 +533,11 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       const attempt = repo.findLatestPlan(taskId);
       return attempt === undefined ? undefined : toDto(attempt);
     },
+    contextOwner(sessionId: string, directory: string, taskId: string): string | undefined {
+      const session = state.live.get(sessionId);
+      return session?.directory === directory && session.taskId === taskId ? session.attemptId : undefined;
+    },
+    blockContext: reactions.blockContext,
     liveAgentOf: (attemptId: string): string | undefined => state.sessionOf(attemptId)?.agent,
     roleIdOf: (attemptId: string): string | null => mustFind(attemptId).roleId,
     usesRole: (roleId: string): boolean => repo.hasRole(roleId),

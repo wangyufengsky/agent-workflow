@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import type { PluginModule } from '@opencode-ai/plugin';
+import { contextHooks } from './context.ts';
 
-// The plugin is built into a standalone file that opencode loads (12 §3), so it cannot import @aw/shared;
+// OpenCode loads this plugin outside the workspace (12 §3), so it cannot import @aw/shared;
 // its unit test uses MCP_TOOL_PREFIX, MCP_ASSISTANT_TOOL_PREFIX and MCP_SESSION_ARG, which keeps these equal. Not
 // exported: opencode treats the module's exports as plugins.
 /** The execution MCP's and the assistant MCP's tools (15 §2): both attribute calls by session. */
@@ -17,7 +18,7 @@ let startupHeaders: Record<string, string> | undefined;
  */
 const bridge: PluginModule = {
   id: 'agent-workflow-bridge',
-  server: async (_input, options) => {
+  server: async (input, options) => {
     if (options?.readHeaderInput === true && startupHeaders === undefined) {
       const raw: unknown = JSON.parse(readFileSync(0, 'utf8'));
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error('Invalid startup headers');
@@ -29,6 +30,9 @@ const bridge: PluginModule = {
       startupHeaders = Object.fromEntries(pairs);
     }
     return {
+      ...(typeof options?.contextApi === 'string' && typeof options.contextToken === 'string'
+        ? contextHooks(input, options.contextApi, options.contextToken)
+        : {}),
       'chat.headers': async (_input, output) => {
         if (startupHeaders === undefined) return;
         for (const key of Object.keys(output.headers)) {

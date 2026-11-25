@@ -23,11 +23,14 @@ import {
   OPENCODE_DOCUMENT_AGENT,
   OPENCODE_FUNCTIONAL_TEST_AGENT,
   OPENCODE_IMAGE_AGENT,
+  OPENCODE_VERSION,
   type PermissionAction,
   type PermissionRule,
   readonlyBashRules,
   SessionAgent,
 } from '@aw/shared';
+
+export const OPENCODE_CONTEXT_PATH = '/internal/context';
 
 export type OpencodeConfigInput = {
   /** `http://127.0.0.1:<apiPort>/mcp/exec` */
@@ -37,6 +40,7 @@ export type OpencodeConfigInput = {
   assistantMcpUrl: string;
   assistantMcpToken: string;
   pluginFile: string;
+  runtimeVersion?: string;
   readHeaderInput?: boolean;
   /** The app's own skills (41, D206). */
   skillsDir: string;
@@ -195,6 +199,8 @@ const SKILL_ENV = { OPENCODE_DISABLE_EXTERNAL_SKILLS: '1' } as const;
 
 /** Injected as `OPENCODE_CONFIG_CONTENT` and merged by opencode with the user's own configuration (12 §2, S3). */
 export function buildOpencodeConfig(input: OpencodeConfigInput) {
+  const contextApi =
+    input.runtimeVersion === OPENCODE_VERSION ? new URL(`${OPENCODE_CONTEXT_PATH}/`, input.mcpUrl).href : undefined;
   const agents = Object.values(SessionAgent).map((base) => [
     OPENCODE_AGENT_NAME[base],
     {
@@ -221,8 +227,14 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
       [MCP_ASSISTANT_SERVER_NAME]: remote(input.assistantMcpUrl, input.assistantMcpToken),
     },
     plugin: [
-      input.readHeaderInput
-        ? [pathToFileURL(input.pluginFile).href, { readHeaderInput: true }]
+      input.readHeaderInput || contextApi
+        ? [
+            pathToFileURL(input.pluginFile).href,
+            {
+              ...(input.readHeaderInput ? { readHeaderInput: true } : {}),
+              ...(contextApi ? { contextApi, contextToken: input.mcpToken } : {}),
+            },
+          ]
         : pathToFileURL(input.pluginFile).href,
     ],
     skills: { paths: [input.skillsDir] },

@@ -17,7 +17,7 @@ export type McpTools = {
   call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<CallToolResult>;
 };
 
-function hasToken(req: FastifyRequest, token: string): boolean {
+export function hasToken(req: FastifyRequest, token: string): boolean {
   const presented = Buffer.from(req.headers.authorization ?? '');
   const expected = Buffer.from(`Bearer ${token}`);
   return presented.length === expected.length && timingSafeEqual(presented, expected);

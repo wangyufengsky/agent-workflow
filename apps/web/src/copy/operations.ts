@@ -326,6 +326,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'ui.mode': SETTINGS_COPY.mode,
   'ui.theme': SETTINGS_COPY.theme,
   'ui.introAnimation': SETTINGS_COPY.intro,
+  'ai.contextEngine': '任务上下文折叠',
   'ai.askOnUncertainty': SETTINGS_COPY.uncertainty,
   'ai.defaultModel': SETTINGS_COPY.defaultModel,
   'ai.defaultEffort': '默认思考强度',

@@ -68,6 +68,7 @@ export const ErrorCode = {
   CheckCommandUnrunnable: 'CHECK_COMMAND_UNRUNNABLE',
   // 尝试 / opencode
   AttemptNotFound: 'ATTEMPT_NOT_FOUND',
+  AttemptContextBudget: 'ATTEMPT_CONTEXT_BUDGET',
   AttemptNoResult: 'ATTEMPT_NO_RESULT',
   AttemptTimeout: 'ATTEMPT_TIMEOUT',
   AttemptSessionError: 'ATTEMPT_SESSION_ERROR',
@@ -239,6 +240,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.NodeAttemptsExhausted]: null,
   [ErrorCode.CheckCommandUnrunnable]: null,
   [ErrorCode.AttemptNotFound]: 404,
+  [ErrorCode.AttemptContextBudget]: null,
   [ErrorCode.AttemptNoResult]: null,
   [ErrorCode.AttemptTimeout]: null,
   [ErrorCode.AttemptSessionError]: null,

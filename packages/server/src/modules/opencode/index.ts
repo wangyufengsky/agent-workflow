@@ -16,6 +16,7 @@ export {
   opencodeLaunchEnv,
   sessionPermissionRules,
 } from './opencode.config.ts';
+export { registerContextRoutes } from './opencode.context.ts';
 export {
   createSessionDispatcher,
   type ObjectAttemptPurpose,

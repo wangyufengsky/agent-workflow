@@ -40,6 +40,11 @@ import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 const PROVIDER = 'aw-scripted';
 const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
+const CONTEXT_PROBE = 'AW_CHECK_REQUEST_PROJECTION';
+const DISABLE_PROBE = 'AW_DISABLE_AFTER_PROJECTION';
+const BUDGET_PROBE = 'AW_CHECK_BUDGET_STOP';
+const contextRequests: ChatMessage[][] = [];
+let providerRequests = 0;
 const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
 const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
@@ -70,7 +75,12 @@ const ASKED = [
   'cat README.md | xargs echo',
 ];
 
-type ChatMessage = { role: string; content: string | Array<{ type: string; text?: string }> | null };
+type ChatMessage = {
+  tool_call_id?: string;
+  tool_calls?: { id: string }[];
+  role: string;
+  content: string | Array<{ type: string; text?: string }> | null;
+};
 
 function textOf(message: ChatMessage): string {
   if (typeof message.content === 'string') return message.content;
@@ -101,7 +111,7 @@ function scriptedModel(): Server {
       void recordCommand(req).then(() => res.end());
       return;
     }
-    void bodyOf(req).then(({ messages, stream, tools, reasoning_effort }) => {
+    void bodyOf(req).then(async ({ messages, stream, tools, reasoning_effort }) => {
       const last = messages.at(-1);
       const prompt = last?.role === 'user' ? textOf(last) : '';
       if (prompt.startsWith(EFFORT_PROBE)) sentEfforts.push(reasoning_effort);
@@ -113,7 +123,16 @@ function scriptedModel(): Server {
         args,
       });
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-      if (hasProbe(PROBE_CHILD)) {
+      providerRequests++;
+      if (hasProbe(CONTEXT_PROBE) || hasProbe(DISABLE_PROBE)) {
+        contextRequests.push(messages);
+        const reads = messages.filter((m) => m.role === 'tool').length;
+        if (reads < 2) calls = [{ name: 'read', args: { filePath: reads === 0 ? 'bulk.txt' : 'latest.txt' } }];
+        else if (reads === 2 && hasProbe(DISABLE_PROBE)) {
+          await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+          calls = [{ name: 'read', args: { filePath: 'README.md' } }];
+        } else calls = [operation(McpToolName.SubmitResult, { summary: 'Read both files', notes: 'completed' })];
+      } else if (hasProbe(PROBE_CHILD)) {
         for (const name of names) advertisedChild.add(name);
         childPrompts.push(...messages.map(textOf));
         if (last?.role === 'tool') {
@@ -201,7 +220,18 @@ beforeAll(async () => {
       },
     }),
   );
-  t = await createTestApp({ realOpencode: true, env: { ...process.env, OPENCODE_CONFIG: configFile } });
+  t = await createTestApp({
+    realOpencode: true,
+    env: {
+      ...process.env,
+      OPENCODE_CONFIG: configFile,
+      OPENCODE_TEST_HOME: configDir,
+      OPENCODE_DISABLE_MODELS_FETCH: '1',
+      ...Object.fromEntries(
+        ['DATA', 'CONFIG', 'STATE', 'CACHE'].map((key) => [`XDG_${key}_HOME`, join(configDir, key)]),
+      ),
+    },
+  });
   await t.app.start(t.port);
   repo = await createTestRepo({ files: { 'scripts/check.sh': '#!/bin/sh\necho ok\n' } });
   await chmod(join(repo.path, 'scripts', 'check.sh'), 0o755);
@@ -502,3 +532,104 @@ it('@opencode 结束命令需要权限时可以授权，保留已提交结果', 
     await t.call(cancelTaskOp, { id: task.id });
   }
 }, 45_000);
+
+it.each(['折叠', '首步超限', '运行中停用', '新任务关闭'])(
+  'M1 真实模型请求（%s）',
+  async (scenario) => {
+    const blocked = scenario === '首步超限';
+    const disable = scenario === '运行中停用';
+    const native = scenario === '新任务关闭';
+    contextRequests.length = 0;
+    providerRequests = 0;
+    await t.call(updateSettingsOp, { 'ai.contextEngine': !native, 'ai.defaultModel': null, 'node.maxAttempts': 3 });
+    const spec = providerFor(model);
+    const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
+    const { project } = await addProject(t, {
+      checkCommand: null,
+      files: {
+        'bulk.txt': Array(200).fill('RAW_CONTEXT_EVIDENCE '.repeat(10)).join('\n'),
+        'latest.txt': Array(200).fill('LATEST_CONTEXT_EVIDENCE '.repeat(9)).join('\n'),
+        'opencode.json': JSON.stringify({
+          model: projectModel,
+          compaction: { auto: true, prune: true },
+          provider: {
+            [PROJECT_PROVIDER]: {
+              ...spec,
+              models: {
+                [MODEL]: {
+                  ...spec.models[MODEL],
+                  limit: { context: blocked ? 2048 : disable ? 57000 : 131072, output: 1024 },
+                },
+              },
+            },
+          },
+        }),
+      },
+    });
+    const done = nodeReaches(
+      t,
+      'locate',
+      blocked || disable ? NodeStatus.Failed : NodeStatus.AwaitingAcceptance,
+      30000,
+    );
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      requirement: blocked ? BUDGET_PROBE : disable ? DISABLE_PROBE : CONTEXT_PROBE,
+      checkpoints: { accept_each_node: true },
+    });
+    try {
+      const { node } = await done;
+      const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+      expect(detail.attempts).toHaveLength(1);
+      const worktree = t.app.services.worktrees.findByTask(task.id);
+      if (!worktree) throw new Error('Missing worktree');
+      const sdk = t.app.services.runtime.sdk();
+      expect(
+        (await sdk.config.get({ directory: worktree.path }, { throwOnError: true })).data.compaction,
+      ).toMatchObject({ auto: native, prune: native });
+      if (blocked || disable) {
+        expect(detail.attempts[0]).toMatchObject({ nudges: 0, error: { code: ErrorCode.AttemptContextBudget } });
+        expect(providerRequests).toBe(blocked ? 0 : 3);
+      }
+      if (!blocked) {
+        const last = contextRequests.at(-1) ?? [];
+        expect(last.filter((m) => m.role === 'tool').map(textOf)).toEqual([
+          native
+            ? expect.stringContaining('RAW_CONTEXT_EVIDENCE')
+            : expect.stringMatching(/AW read messageId=.*partId=.*bulk.txt/),
+          expect.stringContaining('LATEST_CONTEXT_EVIDENCE'),
+        ]);
+        expect(last.filter((m) => m.role === 'tool').map((m) => m.tool_call_id)).toEqual(
+          last.flatMap((m) => m.tool_calls?.map((call) => call.id) ?? []),
+        );
+        expect(contextRequests).toHaveLength(3);
+        const owner = detail.attempts[0];
+        if (!owner) throw new Error('Missing attempt');
+        const sessionID = t.app.services.attempts.get(owner.id).opencodeSessionId;
+        if (!sessionID) throw new Error('Missing session');
+        const history = await sdk.session.messages({ sessionID, directory: worktree.path }, { throwOnError: true });
+        expect(
+          history.data.some((m) =>
+            m.parts.some(
+              (p) =>
+                p.type === 'tool' &&
+                p.tool === 'read' &&
+                p.state.status === 'completed' &&
+                p.state.output.includes('RAW_CONTEXT_EVIDENCE'),
+            ),
+          ),
+        ).toBe(true);
+        expect(
+          t.app.services.attempts
+            .transcript(owner.id, 0)
+            .entries.some((e) => e.kind === 'tool_result' && e.data.output?.includes('RAW_CONTEXT_EVIDENCE')),
+        ).toBe(true);
+      }
+    } finally {
+      await t.call(cancelTaskOp, { id: task.id });
+      await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+    }
+  },
+  45000,
+);

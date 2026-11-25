@@ -81,6 +81,7 @@ import {
   type OpencodeClient,
   type OpencodeRuntime,
   opencodeLaunchEnv,
+  registerContextRoutes,
 } from './modules/opencode/index.ts';
 import { createPermissionReviewer } from './modules/permissions/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
@@ -237,7 +238,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
-    launchEnv: async () => {
+    launchEnv: async (version) => {
       if (apiPort === undefined) throw new Error('opencode started before the API listens');
       const api = `http://127.0.0.1:${apiPort}`;
       const shell = await locateOpencodeShell(env);
@@ -252,6 +253,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       }
       const hasHeaders = Object.keys(headers).length > 0;
       const launchEnv = opencodeLaunchEnv({
+        runtimeVersion: version,
         readHeaderInput: hasHeaders,
         mcpUrl: `${api}${MCP_EXEC_PATH}`,
         mcpToken,
@@ -774,6 +776,15 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
   });
   mcp.register(server);
+  registerContextRoutes(server, {
+    token: mcpToken,
+    enabled: () => settings.service.get('ai.contextEngine'),
+    taskAt: worktrees.service.taskAt,
+    owner: attempts.service.contextOwner,
+    block: attempts.service.blockContext,
+    toolBytes: () => Buffer.byteLength(JSON.stringify(mcp.registry.list())),
+    log,
+  });
   attempts.registerRoutes(server);
   tasks.registerRoutes(server);
   browser.registerRoutes(server);

@@ -30,7 +30,9 @@ describe('@opencode 客户端与配置注入', () => {
       mode: 'primary',
       permission: { edit: 'allow', question: 'deny', external_directory: 'deny' },
     });
-    expect(data.plugin).toEqual(expect.arrayContaining([expect.stringMatching(/agent-workflow-bridge\.js$/)]));
+    expect(data.plugin?.map((entry) => (Array.isArray(entry) ? entry[0] : entry))).toContainEqual(
+      expect.stringMatching(/agent-workflow-bridge\.js$/),
+    );
     // The knowledge researcher only reads (18 §5.1).
     expect(data.agent?.[OPENCODE_AGENT_NAME.researcher]).toMatchObject({
       mode: 'primary',
