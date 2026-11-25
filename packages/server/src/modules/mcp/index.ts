@@ -11,6 +11,7 @@ import type { BrowserService } from '../browser/index.ts';
 import type { DatabaseInvestigations } from '../database-investigations/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { DesignSubmissions } from '../designs/index.ts';
 import type { DocumentProcessor } from '../document-processor/index.ts';
 import type { FunctionalTestsService } from '../functional-tests/index.ts';
 import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
@@ -40,6 +41,7 @@ import { createSubmissionGuides } from './tools/submission-guide.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitBreakdownTool } from './tools/submit-breakdown.tool.ts';
 import { submitCommitMessageTool } from './tools/submit-commit-message.tool.ts';
+import { createDesignSubmissionTools } from './tools/submit-design.tool.ts';
 import { submitFindingsTool } from './tools/submit-findings.tool.ts';
 import { submitMemberAnalysisTool } from './tools/submit-member-analysis.tool.ts';
 import { submitOutlineTool } from './tools/submit-outline.tool.ts';
@@ -61,6 +63,7 @@ export type McpModuleDeps = {
   debug: DebugService;
   knowledge: KnowledgeService;
   decks: DecksService;
+  designSubmissions: DesignSubmissions;
   gitReviews: GitReviewsService;
   commitDrafts: CommitDrafts;
   team: TeamService;
@@ -86,6 +89,7 @@ export function createMcpModule({
   debug,
   knowledge,
   decks,
+  designSubmissions,
   gitReviews,
   commitDrafts,
   team,
@@ -126,6 +130,7 @@ export function createMcpModule({
     submitAnswerTool(knowledge),
     submitOutlineTool(decks),
     submitSlideTool(decks),
+    ...createDesignSubmissionTools(designSubmissions),
     submitFindingsTool(gitReviews),
     submitCommitMessageTool(commitDrafts),
     submitMemberAnalysisTool(team),

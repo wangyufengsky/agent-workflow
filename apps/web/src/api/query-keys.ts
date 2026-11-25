@@ -4,6 +4,7 @@ export const queryKeys = {
   externalMcp: ['assistant', 'external-mcp'],
   environment: ['system', 'environment'],
   projects: ['projects'],
+  designs: ['designs'],
   project: (id: string) => ['projects', id],
   agentsMd: (projectId: string) => ['projects', projectId, 'agents-md'],
   gitInitPreview: (repoPath: string) => ['projects', 'git-init-preview', repoPath],

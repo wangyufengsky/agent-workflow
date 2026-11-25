@@ -166,6 +166,7 @@ export const ServerEventType = {
   KnowledgeUpdated: 'knowledge.updated',
   /** A PPT changed: AI work started or ended, a page was submitted, edited, moved or deleted (23 §8). */
   DeckUpdated: 'deck.updated',
+  DesignUpdated: 'design.updated',
   /** A Git workbench review started, submitted its findings or ended (27 §7.4). */
   GitReviewUpdated: 'git_review.updated',
   /** Reading a project's commits for the team page made progress or finished (33 §7.2). */

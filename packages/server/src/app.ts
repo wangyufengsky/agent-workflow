@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   BUILTIN_INITIATIVE_TEMPLATES,
   BuiltinRoleKey,
+  loadBuiltinDesignTemplates,
   loadBuiltinRoles,
   loadBuiltinWorkflows,
   loadPrompts,
@@ -61,6 +62,7 @@ import { createDatabasesModule, DB_DRIVERS, type DbDriver } from './modules/data
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
+import { createDesignSubmissions, createDesignsRepo, syncBuiltinDesignTemplates } from './modules/designs/index.ts';
 import { createDocumentProcessor } from './modules/document-processor/index.ts';
 import { createFunctionalTestsModule, type FunctionalTestsService } from './modules/functional-tests/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
@@ -362,6 +364,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
   const workflows = createWorkflowsModule({ db: database.db, unit, clock, log, roles: roles.service });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
+  const designsRepo = createDesignsRepo(database.db);
+  syncBuiltinDesignTemplates(designsRepo, unit, clock, loadBuiltinDesignTemplates(config.promptsDir));
   const skills = createSkillsModule({
     db: database.db,
     unit,
@@ -758,6 +762,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     gitNetwork: network.gitEnv,
   });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
+  const designSubmissions = createDesignSubmissions({
+    repo: designsRepo,
+    attempts: attempts.service,
+    projects: projects.service,
+    unit,
+    clock,
+  });
   const mcp = createMcpModule({
     databaseInvestigations,
     events,
@@ -769,6 +780,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     debug: debug.service,
     knowledge: knowledge.service,
     decks: decks.service,
+    designSubmissions,
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
     team: team.service,

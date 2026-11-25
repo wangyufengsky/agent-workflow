@@ -56,7 +56,7 @@ function byList<T>(query: UseQueryResult<T[]>, found: (item: T) => boolean): Pre
 
 function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) {
   const navigate = useNavigate();
-  const route = ENTITY_ROUTES[entity.kind];
+  const route = entity.kind === EntityKind.Design ? undefined : ENTITY_ROUTES[entity.kind];
   const deleted = presence.state === 'deleted';
   return (
     <section
@@ -67,7 +67,7 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
     >
       <div className={styles.cardHead}>
         <span className={styles.tile} data-tone="accent" aria-hidden="true">
-          <Icon name={route.icon} size="sm" />
+          <Icon name={route?.icon ?? 'flow'} size="sm" />
         </span>
         <span className={styles.cardHeading}>
           <span className={styles.eyebrow}>{C.kind[entity.kind]}</span>
@@ -75,9 +75,11 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
         </span>
         {deleted ? <span className={styles.chip}>{C.deleted}</span> : presence.state === 'present' && presence.status}
         {/* The panel shows the conversation beside the page it opens, also from the home page (15 §6, D112). */}
-        <Button size="sm" disabled={deleted} onClick={() => followAssistant(() => route.open(navigate, entity.id))}>
-          {C.open}
-        </Button>
+        {route !== undefined && (
+          <Button size="sm" disabled={deleted} onClick={() => followAssistant(() => route.open(navigate, entity.id))}>
+            {C.open}
+          </Button>
+        )}
       </div>
       {presence.state === 'error' && <ErrorState error={presence.error} />}
     </section>
@@ -186,6 +188,8 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
       return <KnowledgeConversationCard entity={entity} />;
     case EntityKind.Batch:
       return <BatchEntityCard entity={entity} />;
+    case EntityKind.Design:
+      return <Shell entity={entity} presence={{ state: 'present' }} />;
     case EntityKind.Deck:
       return <DeckEntityCard entity={entity} />;
     case EntityKind.Schedule:

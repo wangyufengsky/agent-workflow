@@ -44,4 +44,4 @@ export const ENTITY_ROUTES = {
     icon: 'book',
     open: (navigate, id) => navigate({ to: ROUTES.knowledgeConversation, params: { conversationId: id } }),
   },
-} as const satisfies Record<EntityKind, EntityRoute>;
+} as const satisfies Record<Exclude<EntityKind, typeof EntityKind.Design>, EntityRoute>;

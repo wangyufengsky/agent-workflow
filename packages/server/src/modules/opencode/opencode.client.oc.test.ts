@@ -4,6 +4,8 @@ import {
   listExternalMcpOp,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_SERVER_NAME,
+  MCP_TOOL_PREFIX,
+  McpToolName,
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   RoleBaseAgent,
@@ -37,6 +39,20 @@ describe('@opencode 客户端与配置注入', () => {
     expect(data.agent?.[OPENCODE_AGENT_NAME.researcher]).toMatchObject({
       mode: 'primary',
       permission: { edit: 'deny', question: 'deny', webfetch: 'deny', websearch: 'deny', task: 'deny' },
+    });
+    expect(data.agent?.[OPENCODE_AGENT_NAME.designer]).toMatchObject({
+      mode: 'primary',
+      permission: {
+        '*': 'deny',
+        edit: 'deny',
+        webfetch: 'deny',
+        websearch: 'deny',
+        task: 'deny',
+        external_directory: 'deny',
+        [`${MCP_TOOL_PREFIX}*`]: 'deny',
+        [`${MCP_TOOL_PREFIX}${McpToolName.SubmitDesignSection}`]: 'allow',
+        [`${MCP_TOOL_PREFIX}${McpToolName.ReportProgress}`]: 'allow',
+      },
     });
     // So does the PPT writer (23 §7.1).
     expect(data.agent?.[OPENCODE_AGENT_NAME.slides_writer]).toMatchObject({

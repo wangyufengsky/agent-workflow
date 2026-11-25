@@ -269,3 +269,11 @@ export const SKILL_SELECTION_MAX = 5;
 
 /** Maximum Unicode code points returned by one Recall call. */
 export const RECALL_PAGE_MAX_CHARS = 4096;
+
+/** 项目设计的扫描、提交与图表上限（44 §9）。 */
+export const DESIGN_TITLE_MAX_CHARS = 160;
+export const DESIGN_MAX_SECTIONS = 64;
+export const DESIGN_INSTRUCTION_MAX_CHARS = 8000;
+export const DESIGN_SCAN_MAX_FILE_BYTES = 512 * 1024;
+export const DESIGN_DIAGRAM_MAX_NODES = 100;
+export const DESIGN_DIAGRAM_MAX_EDGES = 250;

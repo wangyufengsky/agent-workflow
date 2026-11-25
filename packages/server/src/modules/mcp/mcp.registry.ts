@@ -1,5 +1,6 @@
 import {
   AppError,
+  ATTEMPT_SUBMIT_TOOL,
   type AttemptDTO,
   type AttemptKind,
   AttemptStatus,
@@ -10,6 +11,7 @@ import {
   type ErrorInfo,
   functionalTestTools,
   isAttemptSubmitTool,
+  isDesignAttemptKind,
   isFunctionalTestNode,
   MCP_SESSION_ARG,
   type McpToolInfo,
@@ -102,6 +104,12 @@ export function createToolRegistry(
         attemptId: attempt.id,
       });
     }
+    if (
+      isDesignAttemptKind(attempt.kind) &&
+      tool.name !== ATTEMPT_SUBMIT_TOOL[attempt.kind] &&
+      tool.name !== McpToolName.ReportProgress
+    )
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'This project design attempt can only use its declared tools');
     if (
       attempts.liveAgentOf(attempt.id) === OPENCODE_AGENT_NAME[SessionAgent.DatabaseAnalyst] &&
       !DATABASE_ANALYST_TOOLS.includes(tool.name)

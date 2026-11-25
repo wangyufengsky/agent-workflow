@@ -52,6 +52,10 @@ export const AttemptKind = {
   DeckOutline: 'deck_outline',
   /** Makes or revises some pages of a PPT (23 §4). */
   DeckSlides: 'deck_slides',
+  DesignOutline: 'design_outline',
+  DesignGenerate: 'design_generate',
+  DesignRevise: 'design_revise',
+  DesignReview: 'design_review',
   /** A read-only review of a diff in the Git workbench (27 §4); belongs to no task. */
   GitReview: 'git_review',
   /** Drafts a commit message from a diff (27 §7.3); belongs to no task. */

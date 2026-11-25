@@ -200,6 +200,8 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
       return <DbConnectionRef ids={ids} />;
     case InputRef.InboxItem:
       return <InboxItemRef ids={ids} />;
+    case InputRef.Design:
+      return <span className="mono">{first}</span>;
     case InputRef.Attempt:
       return <span className="mono">{first.slice(0, 8)}</span>;
     case InputRef.Attachment:

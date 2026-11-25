@@ -1,0 +1,2619 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="default">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>项目设计工作台 · 前端交互设计稿（Agent Workflow）</title>
+<!-- docs/44-project-design.md 的前端交互原型：纯合成数据，自包含单文件，直接双击可用。支持 ?view=list|new|outline|workbench|offline&theme=default|claude|codex -->
+<style>
+/* ---------- 1. 主题令牌（直接取自 apps/web/src/theme/themes/） ---------- */
+:root[data-theme="default"] {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --bg-sunken: #070707;
+  --surface: #111214;
+  --panel: #151517;
+  --raised: #1c1c1f;
+  --overlay: #232327;
+  --sidebar: #121316;
+  --fill-1: rgba(255,255,255,.025);
+  --fill-2: rgba(255,255,255,.045);
+  --fill-3: rgba(255,255,255,.07);
+  --fill-4: rgba(255,255,255,.1);
+  --line: rgba(255,255,255,.08);
+  --line-2: rgba(255,255,255,.14);
+  --line-3: rgba(255,255,255,.22);
+  --ink: #f5f6f7;
+  --ink-2: #d9dce1;
+  --sub: #a1a6ae;
+  --muted: #8c9199;
+  --faint: #5d6168;
+  --accent: #a9bcff;
+  --accent-ink: #c9d5ff;
+  --accent-fill: rgba(169,188,255,.12);
+  --accent-line: rgba(169,188,255,.38);
+  --brand: #4865f2;
+  --brand-fill: rgba(77,107,254,.16);
+  --primary-bg: #ffffff;
+  --primary-ink: #0a0a0a;
+  --primary-hover: #e5e7eb;
+  --ok: #73c799;
+  --ok-fill: rgba(115,199,153,.12);
+  --ok-line: rgba(115,199,153,.38);
+  --run: #73c799;
+  --run-fill: rgba(115,199,153,.12);
+  --run-line: rgba(115,199,153,.48);
+  --warn: #f2c46d;
+  --warn-fill: rgba(242,196,109,.12);
+  --warn-line: rgba(242,196,109,.38);
+  --danger: #ff8d96;
+  --danger-fill: rgba(255,141,150,.11);
+  --danger-line: rgba(255,141,150,.38);
+  --wait: #c9b5ef;
+  --wait-fill: rgba(201,181,239,.12);
+  --wait-line: rgba(201,181,239,.35);
+  --done: #79cbcd;
+  --done-fill: rgba(121,203,205,.12);
+  --done-line: rgba(121,203,205,.35);
+  --node-bg: #191b20;
+  --code-bg: #101216;
+  --code-ink: #e5e9f0;
+  --edge: rgba(255,255,255,.26);
+  --dots: radial-gradient(rgba(255,255,255,.075) 1px, transparent 1.2px);
+  --shadow-pop: 0 18px 50px rgba(0,0,0,.58), 0 0 0 1px rgba(255,255,255,.07);
+  --scrim: rgba(0,0,0,.58);
+}
+
+:root[data-theme="claude"] {
+  color-scheme: light;
+  --bg: #f8f7f3;
+  --bg-sunken: #f1efe9;
+  --surface: #f3f1eb;
+  --panel: #fffefa;
+  --raised: #fffefa;
+  --overlay: #ffffff;
+  --sidebar: #eeede8;
+  --fill-1: rgba(48,45,40,.025);
+  --fill-2: rgba(48,45,40,.045);
+  --fill-3: rgba(48,45,40,.07);
+  --fill-4: rgba(48,45,40,.1);
+  --line: #e5e1d9;
+  --line-2: #dcd7ce;
+  --line-3: #c8c0b2;
+  --ink: #2b2925;
+  --ink-2: #3a3731;
+  --sub: #655f55;
+  --muted: #686157;
+  --faint: #a39b8e;
+  --accent: #89583f;
+  --accent-ink: #6b432f;
+  --accent-fill: rgba(137,88,63,.1);
+  --accent-line: rgba(137,88,63,.36);
+  --brand: #89583f;
+  --brand-fill: rgba(137,88,63,.12);
+  --primary-bg: #302d28;
+  --primary-ink: #ffffff;
+  --primary-hover: #1d1b18;
+  --ok: #36623b;
+  --ok-fill: rgba(54,98,59,.1);
+  --ok-line: rgba(54,98,59,.36);
+  --run: #246b49;
+  --run-fill: rgba(36,107,73,.1);
+  --run-line: rgba(36,107,73,.38);
+  --warn: #8f4b13;
+  --warn-fill: rgba(143,75,19,.1);
+  --warn-line: rgba(143,75,19,.36);
+  --danger: #a04c40;
+  --danger-fill: rgba(160,76,64,.1);
+  --danger-line: rgba(160,76,64,.36);
+  --wait: #6c568e;
+  --wait-fill: rgba(108,86,142,.1);
+  --wait-line: rgba(108,86,142,.36);
+  --done: #1b626c;
+  --done-fill: rgba(27,98,108,.1);
+  --done-line: rgba(27,98,108,.36);
+  --node-bg: #fffefa;
+  --code-bg: #2b2925;
+  --code-ink: #f3f1eb;
+  --edge: rgba(48,45,40,.28);
+  --dots: radial-gradient(rgba(48,45,40,.11) 1px, transparent 1.2px);
+  --shadow-pop: 0 16px 40px rgba(48,45,40,.14), 0 0 0 1px rgba(48,45,40,.08);
+  --scrim: rgba(43,41,37,.28);
+}
+
+:root[data-theme="codex"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-sunken: #f9f9f9;
+  --surface: #f7f7f7;
+  --panel: #ffffff;
+  --raised: #ffffff;
+  --overlay: #ffffff;
+  --sidebar: #f9f9f9;
+  --fill-1: rgba(13,13,13,.025);
+  --fill-2: rgba(13,13,13,.045);
+  --fill-3: rgba(13,13,13,.07);
+  --fill-4: rgba(13,13,13,.1);
+  --line: #ececec;
+  --line-2: #dfdfdf;
+  --line-3: #c4c4c4;
+  --ink: #0d0d0d;
+  --ink-2: #262626;
+  --sub: #5d5d5d;
+  --muted: #616161;
+  --faint: #a3a3a3;
+  --accent: #0169cc;
+  --accent-ink: #00519f;
+  --accent-fill: rgba(1,105,204,.09);
+  --accent-line: rgba(1,105,204,.34);
+  --brand: #0d0d0d;
+  --brand-fill: rgba(13,13,13,.08);
+  --primary-bg: #0d0d0d;
+  --primary-ink: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ok: #0f7a3b;
+  --ok-fill: rgba(15,122,59,.09);
+  --ok-line: rgba(15,122,59,.34);
+  --run: #0f7a3b;
+  --run-fill: rgba(15,122,59,.09);
+  --run-line: rgba(15,122,59,.34);
+  --warn: #8a5800;
+  --warn-fill: rgba(138,88,0,.09);
+  --warn-line: rgba(138,88,0,.34);
+  --danger: #c4242e;
+  --danger-fill: rgba(196,36,46,.09);
+  --danger-line: rgba(196,36,46,.34);
+  --wait: #6d45c4;
+  --wait-fill: rgba(109,69,196,.09);
+  --wait-line: rgba(109,69,196,.34);
+  --done: #136f79;
+  --done-fill: rgba(19,111,121,.09);
+  --done-line: rgba(19,111,121,.34);
+  --node-bg: #ffffff;
+  --code-bg: #f4f5f7;
+  --code-ink: #16181d;
+  --edge: rgba(13,13,13,.24);
+  --dots: radial-gradient(rgba(13,13,13,.09) 1px, transparent 1.2px);
+  --shadow-pop: 0 12px 32px rgba(13,13,13,.1), 0 0 0 1px rgba(13,13,13,.08);
+  --scrim: rgba(13,13,13,.24);
+}
+
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --fs-xs: 11.5px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  --nav-w: 206px;
+  --proto-h: 42px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 var(--fs-md)/1.55 var(--font);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+h1, h2, h3, h4, p { margin: 0; }
+.mono { font-family: var(--font-mono); font-size: 0.9em; }
+.num { font-variant-numeric: tabular-nums; }
+.sub { color: var(--sub); }
+.muted { color: var(--muted); }
+[hidden] { display: none !important; }
+
+/* ---------- 2. 原型切换顶条（仅设计稿演示用） ---------- */
+.proto-bar {
+  height: var(--proto-h);
+  flex: none;
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line-2);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  z-index: 40;
+}
+.proto-tag {
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent-fill);
+  border: 1px solid var(--accent-line);
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+.proto-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+.proto-tab {
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  color: var(--sub);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.proto-tab:hover { background: var(--fill-2); color: var(--ink); }
+.proto-tab.active {
+  background: var(--raised);
+  color: var(--ink);
+  border-color: var(--line-2);
+  font-weight: 600;
+}
+.proto-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.proto-select {
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xs);
+  padding: 3px 8px;
+  font-size: var(--fs-xs);
+}
+
+/* ---------- 3. 应用外框（左侧导航 + 主区） ---------- */
+.app-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.app-sidebar {
+  width: var(--nav-w);
+  flex: none;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 10px;
+  gap: 2px;
+  overflow-y: auto;
+}
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px 12px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.brand-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  color: var(--sub);
+  font-size: 13px;
+  text-align: left;
+  width: 100%;
+  transition: background .12s, color .12s;
+}
+.nav-item:hover { background: var(--fill-2); color: var(--ink); }
+.nav-item.active {
+  background: var(--fill-3);
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav-sep {
+  margin: 10px 8px 5px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+}
+.nav-bottom { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ---------- 4. 通用按钮、徽标、卡片 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--ink);
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, opacity .12s;
+}
+.btn:hover:not(:disabled) { background: var(--fill-3); border-color: var(--line-3); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary {
+  background: var(--primary-bg);
+  color: var(--primary-ink);
+  border-color: transparent;
+  font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn.accent {
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+.btn.danger {
+  background: var(--danger-fill);
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+.btn.sm { height: 27px; padding: 0 9px; font-size: var(--fs-xs); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--sub); }
+.btn.ghost:hover:not(:disabled) { background: var(--fill-2); color: var(--ink); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  border: 1px solid var(--line-2);
+  background: var(--fill-2);
+  color: var(--sub);
+  white-space: nowrap;
+}
+.pill.ok { background: var(--ok-fill); color: var(--ok); border-color: var(--ok-line); }
+.pill.run { background: var(--run-fill); color: var(--run); border-color: var(--run-line); }
+.pill.warn { background: var(--warn-fill); color: var(--warn); border-color: var(--warn-line); }
+.pill.wait { background: var(--wait-fill); color: var(--wait); border-color: var(--wait-line); }
+.pill.accent { background: var(--accent-fill); color: var(--accent-ink); border-color: var(--accent-line); }
+.pill.done { background: var(--done-fill); color: var(--done); border-color: var(--done-line); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.dot.pulse { animation: pulse 1.3s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }
+
+.page-scroll { flex: 1; overflow-y: auto; padding: 28px 34px 48px; }
+.page-wrap { max-width: 1080px; margin: 0 auto; }
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.page-head h1 { font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
+.page-head p { color: var(--sub); font-size: var(--fs-sm); margin-top: 4px; }
+
+.input, .textarea, .select {
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  font-size: var(--fs-sm);
+  outline: none;
+  transition: border-color .15s;
+}
+.input:focus, .textarea:focus, .select:focus { border-color: var(--accent); }
+.textarea { width: 100%; resize: vertical; line-height: 1.5; }
+
+/* ---------- 5. 列表页 ---------- */
+.toolbar-row { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+.design-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+.design-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  text-align: left;
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.design-card:hover { border-color: var(--accent-line); background: var(--raised); transform: translateY(-1px); }
+.design-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.design-card-title { font-size: 15px; font-weight: 600; color: var(--ink); }
+.design-card-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: var(--fs-xs); color: var(--sub); }
+.mini-bar { height: 5px; border-radius: 99px; background: var(--fill-3); overflow: hidden; }
+.mini-bar > i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+
+/* ---------- 6. 新建页 ---------- */
+.form-card {
+  max-width: 780px;
+  margin: 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field-label { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.field-hint { font-size: var(--fs-xs); color: var(--sub); }
+.depth-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.depth-opt {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 13px 14px;
+  text-align: left;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color .15s, background .15s;
+}
+.depth-opt.selected { border-color: var(--accent); background: var(--accent-fill); }
+.depth-opt strong { font-size: 13.5px; color: var(--ink); }
+.depth-opt span { font-size: var(--fs-xs); color: var(--sub); line-height: 1.45; }
+.check-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.check-line input { margin-top: 3px; accent-color: var(--brand); }
+.form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- 7. 大纲确认页 ---------- */
+.scan-banner {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 15px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.scan-stats { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: var(--fs-sm); }
+.skip-drawer {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 14px;
+}
+.outline-list {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.outline-row {
+  display: grid;
+  grid-template-columns: 28px 30px 102px minmax(160px, 1fr) minmax(200px, 1.3fr) 92px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.outline-row:last-child { border-bottom: 0; }
+.outline-row.disabled { opacity: .48; }
+.outline-row input[type="text"] {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  padding: 4px 7px;
+  width: 100%;
+}
+.outline-row input[type="text"]:hover,
+.outline-row input[type="text"]:focus { background: var(--surface); border-color: var(--line-2); outline: none; }
+.outline-foot {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 8. 三栏工作台 ---------- */
+.wb-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.wb-header {
+  height: 52px;
+  flex: none;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wb-title { font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.wb-meta { display: flex; align-items: center; gap: 7px; font-size: var(--fs-xs); color: var(--sub); overflow: hidden; }
+.wb-actions { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+
+.wb-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 262px minmax(0, 1fr) 326px;
+}
+.wb-body.right-collapsed { grid-template-columns: 262px minmax(0, 1fr) 0px; }
+.wb-body.right-collapsed .wb-right { display: none; }
+
+/* 左栏：目录 + 搜索 */
+.wb-left {
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.search-box { padding: 10px 10px 8px; border-bottom: 1px solid var(--line); position: relative; }
+.search-box input { width: 100%; padding-left: 28px; height: 31px; font-size: var(--fs-xs); }
+.search-ico { position: absolute; left: 19px; top: 18px; color: var(--muted); font-size: 12px; pointer-events: none; }
+.search-results {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.search-hit {
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--r-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-xs);
+}
+.search-hit:hover { background: var(--fill-3); }
+.search-hit mark { background: var(--accent-fill); color: var(--accent-ink); border-radius: 3px; padding: 0 2px; }
+
+.toc-scroll { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+.toc-item {
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sub);
+  transition: background .12s, color .12s;
+}
+.toc-item:hover { background: var(--fill-2); color: var(--ink); }
+.toc-item.active { background: var(--accent-fill); color: var(--ink); font-weight: 600; }
+.toc-item.just-arrived { animation: flashIn .9s ease-out; }
+@keyframes flashIn { 0% { background: var(--ok-fill); } 100% { background: transparent; } }
+.toc-sub { padding-left: 22px; display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
+.toc-file {
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.toc-file:hover { background: var(--fill-2); color: var(--ink); }
+.toc-file.active { color: var(--accent-ink); background: var(--accent-fill); font-weight: 500; }
+.toc-foot {
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--sub);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* 中栏：正文 + 交互图 + 文件详情 */
+.wb-center {
+  overflow-y: auto;
+  padding: 22px 30px 44px;
+  background: var(--bg);
+}
+.reader-wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.crumb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--sub); }
+.crumbs button:hover { color: var(--ink); text-decoration: underline; }
+
+.sec-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.sec-header h2 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.sec-header p { margin-top: 6px; color: var(--sub); font-size: var(--fs-sm); }
+
+.block-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.block-card h3 { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.block-card p { font-size: var(--fs-md); color: var(--ink-2); line-height: 1.65; }
+.block-card ul { margin: 0; padding-left: 18px; color: var(--ink-2); display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-sm); }
+
+.callout {
+  border-radius: var(--r-md);
+  padding: 12px 15px;
+  border: 1px solid var(--warn-line);
+  background: var(--warn-fill);
+  font-size: var(--fs-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.callout.info { border-color: var(--accent-line); background: var(--accent-fill); }
+.callout strong { color: var(--ink); font-size: 13px; }
+
+.ev-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: var(--fill-2);
+  border: 1px solid var(--line-2);
+  color: var(--sub);
+}
+.ev-chip:hover { border-color: var(--accent-line); color: var(--accent-ink); }
+.ev-chip.static { border-color: var(--ok-line); color: var(--ok); background: var(--ok-fill); }
+.ev-chip.inferred { border-color: var(--wait-line); color: var(--wait); background: var(--wait-fill); }
+
+/* 交互式结构图容器 */
+.diagram-box {
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.diagram-bar {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-xs);
+}
+.diagram-canvas {
+  background-image: var(--dots);
+  background-size: 18px 18px;
+  padding: 14px;
+  overflow-x: auto;
+}
+.diagram-svg { width: 100%; height: auto; display: block; min-width: 620px; }
+.dg-node { cursor: pointer; transition: opacity .15s; }
+.dg-node:hover rect { stroke: var(--accent); stroke-width: 1.8; }
+.edge-list {
+  border-top: 1px solid var(--line);
+  padding: 10px 14px;
+  background: var(--panel);
+  font-size: var(--fs-xs);
+}
+.edge-list summary { cursor: pointer; color: var(--sub); font-weight: 500; }
+.edge-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.edge-table th, .edge-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.edge-table th { color: var(--muted); font-weight: 500; }
+
+/* 文件与符号详情 */
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.file-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: border-color .15s;
+}
+.file-card:hover { border-color: var(--accent-line); }
+.file-card.selected { border-color: var(--accent); background: var(--accent-fill); }
+.sym-item {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sym-sig {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-ink);
+  background: var(--fill-2);
+  padding: 5px 8px;
+  border-radius: var(--r-xs);
+  overflow-x: auto;
+}
+.code-snippet {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+}
+
+/* 空态（等待生成） */
+.pending-canvas {
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-lg);
+  padding: 54px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--sub);
+}
+
+/* 右栏：复用 ConversationStream 风格 */
+.wb-right {
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.stream-head {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.stream-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stream-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.think-box {
+  border: 1px solid var(--accent-line);
+  background: var(--accent-fill);
+  border-radius: var(--r-sm);
+  padding: 9px 11px;
+  font-size: var(--fs-xs);
+}
+.think-box.done { border-color: var(--line); background: var(--panel); }
+.think-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--accent-ink); }
+.think-box.done .think-title { color: var(--sub); font-weight: 500; }
+.think-body { margin-top: 6px; color: var(--sub); line-height: 1.5; max-height: 82px; overflow: hidden; }
+.act-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  padding: 5px 8px;
+  border-radius: var(--r-xs);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.act-verb { font-weight: 600; color: var(--ink); white-space: nowrap; }
+.act-obj { color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; }
+.act-status { margin-left: auto; font-size: 11px; color: var(--ok); flex: none; }
+.stream-foot {
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+/* ---------- 9. 离线 HTML 站点独立预览外框 ---------- */
+.offline-chrome {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-2);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-xs);
+}
+.url-bar {
+  flex: 1;
+  max-width: 680px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  color: var(--sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 模板卡片与二级页签 */
+.sub-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+.sub-tab {
+  padding: 5px 13px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+  color: var(--sub);
+  font-weight: 500;
+}
+.sub-tab.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0,0,0,.16);
+}
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+.tpl-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tpl-card:hover { border-color: var(--line-3); }
+.tpl-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.tpl-chip {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--sub);
+}
+.tpl-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 9px;
+}
+.tpl-opt {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 11px 12px;
+  text-align: left;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: border-color .15s, background .15s;
+}
+.tpl-opt:hover { border-color: var(--line-3); }
+.tpl-opt.selected { border-color: var(--accent); background: var(--accent-fill); }
+.tpl-preview-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.layout-arch .arch-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.arch-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ---------- 10. 弹窗（局部重写 / 离线导出 / 模板编辑） ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  padding: 20px;
+}
+.modal {
+  width: min(520px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal h3 { font-size: 16px; font-weight: 600; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; }
+.toast {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--raised);
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow-pop);
+  z-index: 80;
+}
+
+@media (max-width: 1120px) {
+  .app-sidebar { width: 176px; }
+  .wb-body { grid-template-columns: 220px minmax(0, 1fr) 280px; }
+}
+@media (max-width: 880px) {
+  .app-sidebar { display: none; }
+  .wb-body { grid-template-columns: 200px minmax(0, 1fr) 0px; }
+  .wb-right { display: none; }
+  .depth-grid { grid-template-columns: 1fr; }
+  .outline-row { grid-template-columns: 24px 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- 原型导航演示控制条 -->
+<div class="proto-bar">
+  <span class="proto-tag">docs/44 前端设计稿</span>
+  <div class="proto-tabs" id="protoTabs">
+    <button class="proto-tab" data-view="list">1. 设计列表 /designs</button>
+    <button class="proto-tab" data-view="templates">2. 模板库（内置 + 自定义）</button>
+    <button class="proto-tab" data-view="new">3. 新建配置 /designs/new</button>
+    <button class="proto-tab" data-view="outline">4. 扫描与大纲确认</button>
+    <button class="proto-tab active" data-view="workbench">5. 三栏工作台（生成 / 阅读）</button>
+    <button class="proto-tab" data-view="offline">6. 导出的离线 HTML 站点</button>
+  </div>
+  <div class="proto-right">
+    <label for="themeSelect" class="sub">主题</label>
+    <select id="themeSelect" class="proto-select">
+      <option value="default">Default（深色）</option>
+      <option value="claude">Claude Code（暖浅）</option>
+      <option value="codex">Codex（白净）</option>
+    </select>
+  </div>
+</div>
+
+<!-- 主应用外框（第 5 视图隐藏应用侧栏，模拟独立浏览器打开 file://） -->
+<div class="app-shell">
+  <aside class="app-sidebar" id="appSidebar" aria-label="主导航">
+    <div class="brand-row">
+      <div class="brand-dot">AW</div>
+      <span>Agent Workflow</span>
+    </div>
+    <button class="nav-item" onclick="toast('应用既有页面：主页')">主页</button>
+    <button class="nav-item" onclick="toast('应用既有页面：任务')">任务</button>
+    <button class="nav-item" onclick="toast('项目详情页内提供「项目设计」快捷入口（简单模式也可直接进）')">项目</button>
+    <button class="nav-item" onclick="toast('应用既有页面：知识问答')">知识问答</button>
+    <button class="nav-item" onclick="toast('应用既有页面：记忆')">记忆</button>
+    <button class="nav-item" onclick="toast('应用既有页面：技能')">技能</button>
+
+    <div class="nav-sep"><span>专业工具</span><span class="mono">PRO</span></div>
+    <button class="nav-item" onclick="toast('应用既有页面：PPT')">PPT</button>
+    <button class="nav-item active" onclick="switchView('list')">
+      <span>项目设计</span>
+      <span class="nav-badge">新</span>
+    </button>
+    <button class="nav-item" onclick="toast('应用既有页面：质量与用量')">质量与用量</button>
+    <button class="nav-item" onclick="toast('应用既有页面：团队')">团队</button>
+    <button class="nav-item" onclick="toast('应用既有页面：Git')">Git</button>
+    <button class="nav-item" onclick="toast('应用既有页面：流程（含面向单次需求的「详细设计」流程）')">流程</button>
+
+    <div class="nav-bottom">
+      <button class="nav-item" onclick="toast('应用既有页面：设置')">设置</button>
+    </div>
+  </aside>
+
+  <main class="app-main">
+    <!-- ========== 视图 1：列表页 ========== -->
+    <section id="view-list" class="page-scroll" hidden>
+      <div class="page-wrap">
+        <div class="page-head">
+          <div>
+            <h1>项目设计</h1>
+            <p>基于代码仓库现状生成结构化架构文档、调用关系与业务流程，支持随时局部重写并导出离线 HTML 站点。</p>
+          </div>
+          <button class="btn primary" onclick="switchView('new')">＋ 新建项目设计</button>
+        </div>
+        <div class="sub-tabs">
+          <button class="sub-tab active" onclick="switchView('list')">全部设计（3）</button>
+          <button class="sub-tab" onclick="switchView('templates')">模板库（内置 5 + 自定义）</button>
+        </div>
+        <div class="toolbar-row">
+          <input class="input" style="width:260px" placeholder="搜索设计标题…" oninput="filterList(this.value)">
+          <select class="select" onchange="filterListProject(this.value)">
+            <option value="">全部项目</option>
+            <option value="order-platform">order-platform</option>
+            <option value="agent-workflow">agent-workflow</option>
+          </select>
+          <span class="sub" style="font-size:12px;margin-left:auto">简单模式用户也可在「项目详情页」直接进入</span>
+        </div>
+        <div class="design-grid" id="designGrid"></div>
+      </div>
+    </section>
+
+    <!-- ========== 视图 1b：模板库（内置 + 自定义） ========== -->
+    <section id="view-templates" class="page-scroll" hidden>
+      <div class="page-wrap">
+        <div class="page-head">
+          <div>
+            <h1>项目设计 · 模板库</h1>
+            <p>分析模板决定「默认章节蓝图」与「AI 分析侧重指引」，内置模板只读，可一键复制为自定义模板；阅读风格与主题可随时零 AI 切换。</p>
+          </div>
+          <button class="btn primary" onclick="openTemplateModal('general', true)">＋ 基于模板新建自定义</button>
+        </div>
+        <div class="sub-tabs">
+          <button class="sub-tab" onclick="switchView('list')">全部设计（3）</button>
+          <button class="sub-tab active" onclick="switchView('templates')">模板库</button>
+        </div>
+        <div class="tpl-grid" id="templateLibraryGrid"></div>
+
+        <div class="block-card" style="margin-top:20px">
+          <h3>
+            <span>阅读风格与视觉主题（与分析模板正交 · 切换零 AI 调用）</span>
+            <span class="pill ok">模型复用 · 即时重渲染</span>
+          </h3>
+          <div class="depth-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button type="button" class="depth-opt" id="tplStyleDoc" onclick="setLayoutStyle('doc'); toast('已切换为「技术文档」阅读风格')">
+              <strong>技术文档（默认）</strong>
+              <span>正文说明、代码摘录、接口表与结构图按阅读顺序均衡排布，适合深入研读与离线归档。</span>
+            </button>
+            <button type="button" class="depth-opt" id="tplStyleArch" onclick="setLayoutStyle('arch'); toast('已切换为「架构图谱优先」阅读风格')">
+              <strong>架构图谱优先</strong>
+              <span>模块指标卡与交互式架构/调用/流程图置顶展示，正文收拢在下方，适合新人导览与架构评审。</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 视图 2：新建配置 ========== -->
+    <section id="view-new" class="page-scroll" hidden>
+      <div class="page-wrap">
+        <div class="page-head">
+          <div>
+            <h1>新建项目设计</h1>
+            <p>先执行纯程序目录扫描（零 AI 调用），按所选分析模板生成初始章节大纲，确认后再由 AI 逐章读取源码。</p>
+          </div>
+          <button class="btn" onclick="switchView('list')">返回列表</button>
+        </div>
+        <div class="form-card" style="max-width:860px">
+          <div class="field">
+            <label class="field-label">目标项目</label>
+            <select class="select" id="newProjectSelect" onchange="onProjectChange(this.value)">
+              <option value="order-platform">order-platform（TypeScript · Fastify · PostgreSQL）</option>
+              <option value="mall-java-service">mall-java-service（Java 21 · Spring Boot · MyBatis）</option>
+              <option value="shop-react-web">shop-react-web（React 19 · Vite · TanStack Query）</option>
+              <option value="agent-workflow">agent-workflow（Electron · React · Fastify · MCP / Agent）</option>
+            </select>
+            <span class="field-hint">切换项目时自动按仓库技术栈推荐最匹配的分析模板，可手动覆盖；全程只读不修改主工作区。</span>
+          </div>
+
+          <div class="field">
+            <label class="field-label">
+              <span>分析模板</span>
+              <span class="pill ok" id="autoMatchBadge">已自动识别推荐</span>
+              <button type="button" class="btn sm ghost" style="margin-left:auto" onclick="switchView('templates')">管理模板库 →</button>
+            </label>
+            <div class="tpl-picker-grid" id="newTemplateGrid"></div>
+            <div class="tpl-preview-box" id="newTemplatePreview"></div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">分析深度</label>
+            <div class="depth-grid" id="depthGrid">
+              <button type="button" class="depth-opt" data-depth="quick" onclick="selectDepth('quick')">
+                <strong>快速</strong>
+                <span>项目总览、分层架构与模块职责，适合快速摸底（Token 消耗最低）</span>
+              </button>
+              <button type="button" class="depth-opt selected" data-depth="standard" onclick="selectDepth('standard')">
+                <strong>标准（推荐）</strong>
+                <span>含目录结构、关键文件职责、核心方法签名、调用图与主业务流程</span>
+              </button>
+              <button type="button" class="depth-opt" data-depth="deep" onclick="selectDepth('deep')">
+                <strong>深度</strong>
+                <span>方法级细节、异常处理、并发与事务边界，默认开启独立 AI 复审</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">阅读风格与视觉主题（随时可换，零 AI 成本）</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <button type="button" class="btn sm" id="newStyleDoc" onclick="setLayoutStyle('doc')">◉ 技术文档（默认）</button>
+              <button type="button" class="btn sm" id="newStyleArch" onclick="setLayoutStyle('arch')">○ 架构图谱优先</button>
+              <span class="sub" style="font-size:12px;margin-left:auto">主题</span>
+              <select class="select" style="height:29px;padding:2px 8px" onchange="document.documentElement.dataset.theme=this.value;document.getElementById('themeSelect').value=this.value">
+                <option value="default">Default（深色）</option>
+                <option value="claude">Claude Code（暖浅）</option>
+                <option value="codex">Codex（白净）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">排除规则</label>
+            <div class="field-hint">内置自动排除：<span class="mono">.git/</span>、<span class="mono">node_modules/</span>、<span class="mono">dist/</span>、<span class="mono">.env*</span>、<span class="mono">*.pem / *.key</span>、锁文件与二进制文件。</div>
+            <input class="input mono" value="fixtures/**, scripts/legacy/**" placeholder="可选：额外排除 glob，逗号分隔">
+          </div>
+
+          <label class="check-line">
+            <input type="checkbox" id="aiReviewCheck">
+            <div>
+              <div style="font-size:13.5px;font-weight:600">生成完成后运行独立 AI 复审</div>
+              <div class="field-hint">另起独立会话对照源码抽查遗漏、无依据断言和推断标签；会增加约 30% Token 消耗。无论是否开启，每次提交均会强制执行程序化路径与图端点校验。</div>
+            </div>
+          </label>
+
+          <div class="form-foot">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px">
+              <span class="sub">模型</span>
+              <select class="select">
+                <option>默认模型（deepseek-v4.1-flash）</option>
+                <option>claude-sonnet-4</option>
+                <option>gpt-5.2-codex</option>
+              </select>
+            </div>
+            <button class="btn primary" onclick="applyTemplateToOutlineAndGo()">扫描项目并按模板拟定大纲 →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 视图 3：大纲确认 ========== -->
+    <section id="view-outline" class="page-scroll" hidden>
+      <div class="page-wrap">
+        <div class="page-head">
+          <div>
+            <h1>order-platform 项目设计 · 大纲待确认</h1>
+            <p>勾选需要分析的章节并调整范围路径，确认后 AI 将按章节逐片读取源码并实时写入工作台。</p>
+          </div>
+          <span class="pill wait"><span class="dot"></span>大纲待确认</span>
+        </div>
+
+        <div class="scan-banner">
+          <div class="scan-stats">
+            <span class="pill ok">纯程序扫描 · 0.4s · 0 Token</span>
+            <span class="pill accent" id="outlineTemplatePill">模板：通用代码仓库</span>
+            <span>基线：<span class="mono">main@a1b2c3d</span></span>
+            <span>技术栈：<strong id="outlineStackText">TypeScript · Fastify · PostgreSQL · Redis</strong></span>
+            <span>可分析：<strong class="num">184</strong> 文件</span>
+            <button class="btn sm ghost" onclick="toggleSkipDrawer()">已自动排除 <span class="num">1,420</span> 项 ▾</button>
+          </div>
+          <div class="skip-drawer" id="skipDrawer" hidden>
+            <div><strong>依赖目录</strong>：node_modules/（1,286 文件）</div>
+            <div><strong>构建产物</strong>：dist/、coverage/（118 文件）</div>
+            <div><strong>敏感凭据</strong>：.env、certs/pay.pem（4 文件 · 未读取）</div>
+            <div><strong>锁文件与二进制</strong>：pnpm-lock.yaml、*.png（12 文件）</div>
+          </div>
+        </div>
+
+        <div class="outline-list" id="outlineList"></div>
+
+        <div class="outline-foot">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="addOutlineRow()">＋ 新增章节</button>
+            <button class="btn accent" onclick="simulateAiOutline()">✦ 让 AI 优化大纲（可选）</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="sub" style="font-size:12.5px" id="outlineCountHint">已选 5 章 · 覆盖 162 个文件</span>
+            <button class="btn primary" onclick="startLiveDemo()">确认大纲，开始生成 →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 视图 4：三栏工作台 ========== -->
+    <section id="view-workbench" class="wb-shell">
+      <header class="wb-header">
+        <span class="wb-title">order-platform 项目设计</span>
+        <div class="wb-meta">
+          <span class="pill accent" id="wbTemplatePill">模板：通用代码仓库</span>
+          <span class="pill" style="font-family:var(--font-mono)">main@a1b2c3d</span>
+          <span class="pill ok" id="wbStatusPill"><span class="dot"></span>5 章 · 覆盖 162 / 184 文件</span>
+        </div>
+        <div class="wb-actions">
+          <button class="btn sm" id="layoutToggleBtn" onclick="toggleLayoutStyle()">风格：技术文档</button>
+          <button class="btn sm accent" id="demoReplayBtn" onclick="startLiveDemo()">▶ 演示逐章实时生成</button>
+          <button class="btn sm" id="followBtn" onclick="toggleFollow()">跟随 AI：开</button>
+          <button class="btn sm" id="stopBtn" onclick="stopDemo()" hidden>停止</button>
+          <button class="btn sm primary" onclick="openExportModal()">导出离线 HTML</button>
+          <button class="btn sm ghost" id="toggleRightBtn" onclick="toggleRightPane()">隐藏执行栏</button>
+        </div>
+      </header>
+
+      <div class="wb-body" id="wbBody">
+        <!-- 左栏：目录与全局搜索 -->
+        <aside class="wb-left">
+          <div class="search-box">
+            <span class="search-ico">⌕</span>
+            <input class="input" id="globalSearch" placeholder="搜索章节、路径、符号（如 refund）" oninput="runSearch(this.value)">
+          </div>
+          <div class="search-results" id="searchResults" hidden></div>
+          <div class="toc-scroll" id="tocList"></div>
+          <div class="toc-foot">
+            <span>结构校验：全部通过</span>
+            <span class="num" id="coverageFoot">覆盖率 88%</span>
+          </div>
+        </aside>
+
+        <!-- 中栏：实时阅读与交互下钻 -->
+        <div class="wb-center" id="wbCenter" onscroll="onReaderScroll()">
+          <div class="reader-wrap" id="readerContent"></div>
+        </div>
+
+        <!-- 右栏：复用 ConversationStream -->
+        <aside class="wb-right">
+          <div class="stream-head">
+            <div class="stream-head-row">
+              <strong style="font-size:13px">AI 执行过程</strong>
+              <span class="pill run" id="streamBadge"><span class="dot"></span>已完成 5 / 5</span>
+            </div>
+            <div style="font-size:11.5px;color:var(--sub)" id="streamSubtitle">
+              agent: <span class="mono">aw-designer</span>（只读）· 复用 ConversationStream
+            </div>
+          </div>
+          <div class="stream-scroll" id="streamLog"></div>
+          <div class="stream-foot">
+            <span id="streamTokens" class="num">本轮用量：42.8k tokens</span>
+            <button class="btn sm ghost" onclick="openReviseModal()">重写当前章</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ========== 视图 5：导出的离线 HTML 站点 ========== -->
+    <section id="view-offline" class="wb-shell" hidden>
+      <div class="offline-chrome">
+        <span class="pill ok">离线模式 · 零网络请求</span>
+        <div class="url-bar">file:///Users/alice/共享资料/订单平台设计/index.html#sec-architecture</div>
+        <span class="pill">无 Agent Workflow 依赖</span>
+        <button class="btn sm" onclick="switchView('workbench')">回到工作台</button>
+      </div>
+      <div class="wb-body right-collapsed" style="grid-template-columns: 262px minmax(0, 1fr);">
+        <aside class="wb-left">
+          <div class="search-box">
+            <span class="search-ico">⌕</span>
+            <input class="input" id="offlineSearch" placeholder="离线全文检索（design-data.js）" oninput="runOfflineSearch(this.value)">
+          </div>
+          <div class="search-results" id="offlineSearchResults" hidden></div>
+          <div class="toc-scroll" id="offlineToc"></div>
+          <div class="toc-foot">
+            <span>基线 <span class="mono">a1b2c3d</span></span>
+            <span>导出于 2026-11-25</span>
+          </div>
+        </aside>
+        <div class="wb-center">
+          <div class="reader-wrap" id="offlineReader"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 弹窗：局部重写 -->
+<div class="modal-backdrop" id="reviseModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>让 AI 重写本章节</h3>
+    <div style="font-size:12.5px;color:var(--sub)">
+      目标章节：<strong id="reviseTargetTitle" style="color:var(--ink)"></strong> · 仅重读该章范围源码，覆盖前自动保留上一版以供一键恢复。
+    </div>
+    <textarea class="textarea" id="reviseInput" rows="3" placeholder="例如：补充退款超时后的补偿定时任务链路，并标注幂等键所在代码行">补充退款失败后的异步补偿逻辑与幂等键位置，并在流程图中标出异常分支。</textarea>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModals()">取消</button>
+      <button class="btn primary" onclick="confirmRevise()">开始局部重写</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：导出离线 HTML -->
+<div class="modal-backdrop" id="exportModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>导出离线 HTML 站点</h3>
+    <div class="field">
+      <label class="field-label">导出目录（单版自包含，不生成 versions/ 历史树）</label>
+      <div style="display:flex;gap:8px">
+        <input class="input mono" style="flex:1" id="exportDirInput" value="/Users/dev/order-platform/docs/project-design-site">
+        <button class="btn" onclick="toast('桌面版调用系统目录选择框')">选择…</button>
+      </div>
+      <span class="field-hint">将写出 <span class="mono">index.html</span>、<span class="mono">design-data.js</span>、<span class="mono">design-model.json</span> 与 <span class="mono">assets/</span>；不执行任何 Git 操作。</span>
+    </div>
+    <div class="callout info">
+      <strong>安全校验与防误覆盖</strong>
+      <span>后端先在同级临时目录渲染并校验链接与数据完整性，再整体替换；若目录中存在非本工具生成的未知文件，将中断并提示更换目录。</span>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModals()">取消</button>
+      <button class="btn primary" onclick="confirmExport()">导出并预览离线站点</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：模板编辑（复制内置 / 编辑自定义） -->
+<div class="modal-backdrop" id="templateModal" hidden>
+  <div class="modal" style="width:min(580px,100%)" role="dialog" aria-modal="true">
+    <h3 id="tplModalTitle">复制为自定义分析模板</h3>
+    <div class="field">
+      <label class="field-label">模板名称</label>
+      <input class="input" id="tplNameInput" placeholder="例如：团队 Java 微服务规范">
+    </div>
+    <div class="field">
+      <label class="field-label">适用范围说明</label>
+      <input class="input" id="tplDescInput" placeholder="一句话说明适用哪类项目">
+    </div>
+    <div class="field">
+      <label class="field-label">预设章节蓝图（每行一章：类型 | 章节名 | 路径提示）</label>
+      <textarea class="textarea mono" id="tplSectionsInput" rows="5" style="font-size:12px"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label">AI 分析侧重指引（注入给 aw-designer，不开放任意脚本）</label>
+      <textarea class="textarea" id="tplPromptInput" rows="3"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModals()">取消</button>
+      <button class="btn primary" onclick="saveCustomTemplate()">保存自定义模板</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl" hidden></div>
+
+<script>
+/* ---------- 合成数据 ---------- */
+/* ---------- 分析模板库（内置 5 套 + 自定义示例） ---------- */
+let TEMPLATES = [
+  {
+    key: 'general',
+    kind: 'builtin',
+    name: '通用代码仓库',
+    desc: '兜底通用模板，适用于任意语言与结构的仓库，梳理架构、模块职责与主调用链。',
+    hints: ['默认兜底', '任意语言'],
+    focus: '重点识别启动入口、顶层模块依赖方向、核心类/函数签名及关键业务流程，每条静态关系必须附带源码行号。',
+    sections: [
+      { kind: '总览', title: '项目总览', scope: 'package.json, src/index.ts', files: 6 },
+      { kind: '架构', title: '系统架构与分层依赖', scope: 'src/api/, src/domain/, src/infra/', files: 24 },
+      { kind: '模块', title: '模块：订单与退款服务', scope: 'src/domain/orders/', files: 52 },
+      { kind: '模块', title: '模块：支付网关与对账', scope: 'src/domain/payment/', files: 46 },
+      { kind: '流程', title: '核心业务流程与异常路径', scope: 'src/domain/orders/, src/jobs/', files: 34 },
+    ],
+  },
+  {
+    key: 'java_backend',
+    kind: 'builtin',
+    name: 'Java / Spring 后端',
+    desc: '面向 Spring Boot / MyBatis / JPA 服务，聚焦三层边界、事务传播、SQL 与 REST API 契约。',
+    hints: ['pom.xml', 'build.gradle', '@RestController'],
+    focus: '重点梳理 Controller → Service → DAO/Mapper 调用链、@Transactional 事务边界与回滚条件、核心表结构与对外接口参数/异常码表。',
+    sections: [
+      { kind: '总览', title: '服务定位与配置基线', scope: 'pom.xml, application*.yml', files: 8 },
+      { kind: '架构', title: '分层架构（Controller / Service / DAO）', scope: 'src/main/java/**/controller/, service/', files: 36 },
+      { kind: '模块', title: '事务边界与并发控制', scope: 'src/main/java/**/service/', files: 42 },
+      { kind: '模块', title: '数据模型与 SQL / Mapper 映射', scope: 'src/main/resources/mapper/, entity/', files: 38 },
+      { kind: '流程', title: '对外 REST API 契约与异常码', scope: 'src/main/java/**/controller/, exception/', files: 28 },
+    ],
+  },
+  {
+    key: 'react_frontend',
+    kind: 'builtin',
+    name: 'React / Web 前端',
+    desc: '面向 React / Vite / Next.js 应用，聚焦路由树、页面与组件层次、状态与接口数据流。',
+    hints: ['react', 'vite.config', 'router'],
+    focus: '重点绘制页面路由树、服务端状态（Query/Store）与 UI 状态边界、公共组件复用关系及 API 客户端错误处理。',
+    sections: [
+      { kind: '总览', title: '前端工程与构建配置', scope: 'package.json, vite.config.ts', files: 6 },
+      { kind: '架构', title: '路由表与布局外壳架构', scope: 'src/app/, src/routes/', files: 18 },
+      { kind: '模块', title: '状态管理与服务端数据流', scope: 'src/api/, src/stores/', files: 28 },
+      { kind: '模块', title: '核心业务页面与公共组件', scope: 'src/features/, src/components/', files: 64 },
+      { kind: '流程', title: '关键用户交互与异步状态流转', scope: 'src/features/checkout/', files: 22 },
+    ],
+  },
+  {
+    key: 'fullstack',
+    kind: 'builtin',
+    name: '全栈应用（Monorepo）',
+    desc: '面向前后端同仓或 Monorepo 项目，梳理跨端共享契约、API 边界、数据库与部署拓扑。',
+    hints: ['pnpm-workspace', 'apps/ + packages/'],
+    focus: '重点追踪 shared 契约包如何连接前后端、前后端鉴权与通信通道（REST/SSE/WS）、数据库迁移与进程启动拓扑。',
+    sections: [
+      { kind: '总览', title: 'Monorepo 拓扑与运行进程', scope: 'pnpm-workspace.yaml, apps/, packages/', files: 12 },
+      { kind: '架构', title: '前后端通信与共享契约（shared）', scope: 'packages/shared/src/', files: 34 },
+      { kind: '模块', title: '后端服务模块与数据持久化', scope: 'packages/server/src/', files: 68 },
+      { kind: '模块', title: '前端交互工作台与状态层', scope: 'apps/web/src/', files: 56 },
+      { kind: '流程', title: '端到端核心业务链路', scope: 'apps/web/src/, packages/server/src/', files: 30 },
+    ],
+  },
+  {
+    key: 'ai_agent',
+    kind: 'builtin',
+    name: 'AI Agent / 工具链',
+    desc: '面向 Agent 编排与 MCP 工程，梳理会话生命周期、角色提示词、工具白名单与安全沙箱。',
+    hints: ['mcp', 'prompts/', 'opencode / agent'],
+    focus: '重点梳理 Agent 角色与提示词组装、会话调度与并发槽位、MCP 工具输入校验与风险分级、沙箱与外部权限隔离边界。',
+    sections: [
+      { kind: '总览', title: 'Agent 架构与进程拓扑', scope: 'packages/server/src/modules/opencode/', files: 16 },
+      { kind: '架构', title: '会话调度、状态机与并发槽位', scope: 'packages/server/src/modules/attempts/, scheduler/', files: 32 },
+      { kind: '模块', title: '内置角色与提示词体系', scope: 'packages/builtin/', files: 28 },
+      { kind: '模块', title: 'MCP 工具清单与权限隔离边界', scope: 'packages/server/src/modules/mcp/', files: 36 },
+      { kind: '流程', title: '任务执行、提问中断与验收闭环', scope: 'packages/server/src/modules/tasks/', files: 40 },
+    ],
+  },
+  {
+    key: 'custom_fintech_v1',
+    kind: 'custom',
+    name: '金融支付微服务规范（自定义）',
+    desc: '基于 Java 后端模板复制，额外要求核对资金幂等键、对账差异表与审计日志字段。',
+    hints: ['手动选择', '团队规范'],
+    focus: '除常规三层架构外，必须逐项列出所有动账接口的幂等键来源、分布式锁超时策略、异步补偿任务与审计落库位置。',
+    sections: [
+      { kind: '总览', title: '支付域定位与合规红线', scope: 'pom.xml, docs/spec/', files: 8 },
+      { kind: '架构', title: '动账链路与幂等保障架构', scope: 'src/main/java/**/payment/', files: 34 },
+      { kind: '模块', title: '账本事务、冻结与解冻状态机', scope: 'src/main/java/**/ledger/', files: 44 },
+      { kind: '流程', title: 'T+1 渠道对账与差错补偿流程', scope: 'src/main/java/**/reconcile/', files: 28 },
+    ],
+  },
+];
+
+const PROJECT_PRESETS = {
+  'order-platform': { stack: 'TypeScript · Fastify · PostgreSQL · Redis', recommended: 'general' },
+  'mall-java-service': { stack: 'Java 21 · Spring Boot 3 · MyBatis · MySQL', recommended: 'java_backend' },
+  'shop-react-web': { stack: 'React 19 · Vite 8 · TanStack Query · Zustand', recommended: 'react_frontend' },
+  'agent-workflow': { stack: 'Electron · React · Fastify · SQLite · MCP', recommended: 'ai_agent' },
+};
+
+const LIST_DESIGNS = [
+  {
+    id: 'order-platform',
+    title: 'order-platform 项目设计',
+    project: 'order-platform',
+    templateName: '通用代码仓库',
+    branch: 'main@a1b2c3d',
+    status: 'ready',
+    statusText: '5 章 · 覆盖 162 / 184 文件',
+    pct: 88,
+    depth: '标准',
+    updated: '刚刚',
+  },
+  {
+    id: 'agent-workflow',
+    title: 'agent-workflow 项目设计',
+    project: 'agent-workflow',
+    templateName: 'AI Agent / 工具链',
+    branch: 'main@7f41e09',
+    status: 'incomplete',
+    statusText: '还有 2 章未完成',
+    pct: 66,
+    depth: '深度（含复审）',
+    updated: '2 小时前',
+  },
+  {
+    id: 'order-quick',
+    title: 'order-platform 快速摸底',
+    project: 'order-platform',
+    templateName: '金融支付微服务规范',
+    branch: 'release/2.4@99d01a2',
+    status: 'outline_ready',
+    statusText: '大纲待确认',
+    pct: 0,
+    depth: '快速',
+    updated: '昨天',
+  },
+];
+
+let outlineItems = [
+  { id: 'overview', kind: '总览', title: '项目总览', scope: 'package.json, src/index.ts', files: 6, checked: true },
+  { id: 'architecture', kind: '架构', title: '系统架构与分层依赖', scope: 'src/api/, src/domain/, src/infra/', files: 24, checked: true },
+  { id: 'mod-order', kind: '模块', title: '模块：订单与退款服务', scope: 'src/domain/orders/', files: 52, checked: true },
+  { id: 'mod-payment', kind: '模块', title: '模块：支付网关与对账', scope: 'src/domain/payment/', files: 46, checked: true },
+  { id: 'flow-refund', kind: '流程', title: '核心业务流程与异常路径', scope: 'src/domain/orders/, src/jobs/', files: 34, checked: true },
+  { id: 'mod-admin', kind: '模块', title: '模块：运营后台报表（可选）', scope: 'src/admin/reports/', files: 22, checked: false },
+];
+
+const SECTIONS = [
+  {
+    id: 'overview',
+    title: '1. 项目总览',
+    kind: 'overview',
+    reviewState: 'passed',
+    summary: 'order-platform 是面向电商履约的订单与结算后端服务，采用 Fastify + TypeScript 分层架构，围绕订单状态机、幂等支付与异步退款构建核心能力。',
+    blocks: [
+      {
+        type: 'markdown',
+        title: '系统定位与启动入口',
+        body: '服务以单一 HTTP 进程承载外部下单 API、支付回调 Webhook 与后台对账任务。启动入口位于 src/index.ts，按顺序完成环境变量校验、PostgreSQL 连接池初始化、Redis 分布式锁客户端创建以及路由注册。',
+        evidence: [
+          { cls: 'static', label: '静态确认', path: 'src/index.ts:14-48' },
+          { cls: 'static', label: '静态确认', path: 'src/app.ts:22-71' },
+        ],
+      },
+      {
+        type: 'table',
+        title: '核心技术栈与运行依赖',
+        columns: ['层级', '组件 / 库', '职责说明'],
+        rows: [
+          ['接口层', 'Fastify 5 + Zod', 'REST API 路由、输入 Schema 校验与统一错误映射'],
+          ['领域层', 'Pure TypeScript', '订单状态机、库存扣减编排、退款资格判定'],
+          ['持久层', 'PostgreSQL + Drizzle', '订单主表、流水账本与事务性 Outbox 事件表'],
+          ['异步协作', 'Redis + BullMQ', '支付回调幂等锁、超时关单与退款重试队列'],
+        ],
+      },
+    ],
+    files: [
+      {
+        path: 'src/index.ts',
+        desc: '进程引导入口、优雅停机钩子与信号处理',
+        symbols: [
+          { name: 'bootstrap', sig: 'async function bootstrap(): Promise<void>', lines: '14-48', desc: '组装数据库连接、Fastify 实例并监听 8080 端口。', callers: ['CLI 启动'], callees: ['createApp', 'initDbPool'] },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'architecture',
+    title: '2. 系统架构与分层依赖',
+    kind: 'architecture',
+    reviewState: 'passed',
+    summary: '项目采用严格的四层单向依赖（API → Domain → Repository / Gateway），跨域异步解耦通过 Outbox 表与事件总线实现。点击下方架构节点可直接下钻对应模块。',
+    diagram: {
+      kind: 'architecture',
+      title: '分层架构与模块依赖图（点击节点下钻）',
+      nodes: [
+        { id: 'n-api', x: 250, y: 20, w: 200, h: 48, label: 'HTTP / Webhook API', sub: 'src/api/routes/*', target: 'overview' },
+        { id: 'n-order', x: 60, y: 118, w: 210, h: 54, label: '订单与退款服务', sub: 'src/domain/orders/', target: 'mod-order', highlight: true },
+        { id: 'n-pay', x: 430, y: 118, w: 210, h: 54, label: '支付网关与对账', sub: 'src/domain/payment/', target: 'mod-payment' },
+        { id: 'n-db', x: 60, y: 222, w: 210, h: 48, label: 'PostgreSQL + Outbox', sub: 'src/infra/db/', target: 'mod-order' },
+        { id: 'n-mq', x: 430, y: 222, w: 210, h: 48, label: '事件队列 / 重试作业', sub: 'src/jobs/refund-worker.ts', target: 'flow-refund' },
+      ],
+      edges: [
+        { from: 'n-api', to: 'n-order', label: '创建/取消/退款', cls: 'static', path: 'src/api/orders.route.ts:38' },
+        { from: 'n-api', to: 'n-pay', label: '接收支付回调', cls: 'static', path: 'src/api/webhooks.route.ts:19' },
+        { from: 'n-order', to: 'n-pay', label: '发起原路退回', cls: 'static', path: 'src/domain/orders/refund.service.ts:64' },
+        { from: 'n-order', to: 'n-db', label: '事务写订单+Outbox', cls: 'static', path: 'src/domain/orders/order.repo.ts:91' },
+        { from: 'n-pay', to: 'n-mq', label: '事件派发 refund.retry', cls: 'inferred', path: '动态订阅（EventBus 按字符串事件名注册）' },
+      ],
+    },
+    blocks: [
+      {
+        type: 'callout',
+        tone: 'info',
+        title: '关于动态事件分派的证据说明',
+        body: '支付网关与退款重试作业之间通过 EventBus 字符串主题（"refund.retry"）解耦，无法仅靠静态导入追踪完整消费方，已在关系图中标注为「AI 推断」并附订阅注册位置说明。',
+      },
+    ],
+    files: [],
+  },
+  {
+    id: 'mod-order',
+    title: '3. 模块：订单与退款服务',
+    kind: 'module',
+    reviewState: 'needs_attention',
+    reviewNote: '独立复审提示：refundOrder() 在外部支付网关超时返回 504 时仅记录 warn，建议确认是否已进入补偿队列（见 src/domain/orders/refund.service.ts:88）。',
+    summary: '承载订单生命周期状态机、幂等创建与退款编排；所有状态跃迁受 order.machine.ts 单一转换表约束。',
+    blocks: [
+      {
+        type: 'markdown',
+        title: '模块职责与不变式',
+        body: '订单主表禁止直接更新 status 字段，必须经由 transitionOrder() 校验合法转换并同事务写入 order_events 审计流水。退款采用两阶段提交：先本地落库 REFUND_PENDING，再调用支付网关，避免网络抖动导致重复退款。',
+        evidence: [
+          { cls: 'static', label: '静态确认', path: 'src/domain/orders/order.machine.ts:11-44' },
+          { cls: 'static', label: '静态确认', path: 'src/domain/orders/refund.service.ts:42-96' },
+        ],
+      },
+      {
+        type: 'code',
+        title: '关键实现摘录 · src/domain/orders/refund.service.ts:61-74',
+        code: `async function refundOrder(orderId: string, reason: string, idempotencyKey: string) {\n  return db.transaction(async (tx) => {\n    const order = await orderRepo.lockForUpdate(tx, orderId);\n    assertTransition(order.status, 'REFUND_PENDING');\n    await refundRepo.insertPending(tx, { orderId, idempotencyKey, reason });\n    return paymentGateway.requestRefund({ orderId, amount: order.paidCents, idempotencyKey });\n  });\n}`,
+      },
+    ],
+    files: [
+      {
+        path: 'src/domain/orders/refund.service.ts',
+        desc: '退款编排、幂等键校验与支付网关调用',
+        symbols: [
+          { name: 'refundOrder', sig: 'async function refundOrder(orderId: string, reason: string, idempotencyKey: string): Promise<RefundResult>', lines: '42-96', desc: '加行锁校验可退余额，生成待退单并调用支付网关原路退回；网关超时会抛出 GatewayTimeoutError。', callers: ['orders.route.ts:POST /refund'], callees: ['orderRepo.lockForUpdate', 'paymentGateway.requestRefund'] },
+          { name: 'reconcilePendingRefund', sig: 'async function reconcilePendingRefund(refundId: string): Promise<void>', lines: '102-138', desc: '由补偿任务调用，查询上游渠道终态并推进本地退款单状态。', callers: ['refund-worker.ts'], callees: ['paymentGateway.queryRefund'] },
+        ],
+      },
+      {
+        path: 'src/domain/orders/order.machine.ts',
+        desc: '订单状态转换白名单与非法转换异常',
+        symbols: [
+          { name: 'assertTransition', sig: 'function assertTransition(from: OrderStatus, to: OrderStatus): void', lines: '24-39', desc: '校验状态转换是否合法，非法时抛出 ORDER_INVALID_STATE。', callers: ['order.service.ts', 'refund.service.ts'], callees: [] },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'mod-payment',
+    title: '4. 模块：支付网关与对账',
+    kind: 'module',
+    reviewState: 'passed',
+    summary: '封装第三方支付渠道签名校验、统一响应适配与 T+1 账单对账任务，隔离渠道差异。',
+    blocks: [
+      {
+        type: 'markdown',
+        title: '渠道适配与防重放',
+        body: '所有 Webhook 回调在进入领域层前，先经过 HMAC-SHA256 验签与 5 分钟时间戳窗口校验，并基于 Redis SETNX 锁定渠道交易号防止并发重复入账。',
+        evidence: [
+          { cls: 'static', label: '静态确认', path: 'src/domain/payment/webhook.verifier.ts:18-55' },
+        ],
+      },
+    ],
+    files: [
+      {
+        path: 'src/domain/payment/payment.gateway.ts',
+        desc: '支付与退款统一网关接口实现',
+        symbols: [
+          { name: 'requestRefund', sig: 'async function requestRefund(req: RefundReq): Promise<GatewayReceipt>', lines: '54-92', desc: '透传幂等键请求上游退款接口，超时上限 8 秒。', callers: ['refund.service.ts'], callees: ['httpClient.post'] },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'flow-refund',
+    title: '5. 核心业务流程与异常路径',
+    kind: 'flow',
+    reviewState: 'passed',
+    summary: '展示用户发起退款后的主路径、网关超时分支与补偿闭环；点击任意流程步骤可定位到实现文件。',
+    diagram: {
+      kind: 'business_flow',
+      title: '退款主链路与超时异常分支（点击步骤跳转）',
+      nodes: [
+        { id: 'f1', x: 30, y: 80, w: 135, h: 48, label: '1. 接收退款请求', sub: '校验幂等键', target: 'mod-order' },
+        { id: 'f2', x: 205, y: 80, w: 145, h: 48, label: '2. 事务落库待退', sub: 'REFUND_PENDING', target: 'mod-order' },
+        { id: 'f3', x: 390, y: 80, w: 145, h: 48, label: '3. 调支付网关', sub: '8s 超时上限', target: 'mod-payment' },
+        { id: 'f4', x: 575, y: 32, w: 130, h: 46, label: '4a. 退款成功', sub: '更新 REFUNDED', target: 'mod-order', ok: true },
+        { id: 'f5', x: 575, y: 128, w: 130, h: 48, label: '4b. 网关超时', sub: '入补偿队列重试', target: 'mod-order', warn: true },
+      ],
+      edges: [
+        { from: 'f1', to: 'f2', label: '校验通过', cls: 'static', path: 'src/domain/orders/refund.service.ts:48' },
+        { from: 'f2', to: 'f3', label: '事务提交后', cls: 'static', path: 'src/domain/orders/refund.service.ts:68' },
+        { from: 'f3', to: 'f4', label: '200 OK', cls: 'static', path: 'src/domain/orders/refund.service.ts:75' },
+        { from: 'f3', to: 'f5', label: '504 / 超时', cls: 'inferred', path: '经 refund-worker 定时轮询兜底' },
+      ],
+    },
+    blocks: [
+      {
+        type: 'markdown',
+        title: '异常与幂等保障总结',
+        body: '客户端重试携带相同 idempotencyKey 时，直接返回已创建的退款单状态；若网关侧返回 504 未知结果，本地保持 REFUND_PENDING 并交由 reconcilePendingRefund 定时反查上游，确保不会错误回滚已扣款退款。',
+        evidence: [
+          { cls: 'static', label: '静态确认', path: 'src/jobs/refund-worker.ts:27-64' },
+        ],
+      },
+    ],
+    files: [],
+  },
+];
+
+/* ---------- 应用状态 ---------- */
+let currentView = 'workbench';
+let activeSectionId = 'architecture';
+let selectedFilePath = null;
+let selectedTemplateKey = 'general';
+let recommendedTemplateKey = 'general';
+let layoutStyle = 'doc'; // 'doc' | 'arch'
+let editingTemplateKey = null; // null = copy/create new, string = edit existing custom
+let followAi = true;
+let rightCollapsed = false;
+let generatedCount = SECTIONS.length; // 5 = 全部已生成；演示时从 0 逐步增长
+let isRunningDemo = false;
+let demoTimers = [];
+let revisedBackup = {}; // sectionId -> backup summary/blocks
+let listQuery = '';
+let listProject = '';
+
+/* ---------- 视图与主题切换 ---------- */
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.proto-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  ['list', 'templates', 'new', 'outline', 'workbench', 'offline'].forEach(v => {
+    document.getElementById('view-' + v).hidden = v !== view;
+  });
+  document.getElementById('appSidebar').hidden = (view === 'offline');
+  if (view === 'list') renderList();
+  if (view === 'templates') renderTemplateLibrary();
+  if (view === 'new') renderNewTemplatePicker();
+  if (view === 'outline') renderOutline();
+  if (view === 'workbench') renderWorkbench();
+  if (view === 'offline') renderOffline();
+}
+
+document.getElementById('protoTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.proto-tab');
+  if (btn) switchView(btn.dataset.view);
+});
+
+document.getElementById('themeSelect').addEventListener('change', (e) => {
+  document.documentElement.dataset.theme = e.target.value;
+});
+
+/* ---------- 1. 列表渲染 ---------- */
+function filterList(q) { listQuery = q.trim().toLowerCase(); renderList(); }
+function filterListProject(p) { listProject = p; renderList(); }
+
+function renderList() {
+  const grid = document.getElementById('designGrid');
+  const items = LIST_DESIGNS.filter(d =>
+    (!listQuery || d.title.toLowerCase().includes(listQuery)) &&
+    (!listProject || d.project === listProject)
+  );
+  grid.innerHTML = items.map(d => {
+    const tone = d.status === 'ready' ? 'ok' : d.status === 'incomplete' ? 'warn' : 'wait';
+    const target = d.status === 'outline_ready' ? 'outline' : 'workbench';
+    return `
+      <button class="design-card" onclick="switchView('${target}')">
+        <div class="design-card-top">
+          <span class="design-card-title">${d.title}</span>
+          <span class="pill ${tone}"><span class="dot"></span>${d.statusText}</span>
+        </div>
+        <div class="design-card-meta">
+          <span>项目：${d.project}</span>
+          <span class="pill accent" style="padding:0 6px;font-size:10.5px">${d.templateName}</span>
+          <span class="mono">${d.branch}</span>
+          <span>深度：${d.depth}</span>
+        </div>
+        <div class="mini-bar"><i style="width:${d.pct}%"></i></div>
+        <div class="design-card-meta" style="justify-content:space-between;width:100%">
+          <span class="num">代码覆盖 ${d.pct}%</span>
+          <span>更新于 ${d.updated}</span>
+        </div>
+      </button>`;
+  }).join('') || `<div class="sub">没有匹配的项目设计。</div>`;
+}
+
+/* ---------- 1b. 模板库 & 新建页模板选择 ---------- */
+function getTemplate(key) {
+  return TEMPLATES.find(t => t.key === key) || TEMPLATES[0];
+}
+
+function renderTemplateLibrary() {
+  const grid = document.getElementById('templateLibraryGrid');
+  grid.innerHTML = TEMPLATES.map(t => `
+    <div class="tpl-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <strong style="font-size:15px">${t.name}</strong>
+        <span class="pill ${t.kind === 'builtin' ? '' : 'accent'}">${t.kind === 'builtin' ? '内置 · 只读' : '自定义'}</span>
+      </div>
+      <div class="sub" style="font-size:12.5px;line-height:1.5">${t.desc}</div>
+      <div style="font-size:11.5px;color:var(--muted)">自动识别：${t.hints.map(h => `<span class="mono">${h}</span>`).join(' · ')}</div>
+      <div class="tpl-chips">
+        ${t.sections.map((s, idx) => `<span class="tpl-chip">${idx + 1}. ${s.title}</span>`).join('')}
+      </div>
+      <div style="font-size:11.5px;color:var(--sub);background:var(--surface);padding:8px 10px;border-radius:6px;border:1px solid var(--line)">
+        <strong style="color:var(--ink)">AI 侧重：</strong>${t.focus}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:auto;padding-top:4px;flex-wrap:wrap">
+        <button class="btn sm primary" onclick="useTemplateForNew('${t.key}')">使用此模板新建</button>
+        <button class="btn sm" onclick="openTemplateModal('${t.key}', true)">复制为自定义</button>
+        ${t.kind === 'custom' ? `
+          <button class="btn sm ghost" onclick="openTemplateModal('${t.key}', false)">编辑</button>
+          <button class="btn sm ghost" style="color:var(--danger)" onclick="deleteCustomTemplate('${t.key}')">删除</button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+  updateStyleButtons();
+}
+
+function useTemplateForNew(key) {
+  selectedTemplateKey = key;
+  switchView('new');
+  toast(`已预选分析模板：${getTemplate(key).name}`);
+}
+
+function onProjectChange(proj) {
+  const preset = PROJECT_PRESETS[proj] || PROJECT_PRESETS['order-platform'];
+  recommendedTemplateKey = preset.recommended;
+  selectedTemplateKey = preset.recommended;
+  renderNewTemplatePicker();
+  toast(`已自动识别 ${proj} 技术栈，推荐「${getTemplate(selectedTemplateKey).name}」模板`);
+}
+
+function renderNewTemplatePicker() {
+  const grid = document.getElementById('newTemplateGrid');
+  grid.innerHTML = TEMPLATES.map(t => {
+    const isRec = t.key === recommendedTemplateKey;
+    const isSel = t.key === selectedTemplateKey;
+    return `
+      <button type="button" class="tpl-opt ${isSel ? 'selected' : ''}" onclick="selectNewTemplate('${t.key}')">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%">
+          <strong style="font-size:13px">${t.name}</strong>
+          ${isRec ? `<span class="pill ok" style="padding:0 6px;font-size:10px">自动推荐</span>` : t.kind === 'custom' ? `<span class="pill accent" style="padding:0 6px;font-size:10px">自定义</span>` : ''}
+        </div>
+        <span style="font-size:11.5px;color:var(--sub);line-height:1.4">${t.desc.slice(0, 34)}…</span>
+      </button>
+    `;
+  }).join('');
+
+  const cur = getTemplate(selectedTemplateKey);
+  document.getElementById('autoMatchBadge').textContent =
+    selectedTemplateKey === recommendedTemplateKey ? `自动识别推荐：${cur.name}` : `手动选择：${cur.name}`;
+  document.getElementById('newTemplatePreview').innerHTML = `
+    <div><strong style="color:var(--ink)">预设章节蓝图（${cur.sections.length} 章）：</strong>${cur.sections.map((s, i) => `${i + 1}. ${s.title}`).join(' → ')}</div>
+    <div><strong style="color:var(--ink)">AI 分析侧重：</strong>${cur.focus}</div>
+  `;
+  updateStyleButtons();
+}
+
+function selectNewTemplate(key) {
+  selectedTemplateKey = key;
+  renderNewTemplatePicker();
+}
+
+function applyTemplateToOutlineAndGo() {
+  const tpl = getTemplate(selectedTemplateKey);
+  const proj = document.getElementById('newProjectSelect').value;
+  const preset = PROJECT_PRESETS[proj] || PROJECT_PRESETS['order-platform'];
+  outlineItems = tpl.sections.map((s, i) => ({
+    id: `${tpl.key}-${i}`,
+    kind: s.kind,
+    title: s.title,
+    scope: s.scope,
+    files: s.files,
+    checked: true,
+  }));
+  document.getElementById('outlineTemplatePill').textContent = `模板：${tpl.name}`;
+  document.getElementById('outlineStackText').textContent = preset.stack;
+  document.getElementById('wbTemplatePill').textContent = `模板：${tpl.name}`;
+  switchView('outline');
+  toast(`已按「${tpl.name}」模板生成 ${outlineItems.length} 章初始大纲（0 Token）`);
+}
+
+function openTemplateModal(sourceKey, isCopy) {
+  const src = getTemplate(sourceKey);
+  editingTemplateKey = isCopy ? null : src.key;
+  document.getElementById('tplModalTitle').textContent = isCopy ? `基于「${src.name}」复制自定义模板` : `编辑自定义模板：${src.name}`;
+  document.getElementById('tplNameInput').value = isCopy ? `${src.name} · 副本` : src.name;
+  document.getElementById('tplDescInput').value = src.desc;
+  document.getElementById('tplSectionsInput').value = src.sections.map(s => `${s.kind} | ${s.title} | ${s.scope}`).join('\n');
+  document.getElementById('tplPromptInput').value = src.focus;
+  document.getElementById('templateModal').hidden = false;
+}
+
+function saveCustomTemplate() {
+  const name = document.getElementById('tplNameInput').value.trim();
+  const desc = document.getElementById('tplDescInput').value.trim() || '用户自定义分析模板';
+  const focus = document.getElementById('tplPromptInput').value.trim() || '按章节要求分析源码并附带行号证据。';
+  const lines = document.getElementById('tplSectionsInput').value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!name || !lines.length) return toast('请填写模板名称和至少一个预设章节');
+  const sections = lines.map(l => {
+    const parts = l.split('|').map(x => x.trim());
+    return { kind: parts[0] || '模块', title: parts[1] || parts[0], scope: parts[2] || 'src/', files: 24 };
+  });
+
+  if (editingTemplateKey) {
+    const idx = TEMPLATES.findIndex(t => t.key === editingTemplateKey);
+    if (idx >= 0) TEMPLATES[idx] = { ...TEMPLATES[idx], name, desc, focus, sections };
+    toast(`已更新自定义模板「${name}」`);
+  } else {
+    const key = 'custom_' + Date.now();
+    TEMPLATES.push({ key, kind: 'custom', name, desc, hints: ['自定义'], focus, sections });
+    selectedTemplateKey = key;
+    toast(`已创建自定义模板「${name}」，现可在新建页直接选用`);
+  }
+  closeModals();
+  if (currentView === 'templates') renderTemplateLibrary();
+  if (currentView === 'new') renderNewTemplatePicker();
+}
+
+function deleteCustomTemplate(key) {
+  TEMPLATES = TEMPLATES.filter(t => t.key !== key);
+  if (selectedTemplateKey === key) selectedTemplateKey = 'general';
+  renderTemplateLibrary();
+  toast('已删除自定义模板（已有设计保留创建时快照，不受影响）');
+}
+
+/* ---------- 阅读风格切换（零 AI 实时重渲染） ---------- */
+function setLayoutStyle(style) {
+  layoutStyle = style;
+  updateStyleButtons();
+  if (currentView === 'workbench') renderWorkbench();
+  if (currentView === 'offline') renderOffline();
+}
+
+function toggleLayoutStyle() {
+  setLayoutStyle(layoutStyle === 'doc' ? 'arch' : 'doc');
+  toast(`已切换阅读风格：${layoutStyle === 'doc' ? '技术文档' : '架构图谱优先'}（零 AI 调用）`);
+}
+
+function updateStyleButtons() {
+  const isDoc = layoutStyle === 'doc';
+  const d1 = document.getElementById('tplStyleDoc'), a1 = document.getElementById('tplStyleArch');
+  if (d1 && a1) { d1.classList.toggle('selected', isDoc); a1.classList.toggle('selected', !isDoc); }
+  const d2 = document.getElementById('newStyleDoc'), a2 = document.getElementById('newStyleArch');
+  if (d2 && a2) {
+    d2.className = 'btn sm ' + (isDoc ? 'accent' : '');
+    d2.textContent = (isDoc ? '◉ ' : '○ ') + '技术文档（默认）';
+    a2.className = 'btn sm ' + (!isDoc ? 'accent' : '');
+    a2.textContent = (!isDoc ? '◉ ' : '○ ') + '架构图谱优先';
+  }
+  const wbBtn = document.getElementById('layoutToggleBtn');
+  if (wbBtn) wbBtn.textContent = `风格：${isDoc ? '技术文档' : '架构图谱优先'}`;
+}
+
+/* ---------- 2. 新建配置 ---------- */
+function selectDepth(depth) {
+  document.querySelectorAll('#depthGrid .depth-opt').forEach(b => b.classList.toggle('selected', b.dataset.depth === depth));
+  document.getElementById('aiReviewCheck').checked = (depth === 'deep');
+}
+
+/* ---------- 3. 大纲确认 ---------- */
+function toggleSkipDrawer() {
+  const el = document.getElementById('skipDrawer');
+  el.hidden = !el.hidden;
+}
+
+function renderOutline() {
+  const list = document.getElementById('outlineList');
+  list.innerHTML = outlineItems.map((it, i) => `
+    <div class="outline-row ${it.checked ? '' : 'disabled'}">
+      <input type="checkbox" ${it.checked ? 'checked' : ''} onchange="toggleOutlineItem(${i})">
+      <span class="sub num">${i + 1}</span>
+      <span class="pill">${it.kind}</span>
+      <input type="text" value="${it.title}" onchange="outlineItems[${i}].title=this.value">
+      <input type="text" class="mono" style="font-size:12px;color:var(--sub)" value="${it.scope}" onchange="outlineItems[${i}].scope=this.value">
+      <div style="display:flex;gap:4px;justify-content:flex-end">
+        <button class="btn sm ghost" title="上移" onclick="moveOutline(${i},-1)">↑</button>
+        <button class="btn sm ghost" title="下移" onclick="moveOutline(${i},1)">↓</button>
+        <button class="btn sm ghost" title="删除" onclick="removeOutline(${i})">✕</button>
+      </div>
+    </div>
+  `).join('');
+  const active = outlineItems.filter(x => x.checked);
+  const files = active.reduce((s, x) => s + x.files, 0);
+  document.getElementById('outlineCountHint').textContent = `已选 ${active.length} 章 · 预计分析 ${files} 个文件`;
+}
+
+function toggleOutlineItem(i) { outlineItems[i].checked = !outlineItems[i].checked; renderOutline(); }
+function moveOutline(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= outlineItems.length) return;
+  [outlineItems[i], outlineItems[j]] = [outlineItems[j], outlineItems[i]];
+  renderOutline();
+}
+function removeOutline(i) {
+  if (outlineItems.length <= 1) return toast('至少保留一个章节');
+  outlineItems.splice(i, 1);
+  renderOutline();
+}
+function addOutlineRow() {
+  outlineItems.push({ id: 'custom-' + Date.now(), kind: '自定义', title: '专项：缓存与一致性策略', scope: 'src/infra/redis/', files: 12, checked: true });
+  renderOutline();
+}
+function simulateAiOutline() {
+  toast('AI 正在结合入口源码重新归并业务域大纲…');
+  setTimeout(() => {
+    outlineItems[2].title = '模块：订单状态机与两阶段退款';
+    outlineItems[3].title = '模块：支付回调验签与渠道对账';
+    renderOutline();
+    toast('AI 已按业务域优化章节标题与范围');
+  }, 600);
+}
+
+/* ---------- 4. 工作台渲染与实时生成模拟 ---------- */
+function renderWorkbench() {
+  const body = document.getElementById('wbBody');
+  body.classList.toggle('right-collapsed', rightCollapsed);
+  document.getElementById('toggleRightBtn').textContent = rightCollapsed ? '展开执行栏' : '隐藏执行栏';
+  document.getElementById('followBtn').textContent = followAi ? '跟随 AI：开' : '自由阅读（点击恢复跟随）';
+  document.getElementById('stopBtn').hidden = !isRunningDemo;
+
+  const statusPill = document.getElementById('wbStatusPill');
+  if (isRunningDemo) {
+    statusPill.className = 'pill run';
+    statusPill.innerHTML = `<span class="dot pulse"></span>正在生成 ${generatedCount} / ${SECTIONS.length} 章`;
+  } else if (generatedCount < SECTIONS.length) {
+    statusPill.className = 'pill warn';
+    statusPill.innerHTML = `<span class="dot"></span>还有 ${SECTIONS.length - generatedCount} 章未完成`;
+  } else {
+    statusPill.className = 'pill ok';
+    statusPill.innerHTML = `<span class="dot"></span>${SECTIONS.length} 章 · 覆盖 162 / 184 文件`;
+  }
+  document.getElementById('coverageFoot').textContent = `覆盖率 ${Math.round((generatedCount / SECTIONS.length) * 88)}%`;
+
+  renderToc('tocList', false);
+  renderSectionContent('readerContent', activeSectionId, false);
+  renderStream();
+}
+
+function renderToc(targetId, isOffline) {
+  const el = document.getElementById(targetId);
+  el.innerHTML = SECTIONS.map((sec, idx) => {
+    const done = isOffline || idx < generatedCount;
+    const running = !isOffline && isRunningDemo && idx === generatedCount;
+    const icon = running
+      ? `<span class="dot pulse" style="color:var(--run)"></span>`
+      : done
+        ? (sec.reviewState === 'needs_attention'
+            ? `<span style="color:var(--warn);font-size:12px">⚠</span>`
+            : `<span style="color:var(--ok);font-size:12px">✓</span>`)
+        : `<span class="dot" style="color:var(--faint)"></span>`;
+    const isActive = activeSectionId === sec.id;
+    const filesHtml = done && sec.files.length ? `
+      <div class="toc-sub">
+        ${sec.files.map(f => `
+          <button class="toc-file ${selectedFilePath === f.path ? 'active' : ''}" onclick="${isOffline ? `selectOfflineFile('${sec.id}','${f.path}')` : `selectFile('${sec.id}','${f.path}')`}">
+            <span class="mono">${f.path.split('/').pop()}</span>
+          </button>`).join('')}
+      </div>` : '';
+    return `
+      <button class="toc-item ${isActive ? 'active' : ''}" onclick="${isOffline ? `selectOfflineSection('${sec.id}')` : `selectSection('${sec.id}', true)`}">
+        ${icon}
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sec.title}</span>
+      </button>
+      ${filesHtml}
+    `;
+  }).join('');
+}
+
+function selectSection(id, manual) {
+  activeSectionId = id;
+  selectedFilePath = null;
+  if (manual && isRunningDemo) {
+    followAi = false;
+  }
+  renderWorkbench();
+}
+
+function selectFile(secId, path) {
+  activeSectionId = secId;
+  selectedFilePath = path;
+  if (isRunningDemo) followAi = false;
+  renderWorkbench();
+}
+
+function toggleFollow() {
+  followAi = !followAi;
+  if (followAi && generatedCount > 0) {
+    activeSectionId = SECTIONS[Math.min(generatedCount - 1, SECTIONS.length - 1)].id;
+  }
+  renderWorkbench();
+}
+
+function toggleRightPane() {
+  rightCollapsed = !rightCollapsed;
+  renderWorkbench();
+}
+
+function onReaderScroll() {
+  if (isRunningDemo && followAi) {
+    followAi = false;
+    document.getElementById('followBtn').textContent = '自由阅读（点击恢复跟随）';
+  }
+}
+
+function renderSvgDiagram(dg, isOffline) {
+  const nodeMap = Object.fromEntries(dg.nodes.map(n => [n.id, n]));
+  const maxY = Math.max(...dg.nodes.map(n => n.y + n.h)) + 26;
+  const maxX = Math.max(...dg.nodes.map(n => n.x + n.w)) + 26;
+
+  const edgesSvg = dg.edges.map(e => {
+    const a = nodeMap[e.from], b = nodeMap[e.to];
+    const x1 = a.x + a.w / 2, y1 = a.y + a.h;
+    const x2 = b.x + b.w / 2, y2 = b.y;
+    const horiz = Math.abs(a.y - b.y) < 30;
+    const sx = horiz ? a.x + a.w : x1, sy = horiz ? a.y + a.h / 2 : y1;
+    const ex = horiz ? b.x : x2, ey = horiz ? b.y + b.h / 2 : y2;
+    const mx = (sx + ex) / 2, my = (sy + ey) / 2;
+    const dash = e.cls === 'inferred' ? 'stroke-dasharray="5 4"' : '';
+    const stroke = e.cls === 'inferred' ? 'var(--wait)' : 'var(--edge)';
+    return `
+      <line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${stroke}" stroke-width="1.5" ${dash} marker-end="url(#arrow)" />
+      <rect x="${mx - 44}" y="${my - 10}" width="88" height="19" rx="5" fill="var(--panel)" stroke="var(--line)" />
+      <text x="${mx}" y="${my + 3}" text-anchor="middle" font-size="10.5" fill="var(--sub)">${e.label}</text>
+    `;
+  }).join('');
+
+  const nodesSvg = dg.nodes.map(n => {
+    const stroke = n.warn ? 'var(--warn)' : n.ok ? 'var(--ok)' : n.highlight ? 'var(--accent)' : 'var(--line-2)';
+    const fill = n.warn ? 'var(--warn-fill)' : n.ok ? 'var(--ok-fill)' : 'var(--node-bg)';
+    const clickFn = isOffline ? `selectOfflineSection('${n.target}')` : `selectSection('${n.target}', true)`;
+    return `
+      <g class="dg-node" onclick="${clickFn}">
+        <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="1.3" />
+        <text x="${n.x + 12}" y="${n.y + 21}" font-size="12.5" font-weight="600" fill="var(--ink)">${n.label}</text>
+        <text x="${n.x + 12}" y="${n.y + 38}" font-size="10.5" font-family="var(--font-mono)" fill="var(--sub)">${n.sub}</text>
+      </g>
+    `;
+  }).join('');
+
+  return `
+    <div class="diagram-box">
+      <div class="diagram-bar">
+        <strong>${dg.title}</strong>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="ev-chip static">实线 · 静态确认</span>
+          <span class="ev-chip inferred">虚线 · AI 推断</span>
+        </div>
+      </div>
+      <div class="diagram-canvas">
+        <svg class="diagram-svg" viewBox="0 0 ${maxX} ${maxY}">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--sub)" />
+            </marker>
+          </defs>
+          ${edgesSvg}
+          ${nodesSvg}
+        </svg>
+      </div>
+      <details class="edge-list">
+        <summary>文本关系列表（${dg.edges.length} 条边 · 键盘可访问与证据溯源）</summary>
+        <table class="edge-table">
+          <thead><tr><th>起点</th><th>关系 / 条件</th><th>终点</th><th>可信度与依据</th></tr></thead>
+          <tbody>
+            ${dg.edges.map(e => `
+              <tr>
+                <td>${nodeMap[e.from].label}</td>
+                <td>${e.label}</td>
+                <td>${nodeMap[e.to].label}</td>
+                <td><span class="ev-chip ${e.cls}">${e.cls === 'static' ? '静态确认' : 'AI 推断'}</span> <span class="mono sub">${e.path}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </details>
+    </div>
+  `;
+}
+
+function renderSectionContent(targetId, secId, isOffline) {
+  const el = document.getElementById(targetId);
+  const idx = SECTIONS.findIndex(s => s.id === secId);
+  const sec = SECTIONS[idx];
+
+  if (!isOffline && idx >= generatedCount) {
+    el.innerHTML = `
+      <div class="pending-canvas">
+        <span class="pill ${isRunningDemo && idx === generatedCount ? 'run' : ''}">
+          <span class="dot ${isRunningDemo && idx === generatedCount ? 'pulse' : ''}"></span>
+          ${isRunningDemo && idx === generatedCount ? 'AI 正在读取源码并分析本章节…' : '等待按顺序生成'}
+        </span>
+        <h3 style="color:var(--ink)">${sec.title}</h3>
+        <p style="max-width:440px;font-size:13px">本章节尚未提交。AI 完成源码分析并经程序校验路径与图端点后，正文、文件卡片和关系图会立即出现在这里。</p>
+      </div>`;
+    return;
+  }
+
+  const hasBackup = !!revisedBackup[sec.id];
+  const reviewBadge = sec.reviewState === 'needs_attention'
+    ? `<span class="pill warn">复审关注 · 1 条建议</span>`
+    : `<span class="pill ok">校验通过</span>`;
+
+  const blocksHtml = sec.blocks.map(b => {
+    if (b.type === 'markdown') {
+      const ev = (b.evidence || []).map(e =>
+        `<button class="ev-chip ${e.cls}" onclick="copyPath('${e.path}')">${e.label} · ${e.path}</button>`
+      ).join(' ');
+      return `
+        <div class="block-card">
+          <h3><span>${b.title}</span></h3>
+          <p>${b.body}</p>
+          ${ev ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">${ev}</div>` : ''}
+        </div>`;
+    }
+    if (b.type === 'table') {
+      return `
+        <div class="block-card">
+          <h3>${b.title}</h3>
+          <table class="edge-table" style="margin-top:0">
+            <thead><tr>${b.columns.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+            <tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+        </div>`;
+    }
+    if (b.type === 'code') {
+      return `
+        <div class="block-card">
+          <h3><span>${b.title}</span><button class="btn sm ghost" onclick="copyPath('${b.title.split('· ')[1] || ''}')">复制路径</button></h3>
+          <pre class="code-snippet">${b.code.replace(/</g, '&lt;')}</pre>
+        </div>`;
+    }
+    if (b.type === 'callout') {
+      return `<div class="callout ${b.tone}"><strong>${b.title}</strong><span>${b.body}</span></div>`;
+    }
+    return '';
+  }).join('');
+
+  const filesHtml = sec.files.length ? `
+    <div class="block-card">
+      <h3><span>本章节关键文件与符号（${sec.files.length} 个文件）</span></h3>
+      <div class="file-grid">
+        ${sec.files.map(f => `
+          <button class="file-card ${selectedFilePath === f.path ? 'selected' : ''}" onclick="${isOffline ? `selectOfflineFile('${sec.id}','${f.path}')` : `selectFile('${sec.id}','${f.path}')`}">
+            <span class="mono" style="font-weight:600;color:var(--ink)">${f.path}</span>
+            <span class="sub" style="font-size:12px">${f.desc}</span>
+            <span class="muted" style="font-size:11px">${f.symbols.length} 个关键符号 · 点击展开详情</span>
+          </button>`).join('')}
+      </div>
+      ${renderSelectedFileDetail(sec, isOffline)}
+    </div>` : '';
+
+  el.innerHTML = `
+    <div class="crumb-row">
+      <div class="crumbs">
+        <button onclick="${isOffline ? `selectOfflineSection('overview')` : `selectSection('overview', true)`}">order-platform</button>
+        <span>/</span>
+        <span>${sec.title}</span>
+        ${selectedFilePath ? `<span>/</span><span class="mono">${selectedFilePath}</span>` : ''}
+      </div>
+      ${reviewBadge}
+    </div>
+
+    <div class="sec-header">
+      <div>
+        <h2>${sec.title}</h2>
+        <p>${sec.summary}</p>
+      </div>
+      ${isOffline ? '' : `
+      <div style="display:flex;gap:6px;flex:none">
+        ${hasBackup ? `<button class="btn sm" onclick="restoreSection('${sec.id}')">↩ 恢复上一版</button>` : ''}
+        <button class="btn sm accent" onclick="openReviseModal()">✦ 让 AI 重写</button>
+      </div>`}
+    </div>
+
+    ${layoutStyle === 'arch' ? `
+      <div class="layout-arch">
+        <div class="arch-hero-grid">
+          <div class="arch-stat-card"><span class="sub" style="font-size:11.5px">当前阅读风格</span><strong>架构图谱优先</strong><span class="muted" style="font-size:11px">结构图与文件卡置顶，零 AI 切换</span></div>
+          <div class="arch-stat-card"><span class="sub" style="font-size:11.5px">关联源码文件</span><strong class="num">${sec.files.length} 个关键文件</strong><span class="muted" style="font-size:11px">路径与行号均经程序校验</span></div>
+          <div class="arch-stat-card"><span class="sub" style="font-size:11.5px">章节状态</span><strong>${sec.reviewState === 'needs_attention' ? '复审待确认' : '校验已通过'}</strong><span class="muted" style="font-size:11px">分析模板：${getTemplate(selectedTemplateKey).name}</span></div>
+        </div>
+      </div>
+    ` : ''}
+    ${sec.reviewNote ? `<div class="callout"><strong>独立 AI 复审提示</strong><span>${sec.reviewNote}</span></div>` : ''}
+    ${sec.diagram ? renderSvgDiagram(sec.diagram, isOffline) : ''}
+    ${layoutStyle === 'arch' ? filesHtml + blocksHtml : blocksHtml + filesHtml}
+  `;
+}
+
+function renderSelectedFileDetail(sec, isOffline) {
+  const file = sec.files.find(f => f.path === selectedFilePath) || sec.files[0];
+  if (!file) return '';
+  return `
+    <div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <strong class="mono" style="font-size:13px">${file.path}</strong>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm ghost" onclick="copyPath('${file.path}')">复制相对路径</button>
+          ${isOffline ? '' : `<button class="btn sm" onclick="toast('调用宿主能力定位源码：${file.path}')">在编辑器中打开</button>`}
+        </div>
+      </div>
+      ${file.symbols.map(sym => `
+        <div class="sym-item">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <strong>${sym.name}</strong>
+            <span class="ev-chip static">静态确认 · L${sym.lines}</span>
+          </div>
+          <div class="sym-sig">${sym.sig}</div>
+          <div style="font-size:13px;color:var(--ink-2)">${sym.desc}</div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--sub)">
+            <span>上游调用：<span class="mono">${sym.callers.join(', ') || '入口'}</span></span>
+            <span>下游调用：<span class="mono">${sym.callees.join(', ') || '无'}</span></span>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+/* ---------- 右栏 ConversationStream 渲染 ---------- */
+function renderStream() {
+  const badge = document.getElementById('streamBadge');
+  const log = document.getElementById('streamLog');
+  if (isRunningDemo) {
+    badge.className = 'pill run';
+    badge.innerHTML = `<span class="dot pulse"></span>生成中 ${generatedCount} / ${SECTIONS.length}`;
+  } else {
+    badge.className = 'pill ok';
+    badge.innerHTML = `<span class="dot"></span>已完成 ${generatedCount} / ${SECTIONS.length}`;
+  }
+
+  const doneLogs = SECTIONS.slice(0, generatedCount).map((sec, idx) => `
+    <div class="think-box done">
+      <div class="think-title">✦ 思考了 ${3 + idx} 秒 · ${sec.title}</div>
+    </div>
+    <div class="act-row">
+      <span class="act-verb">查看</span>
+      <span class="act-obj">${sec.files[0]?.path || 'src/domain/'}</span>
+      <span class="act-status">✓</span>
+    </div>
+    <div class="act-row">
+      <span class="act-verb">提交章节</span>
+      <span class="act-obj">submit_design_section(${sec.id})</span>
+      <span class="act-status">校验通过 ✓</span>
+    </div>
+  `).join('');
+
+  const liveBlock = isRunningDemo && generatedCount < SECTIONS.length ? `
+    <div class="think-box">
+      <div class="think-title"><span class="dot pulse"></span> 正在思考 · ${SECTIONS[generatedCount].title}</div>
+      <div class="think-body">正在核对模块导入边界与退款状态跃迁路径，准备抽取关键方法签名并验证行号证据，随后调用 submit_design_section 提交本章节…</div>
+    </div>
+    <div class="act-row">
+      <span class="act-verb" style="color:var(--run)">读取源码</span>
+      <span class="act-obj">${SECTIONS[generatedCount].files[0]?.path || 'src/domain/orders/refund.service.ts'}</span>
+      <span class="act-status" style="color:var(--run)">●</span>
+    </div>
+  ` : '';
+
+  log.innerHTML = doneLogs + liveBlock || `<div class="sub" style="font-size:12.5px">准备派发只读会话 aw-designer…</div>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ---------- 实时逐章生成演示 ---------- */
+function startLiveDemo() {
+  stopDemo(true);
+  switchView('workbench');
+  rightCollapsed = false;
+  followAi = true;
+  isRunningDemo = true;
+  generatedCount = 0;
+  activeSectionId = SECTIONS[0].id;
+  renderWorkbench();
+
+  SECTIONS.forEach((sec, idx) => {
+    const t = setTimeout(() => {
+      if (!isRunningDemo) return;
+      generatedCount = idx + 1;
+      if (followAi) {
+        activeSectionId = sec.id;
+        selectedFilePath = null;
+      }
+      if (generatedCount === SECTIONS.length) {
+        isRunningDemo = false;
+        toast('全部 5 个章节生成并校验通过！右栏可随时收起进入阅读态');
+      }
+      renderWorkbench();
+    }, (idx + 1) * 1450);
+    demoTimers.push(t);
+  });
+}
+
+function stopDemo(silent) {
+  demoTimers.forEach(clearTimeout);
+  demoTimers = [];
+  isRunningDemo = false;
+  if (!silent) {
+    renderWorkbench();
+    toast('已中止当前分片，已完成章节完整保留，可随时点击「继续」');
+  }
+}
+
+/* ---------- 全局搜索（工作台 & 离线） ---------- */
+function buildSearchHits(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const hits = [];
+  SECTIONS.forEach(sec => {
+    if (sec.title.toLowerCase().includes(q) || sec.summary.toLowerCase().includes(q)) {
+      hits.push({ kind: '章节', label: sec.title, sub: sec.summary.slice(0, 44) + '…', secId: sec.id });
+    }
+    sec.files.forEach(f => {
+      if (f.path.toLowerCase().includes(q) || f.desc.toLowerCase().includes(q)) {
+        hits.push({ kind: '文件', label: f.path, sub: f.desc, secId: sec.id, filePath: f.path });
+      }
+      f.symbols.forEach(sym => {
+        if (sym.name.toLowerCase().includes(q) || sym.desc.toLowerCase().includes(q)) {
+          hits.push({ kind: '符号', label: sym.name, sub: `${f.path} · L${sym.lines}`, secId: sec.id, filePath: f.path });
+        }
+      });
+    });
+  });
+  return hits.slice(0, 8);
+}
+
+function runSearch(q) {
+  const box = document.getElementById('searchResults');
+  const hits = buildSearchHits(q);
+  if (!q.trim()) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = hits.length ? hits.map(h => `
+    <button class="search-hit" onclick="jumpHit('${h.secId}', '${h.filePath || ''}', false)">
+      <div><span class="pill" style="padding:0 5px;font-size:10px">${h.kind}</span> <strong>${h.label}</strong></div>
+      <span class="sub">${h.sub}</span>
+    </button>`).join('') : `<div class="sub" style="padding:8px;font-size:12px">无匹配结果</div>`;
+}
+
+function runOfflineSearch(q) {
+  const box = document.getElementById('offlineSearchResults');
+  const hits = buildSearchHits(q);
+  if (!q.trim()) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = hits.length ? hits.map(h => `
+    <button class="search-hit" onclick="jumpHit('${h.secId}', '${h.filePath || ''}', true)">
+      <div><span class="pill" style="padding:0 5px;font-size:10px">${h.kind}</span> <strong>${h.label}</strong></div>
+      <span class="sub">${h.sub}</span>
+    </button>`).join('') : `<div class="sub" style="padding:8px;font-size:12px">无匹配结果</div>`;
+}
+
+function jumpHit(secId, filePath, isOffline) {
+  activeSectionId = secId;
+  selectedFilePath = filePath || null;
+  document.getElementById(isOffline ? 'offlineSearchResults' : 'searchResults').hidden = true;
+  if (isOffline) renderOffline(); else renderWorkbench();
+}
+
+/* ---------- 局部重写与恢复上一版 ---------- */
+function openReviseModal() {
+  const sec = SECTIONS.find(s => s.id === activeSectionId);
+  document.getElementById('reviseTargetTitle').textContent = sec.title;
+  document.getElementById('reviseModal').hidden = false;
+}
+
+function confirmRevise() {
+  const req = document.getElementById('reviseInput').value.trim();
+  const sec = SECTIONS.find(s => s.id === activeSectionId);
+  revisedBackup[sec.id] = { summary: sec.summary, reviewState: sec.reviewState, reviewNote: sec.reviewNote };
+  sec.summary = `[已按要求局部重写] ${sec.summary} 已补充：${req || '异常处理与补偿闭环说明'}（源码定位已程序校验通过）。`;
+  sec.reviewState = 'passed';
+  sec.reviewNote = null;
+  closeModals();
+  renderWorkbench();
+  toast('局部重写完成，已保留上一版可供一键恢复');
+}
+
+function restoreSection(id) {
+  const bk = revisedBackup[id];
+  if (!bk) return;
+  const sec = SECTIONS.find(s => s.id === id);
+  sec.summary = bk.summary;
+  sec.reviewState = bk.reviewState;
+  sec.reviewNote = bk.reviewNote;
+  delete revisedBackup[id];
+  renderWorkbench();
+  toast('已恢复该章节上一版内容');
+}
+
+/* ---------- 导出离线站点 ---------- */
+function openExportModal() { document.getElementById('exportModal').hidden = false; }
+function confirmExport() {
+  closeModals();
+  switchView('offline');
+  toast('已导出离线 HTML 站点（index.html + design-data.js + design-model.json + assets/）');
+}
+
+function renderOffline() {
+  renderToc('offlineToc', true);
+  renderSectionContent('offlineReader', activeSectionId, true);
+}
+function selectOfflineSection(id) { activeSectionId = id; selectedFilePath = null; renderOffline(); }
+function selectOfflineFile(secId, path) { activeSectionId = secId; selectedFilePath = path; renderOffline(); }
+
+function closeModals() {
+  document.getElementById('reviseModal').hidden = true;
+  document.getElementById('exportModal').hidden = true;
+  document.getElementById('templateModal').hidden = true;
+}
+
+function copyPath(p) {
+  if (!p) return;
+  navigator.clipboard?.writeText(p).catch(() => {});
+  toast('已复制源码位置：' + p);
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toastEl');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
+
+/* ---------- 初始化（支持 ?view=&theme=） ---------- */
+const params = new URLSearchParams(location.search);
+if (params.get('theme') && ['default', 'claude', 'codex'].includes(params.get('theme'))) {
+  document.documentElement.dataset.theme = params.get('theme');
+  document.getElementById('themeSelect').value = params.get('theme');
+}
+switchView(params.get('view') || 'workbench');
+</script>
+</body>
+</html>

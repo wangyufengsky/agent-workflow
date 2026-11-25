@@ -208,7 +208,7 @@ stateDiagram-v2
 <!-- /fsm:attempt -->
 
 - `queued` / `slot_granted`：不属于任务的尝试在模型额度用满时以 `queued` 创建，还没有会话；轮到时 `slot_granted` 进入 `starting`（D186，03 §8）。排队中可 `abort`，运行时消失或后端重启时为 `interrupted`。任务的尝试由调度器在额度内派发，总是直接 `starting`。
-- `submitted`：`plan` 类为 `submit_plan` 校验通过；`execute` 类为 `submit_result`；`review` 类为 `submit_review`；`research` 类为 `submit_answer`；`deck_outline` 类为 `submit_outline`；`deck_slides` 类为这次工作的最后一个目标页的 `submit_slide`（23 §4.1）。知识问答的轮次与 PPT 没有自己的状态机，它们的状态是尝试状态的投影（18 §3、23 §4.3）。尝试成功只表示「模型交付了结果」，验收结论在节点层。
+- `submitted`：`plan` 类为 `submit_plan` 校验通过；`execute` 类为 `submit_result`；`review` 类为 `submit_review`；`research` 类为 `submit_answer`；`deck_outline` 类为 `submit_outline`；`deck_slides` 类为这次工作的最后一个目标页的 `submit_slide`（23 §4.1）。项目设计的 `design_outline` 用 `submit_design_outline`，`design_generate` / `design_revise` 在最后一个目标章节的 `submit_design_section` 成功后结束，`design_review` 用 `submit_design_review`（44 §7）。知识问答的轮次、PPT 和项目设计工作没有自己的状态机，它们的状态是尝试状态的投影（18 §3、23 §4.3）。尝试成功只表示「模型交付了结果」，验收结论在节点层。
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
 - `timeout`：从 `running` 起超过 `attempt.timeoutMinutes`。
 - `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。会话仍在创建中（`starting`）时也可中止（任务取消），之后不再发送首条消息。

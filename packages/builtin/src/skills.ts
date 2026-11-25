@@ -79,6 +79,7 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.DatabaseAnalyst]: [SkillName.DbReadonly, SkillName.SubmitResult],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
+  [SessionAgent.Designer]: [],
   [SessionAgent.CodeReviewer]: [SkillName.CodeReview, SkillName.ImageAnalysis],
   [SessionAgent.Delegate]: [],
 };
