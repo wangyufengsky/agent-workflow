@@ -106,9 +106,8 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
       });
       const submit = (tool: McpToolName, input: Record<string, unknown>) =>
         callTool(mcp, tool, { ...input, [MCP_SESSION_ARG]: attempt.opencodeSessionId });
-      const unrelated = kind === AttemptKind.DesignOutline
-        ? McpToolName.SubmitDesignSection
-        : McpToolName.SubmitDesignOutline;
+      const unrelated =
+        kind === AttemptKind.DesignOutline ? McpToolName.SubmitDesignSection : McpToolName.SubmitDesignOutline;
       for (const tool of [unrelated, McpToolName.Recall, McpToolName.AskUser, McpToolName.DbListConnections]) {
         expect(await submit(tool, {})).toMatchObject({
           isError: true,
