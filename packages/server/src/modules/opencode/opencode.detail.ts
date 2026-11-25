@@ -15,6 +15,7 @@ import {
 import { type OpencodeClient, parseModelRef } from './opencode.client.ts';
 import { contextBasePrompt } from './opencode.config.ts';
 import type { createBudgetSnapshots } from './opencode.context.ts';
+import { type ContextOwner, recallToolName } from './opencode.context-owner.ts';
 import type { createContextSummaries } from './opencode.summaries.ts';
 
 const PREVIEW_CHARS = 8192;
@@ -42,7 +43,7 @@ export function createContextInspector(
   summaries: ReturnType<typeof createContextSummaries>,
   prompts: Prompts,
   mcpToolBytes: (execution: boolean) => number,
-  canProject: (directory: string, taskId: string) => boolean,
+  canProject: (directory: string) => boolean,
 ) {
   const nativeSizes = new Map<string, Promise<number>>();
   function nativeBytes(directory: string, model: string) {
@@ -63,18 +64,16 @@ export function createContextInspector(
     directory,
     stopped = false,
     model: configured = null,
-    attemptId,
-    taskId,
+    owner,
   }: {
     sessionId: string | null;
     directory: string;
     stopped?: boolean;
     model?: string | null;
-    attemptId?: string;
-    taskId?: string | null;
+    owner: ContextOwner;
   }): Promise<ContextDetailDTO> {
-    const cached = sessionId && attemptId ? snapshots.get(sessionId) : undefined;
-    const snapshot = cached?.attemptId === attemptId ? cached : undefined;
+    const cached = sessionId ? snapshots.get(sessionId) : undefined;
+    const snapshot = cached?.ownerId === owner.id ? cached : undefined;
     const budget = snapshot ?? null;
     const connected = sessionId && opencode.isConnected();
     const fallback = connected && !budget;
@@ -123,13 +122,13 @@ export function createContextInspector(
       ? budget.limit
       : (catalog?.available.find((m) => `${m.providerId}/${m.modelId}` === model)?.contextLimit ?? null);
     const rate = budget?.bytesPerToken ?? DEFAULT_BYTES_PER_TOKEN;
-    const summary = sessionId && attemptId ? (summaries.get(sessionId) ?? null) : null;
+    const summary = sessionId ? (summaries.get(sessionId, owner) ?? null) : null;
     // 进程重启或快照淘汰后只能按当前规则重建，不能把后来发布的摘要冒充历史发送记录。
     let receipt = snapshot?.receipt;
     let countedWindow = active;
-    const reconstructed = !receipt && !!sessionId && (!!summary || (!!taskId && canProject(directory, taskId)));
+    const reconstructed = !receipt && !!sessionId && (!!summary || canProject(directory));
     if (reconstructed) {
-      const { folded, projected } = projectWindow(active, summary ?? undefined);
+      const { folded, projected } = projectWindow(active, summary ?? undefined, recallToolName(owner));
       countedWindow = projected;
       receipt = projectionReceipt(active, folded, projected, summary ?? undefined);
     }
@@ -149,7 +148,7 @@ export function createContextInspector(
       const parts = m.parts.map((p) => {
         if (archived || hasSummary || !foldedIds.has(p.id) || p.type !== 'tool' || p.state.status !== 'completed')
           return p;
-        const reference = referenceText(p, id);
+        const reference = referenceText(p, id, recallToolName(owner));
         if (!reference) return p;
         folded.push({
           messageId: id,
@@ -206,13 +205,13 @@ export function createContextInspector(
       system:
         budget?.systemTokens ??
         Math.ceil(
-          (Buffer.byteLength(contextBasePrompt(prompts, user?.agent, !!attemptId)) +
+          (Buffer.byteLength(contextBasePrompt(prompts, user?.agent, owner.kind === 'attempt')) +
             Buffer.byteLength(user?.system ?? '')) /
             rate,
         ),
       tools: budget
         ? budget.toolTokens + budget.externalTokens
-        : Math.ceil((mcpToolBytes(!!attemptId) + native) / rate),
+        : Math.ceil((mcpToolBytes(owner.kind === 'attempt') + native) / rate),
       dialogue: Math.ceil(raw.dialogue / rate),
       toolOutput: Math.ceil(raw.toolOutput / rate),
       summary: Math.ceil(raw.summary / rate),

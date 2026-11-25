@@ -9,7 +9,7 @@ it('助手入口按会话目录查询原窗口，保留尾段，历史预览限�
   try {
     const { body: conversation } = await t.call(createConversationOp, {});
     expect((await t.call(getAssistantContextOp, { id: conversation.id })).body.messages).toEqual([]);
-    await t.call(updateSettingsOp, { 'ai.defaultModel': 'opencode/fake-model' });
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false, 'ai.defaultModel': 'opencode/fake-model' });
     const native = vi
       .spyOn(t.fake, 'nativeToolBytes')
       .mockRejectedValueOnce(new Error('Tool list unavailable'))

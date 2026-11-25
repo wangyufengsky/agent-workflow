@@ -30,6 +30,7 @@ import {
   PermissionDecision,
   PermissionMode,
   producedEntity,
+  type RecallInput,
   type SendAssistantMessageRequest,
   ServerEventType,
   type TranscriptEntry,
@@ -53,12 +54,14 @@ import type { ModelSlots } from '../model-slots/index.ts';
 import {
   type AssistantPrompt,
   assistantPermissionRules,
+  CONTEXT_OVERFLOW_ERROR,
   createMessageId,
   type OpencodeClient,
   type OpencodeError,
   type OpencodeEvent,
   OpencodeEventType,
   parseModelRef,
+  recallPage,
   type SessionDispatcher,
   SessionPurpose,
   ToolCallStatus,
@@ -98,6 +101,8 @@ export type AssistantServiceDeps = {
 
 type TurnOutcome = { error: OpencodeError | undefined } | { requestError: unknown };
 type Turn = {
+  contextModel?: string;
+  compacting?: boolean;
   delegation: AbortController;
   intent: string;
   source: 'user' | 'app';
@@ -112,6 +117,7 @@ type Turn = {
 
 /** What we keep about a conversation while the app runs; lost on restart like the session's turn (D46). */
 type Live = {
+  summaryLifetime: AbortController;
   busy: boolean;
   /** 外部请求尚未返回时，空闲事件也不能放行下一次发送。 */
   sending: boolean;
@@ -184,6 +190,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     let state = live.get(id);
     if (state === undefined) {
       state = {
+        summaryLifetime: new AbortController(),
         busy: false,
         sending: false,
         deleting: false,
@@ -370,6 +377,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       completion: null,
       outcome: null,
     };
+    if (state.summaryLifetime.signal.aborted) state.summaryLifetime = new AbortController();
     state.turn = turn;
     publish(c.id);
     try {
@@ -401,22 +409,55 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     model: string | null,
     turn: Turn,
   ): Promise<void> {
-    const request = opencode.promptAssistant({
+    const directory = filesDir(c.id);
+    const input = {
       sessionId,
-      directory: filesDir(c.id),
-      messageId: turn.messageId,
+      directory,
       agent: OPENCODE_ASSISTANT_AGENT,
       efforts: modelEfforts(settings.getAll()),
       ...(model === null ? {} : { model: parseModelRef(model) }),
       system: systemText,
       text,
-    });
+    };
+    const request = opencode.promptAssistant({ ...input, messageId: turn.messageId });
     turn.request = request;
-    // 两条 Promise 都立即接上处理器；前置失败可以早于接受，不能产生未处理拒绝。
-    turn.completion = request.completed.then(
-      (outcome) => completeTurn(c, turn, outcome),
-      (requestError: unknown) => completeTurn(c, turn, { requestError }),
-    );
+    const signal = turn.delegation.signal;
+    turn.completion = request.completed
+      .then(async (outcome) => {
+        if (
+          outcome.error?.name !== CONTEXT_OVERFLOW_ERROR ||
+          !turn.contextModel ||
+          signal.aborted ||
+          !settings.get('ai.contextEngine')
+        )
+          return outcome;
+        turn.compacting = true;
+        try {
+          const at = { sessionId, directory, signal };
+          await opencode.abort(at);
+          signal.throwIfAborted();
+          await opencode.summarizeSession({ ...at, model: parseModelRef(turn.contextModel) });
+          signal.throwIfAborted();
+          if (!settings.get('ai.contextEngine')) return outcome;
+        } catch (err) {
+          if (!signal.aborted) log.warn({ err, conversationId: c.id, sessionId }, 'assistant context recovery failed');
+          return outcome;
+        } finally {
+          turn.compacting = false;
+        }
+        const messageId = createMessageId(clock.now());
+        usage.message(c.id, messageId, turn.messageId);
+        log.info({ conversationId: c.id, sessionId }, 'assistant context recovery continued');
+        const retry = opencode.promptAssistant({ ...input, messageId });
+        turn.request = retry;
+        // accepted 与 completed 可能同时拒绝；本轮终态仍由同步请求的 completed 决定。
+        const [, result] = await Promise.all([retry.accepted, retry.completed]);
+        return result;
+      })
+      .then(
+        (outcome) => completeTurn(c, turn, outcome),
+        (requestError: unknown) => completeTurn(c, turn, { requestError }),
+      );
     await request.accepted;
   }
 
@@ -455,7 +496,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           type: OpencodeEventType.Error,
           sessionId: c.opencodeSessionId ?? '',
           error:
-            outcome.error.name === 'ContextOverflowError'
+            outcome.error.name === CONTEXT_OVERFLOW_ERROR
               ? { ...outcome.error, data: { ...outcome.error.data, assistantTurnSource: turn.source } }
               : outcome.error,
         }),
@@ -631,6 +672,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     // 裸 session 终止事件没有请求 id；原生 abort 甚至会发多个迟到 Idle。
     // 真实错误与结束统一由本轮同步 HTTP 的 completed 处理。
     if (event.type === OpencodeEventType.Error || event.type === OpencodeEventType.Idle) return;
+    if (state.turn?.compacting) return;
     record(c, state.view.toEntries(event));
     if (event.type === OpencodeEventType.Retry) usage.waitForModel(id);
     else usage.modelAnswering(id);
@@ -748,6 +790,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const c = get(id);
     const state = liveOf(id);
     if (state.deleting) throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is being deleted`, { id });
+    state.summaryLifetime.abort();
     if ((!state.busy && !state.sending) || state.stopping) return;
     if (state.queued) {
       slots.cancel(id);
@@ -831,9 +874,44 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       if (sessions.get(sessionId) !== id || state?.busy !== true || signal?.aborted !== false) return undefined;
       return signal;
     },
+    isFilesDirectory(path: string) {
+      return dirname(path) === join(directory, ASSISTANT_FILES_DIR);
+    },
+    contextOwner(sessionId: string, path: string) {
+      const id = sessions.get(sessionId);
+      if (!id || filesDir(id) !== path) return undefined;
+      const state = live.get(id);
+      if (
+        !state?.busy ||
+        !state.turn ||
+        state.turn.compacting ||
+        state.stopping ||
+        state.deleting ||
+        get(id).opencodeSessionId !== sessionId
+      )
+        return undefined;
+      return { kind: 'assistant' as const, id, taskId: null };
+    },
+    summarySignal(id: string, sessionId: string) {
+      return sessions.get(sessionId) === id ? live.get(id)?.summaryLifetime.signal : undefined;
+    },
+    manageContext(id: string, model: string) {
+      const turn = live.get(id)?.turn;
+      if (turn) turn.contextModel = model;
+    },
+    recall(c: Conversation, input: RecallInput, signal?: AbortSignal) {
+      if (!c.opencodeSessionId || sessions.get(c.opencodeSessionId) !== c.id || !c.isolated)
+        throw new AppError(ErrorCode.NotFound, 'No current assistant session for recall');
+      return recallPage(opencode, c.opencodeSessionId, filesDir(c.id), input, signal);
+    },
     contextSource(id: string) {
       const c = get(id);
-      return { sessionId: c.opencodeSessionId, directory: filesDir(id), model: settings.get('ai.defaultModel') };
+      return {
+        owner: { kind: 'assistant' as const, id, taskId: null },
+        sessionId: c.opencodeSessionId,
+        directory: c.isolated ? filesDir(id) : directory,
+        model: settings.get('ai.defaultModel'),
+      };
     },
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
     /** The MCP servers the user added to opencode themself (28 §4); the app's own two are not theirs to manage. */
@@ -859,7 +937,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         });
       });
     },
-    dispose: usage.dispose,
+    dispose() {
+      for (const state of live.values()) state.summaryLifetime.abort();
+      usage.dispose();
+    },
     /** The conversation an assistant MCP call comes from (15 §2). */
     findBySession: (sessionId: string): Conversation | undefined => repo.findBySession(sessionId),
     filesDir,
@@ -955,7 +1036,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           .some(
             (entry) =>
               entry.kind === TranscriptEntryKind.Error &&
-              entry.data.details?.opencodeErrorName === 'ContextOverflowError' &&
+              entry.data.details?.opencodeErrorName === CONTEXT_OVERFLOW_ERROR &&
               entry.data.details.assistantTurnSource !== 'app',
           );
       const draftText =
@@ -1020,6 +1101,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         state.busy = false;
       }
       state.deleting = true;
+      state.summaryLifetime.abort();
       turn?.delegation.abort();
       usage.pause(id);
       try {

@@ -154,6 +154,7 @@ describe('opencode 配置生成', () => {
         McpToolName.DbDescribe,
         McpToolName.DbQuery,
         McpToolName.InvestigateDatabase,
+        McpToolName.Recall,
         McpToolName.ReadAttachment,
         McpToolName.AskUser,
         McpToolName.ReportProgress,

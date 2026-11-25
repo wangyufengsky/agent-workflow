@@ -922,7 +922,9 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 | 列 | 类型 | 含义 |
 | --- | --- | --- |
 | session_id | TEXT PK | 主任务的物理会话 |
-| task_id | TEXT NOT NULL FK → tasks.id | 删除任务时级联清理。原生会话删除事件也按 session_id 清理 |
+| task_id | TEXT NULL FK → tasks.id | 所属任务，删除级联清理 |
+| attempt_id | TEXT NULL FK → attempts.id | 所属尝试，历史行通过 task_id 识别 |
+| conversation_id | TEXT NULL FK → assistant_conversations.id | 所属助手对话，删除级联清理。原生会话删除或压缩按 session_id 清理 |
 | upto_message_id | TEXT NOT NULL | 已摘要的最后一条闭合消息 |
 | summary_text | TEXT NOT NULL | 无工具 Worker 生成的历史摘要 |
 | updated_at | INTEGER NOT NULL | 最近一次发布的毫秒时间戳 |

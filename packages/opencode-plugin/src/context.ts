@@ -20,7 +20,7 @@ type RequestEstimate = {
   receipt: ProjectionReceipt;
   userId: string;
   agent: string;
-  attemptId: string;
+  ownerId: string;
   before: Size;
   after: Size;
   system: number;
@@ -47,7 +47,14 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
     if (sessionId) url.searchParams.set('sessionId', sessionId);
     const res = await fetch(url, { headers });
     if (!res.ok) throw new Error(`AW context scope unavailable: ${res.status}`);
-    return (await res.json()) as { enabled: boolean; attemptId?: string | null; toolBytes?: number; summary?: Summary };
+    return (await res.json()) as {
+      enabled: boolean;
+      kind?: 'attempt' | 'assistant';
+      ownerId?: string | null;
+      toolBytes?: number;
+      recallTool?: string;
+      summary?: Summary;
+    };
   }
   return {
     event: async ({ event }) => {
@@ -74,9 +81,16 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
       if (user?.role !== 'user') return;
       const sessionId = user.sessionID;
       const owner = await scope(sessionId);
-      if (!owner.attemptId || messages.some((m) => m.info.sessionID !== sessionId)) return;
+      if (
+        !owner.ownerId ||
+        (!owner.enabled && owner.kind === 'assistant') ||
+        messages.some((m) => m.info.sessionID !== sessionId)
+      ) {
+        estimates.delete(sessionId);
+        return;
+      }
       const { folded, projected: candidate } = owner.enabled
-        ? projectWindow(messages, owner.summary)
+        ? projectWindow(messages, owner.summary, owner.recallTool)
         : { folded: messages, projected: messages };
       const before = historySize(messages);
       const after = historySize(candidate);
@@ -119,7 +133,7 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
       const receipt = projectionReceipt(messages, folded, candidate, owner.summary);
       estimates.set(sessionId, {
         receipt,
-        attemptId: owner.attemptId,
+        ownerId: owner.ownerId,
         userId: user.id,
         agent: user.agent,
         before,
@@ -201,7 +215,7 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         body: JSON.stringify({
           directory: ctx.directory,
           sessionId: sessionID,
-          attemptId: estimate.attemptId,
+          ownerId: estimate.ownerId,
           ...breakdown,
           model: `${model.providerID}/${model.id}`,
           receipt: estimate.receipt,

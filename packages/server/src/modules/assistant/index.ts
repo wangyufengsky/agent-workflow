@@ -24,6 +24,9 @@ import {
   listDatabaseInvestigationsOp,
   MCP_ASSISTANT_PATH,
   MCP_ASSISTANT_SERVER_NAME,
+  McpToolName,
+  recallInputSchema,
+  recallOutputSchema,
   UiMode,
 } from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
@@ -243,6 +246,15 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
             instruction: NEEDS_CONFIRMATION_INSTRUCTION,
           };
         },
+      },
+      {
+        name: McpToolName.Recall,
+        mode: UiMode.Simple,
+        description:
+          'Read a page of original tool output from a folded reference in this conversation. Continue at nextOffset.',
+        input: recallInputSchema,
+        handler: async (input, { conversation, signal }) =>
+          recallOutputSchema.parse(await conversations.recall(conversation, recallInputSchema.parse(input), signal)),
       },
       ...helperTools({ ...deps, conversations }),
       ...officeTools({ ...deps, conversations }),

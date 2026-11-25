@@ -390,7 +390,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ui.mode` | `simple` | 简单 |
 | `ui.theme` | `system` | 简单 |
 | `ui.introAnimation` | `true`（打开动画，下次启动生效；main 经 `launch.json` 读它，28 §5.3） | 简单 |
-| `ai.contextEngine` | `false` | 专业，受管任务工作树的请求级上下文折叠 |
+| `ai.contextEngine` | `true` | 专业，任务与助手会话的请求级上下文折叠 |
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
 | `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
@@ -425,7 +425,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
-`ai.contextEngine` 在 OpenCode 1.19.0 初始化 AW 专用任务工作树时生效。关闭后，新任务沿用原配置，已受管会话下次发送前按完整历史检查预算。输入按 UTF-8 字节估算，计入系统提示、历史和工具定义，并为本次输出预留空间。V1 的工具清单接口未提供第三方 MCP 的完整 schema，其首轮按 AW 执行 MCP 的工具定义体积估算，连续执行时用 Provider 报告的输入与缓存账单修正。首轮按 3 字节/token，后续在 1.5–6 之间校准；图片单独估算。受管模式估算超限只预警。收到真实超窗并结束当前生成后，原会话至多显式压缩一次，待下一成功步骤才恢复重试资格。
+`ai.contextEngine` 在 OpenCode 1.19.0 初始化任务工作树、项目目录、空白演示文稿目录或助手对话目录时生效。委派等尝试使用独立目录时，按已登记的活动尝试认领。只有活动尝试与助手当前物理会话接受请求级投影。关闭后，新任务沿用原配置，已受管尝试下次发送前按完整历史检查预算，助手沿用超窗后的新对话续接。输入按 UTF-8 字节估算，计入系统提示、历史和工具定义，并为本次输出预留空间。V1 的工具清单接口未提供第三方 MCP 的完整 schema，其首轮按当前通道的 AW MCP 工具定义体积估算，连续执行时用 Provider 报告的输入与缓存账单修正。首轮按 3 字节/token，后续在 1.5–6 之间校准；图片单独估算。受管模式估算超限只预警。收到真实超窗并结束当前生成后，原会话至多显式压缩一次，待下一成功步骤才恢复重试资格。
 
 ## 5. 错误码
 

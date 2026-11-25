@@ -14,13 +14,14 @@ import type { Logger } from '../../core/logger.ts';
 
 import { OPENCODE_CONTEXT_PATH } from './opencode.config.ts';
 
+import { type ContextOwner, ownerLog, recallToolName } from './opencode.context-owner.ts';
 import type { createContextSummaries } from './opencode.summaries.ts';
 
 const directoryQuery = z.object({ directory: z.string().min(1), sessionId: z.string().optional() });
 const report = budgetSnapshotSchema.omit({ blocked: true }).extend({
   receipt: projectionReceiptSchema,
   directory: z.string(),
-  attemptId: z.string(),
+  ownerId: z.string(),
   sessionId: z.string(),
   summary: z
     .object({ uptoMessageId: z.string().min(1), source: z.string().min(1), model: z.string().min(1) })
@@ -28,11 +29,11 @@ const report = budgetSnapshotSchema.omit({ blocked: true }).extend({
 });
 
 export function createBudgetSnapshots() {
-  const values = new Map<string, ContextBudgetSnapshot & { receipt: ProjectionReceipt; attemptId: string }>();
+  const values = new Map<string, ContextBudgetSnapshot & { receipt: ProjectionReceipt; ownerId: string }>();
   return {
     get: (id: string) => values.get(id),
     delete: (id: string) => values.delete(id),
-    set(id: string, data: ContextBudgetSnapshot & { receipt: ProjectionReceipt; attemptId: string }) {
+    set(id: string, data: ContextBudgetSnapshot & { receipt: ProjectionReceipt; ownerId: string }) {
       values.delete(id);
       values.set(id, data);
       const oldest = values.keys().next().value;
@@ -46,14 +47,14 @@ export function registerContextRoutes(
   server: FastifyInstance,
   deps: {
     snapshots: ReturnType<typeof createBudgetSnapshots>;
-    manage(sessionId: string, model: string): void;
+    manage(owner: ContextOwner, sessionId: string, model: string): void;
     token: string;
     enabled(): boolean;
-    taskAt(path: string): string | undefined;
-    owner(sessionId: string, directory: string, taskId: string): string | undefined;
-    block(sessionId: string, attemptId: string): void;
+    directoryManaged(path: string): boolean;
+    owner(sessionId: string, directory: string): ContextOwner | undefined;
+    block(owner: ContextOwner, sessionId: string): void;
     summaries: ReturnType<typeof createContextSummaries>;
-    toolBytes(): number;
+    toolBytes(execution: boolean): number;
     log: Logger;
   },
 ): void {
@@ -64,38 +65,39 @@ export function registerContextRoutes(
       });
       routes.get('/scope', async (req) => {
         const { directory, sessionId } = parseInput(directoryQuery, req.query);
-        const taskId = deps.taskAt(directory);
-        const enabled = !!taskId && deps.enabled();
-        if (!sessionId) return { enabled };
-        const attemptId = taskId && deps.owner(sessionId, directory, taskId);
-        if (!attemptId) return { enabled, attemptId: null };
+        if (!sessionId) return { enabled: deps.enabled() && deps.directoryManaged(directory) };
+        const owner = deps.owner(sessionId, directory);
+        if (!owner) return { enabled: false, ownerId: null };
+        const enabled = deps.enabled();
         return {
           enabled,
-          attemptId,
-          toolBytes: deps.toolBytes(),
-          ...(enabled && { summary: deps.summaries.get(sessionId) }),
+          kind: owner.kind,
+          ownerId: owner.id,
+          toolBytes: deps.toolBytes(owner.kind === 'attempt'),
+          recallTool: recallToolName(owner),
+          ...(enabled && { summary: deps.summaries.get(sessionId, owner) }),
         };
       });
       routes.post('/budget', async (req) => {
         const { directory, summary, receipt, ...data } = parseInput(report, req.body);
-        const taskId = deps.taskAt(directory);
-        if (!taskId || deps.owner(data.sessionId, directory, taskId) !== data.attemptId) return { blocked: true };
+        const owner = deps.owner(data.sessionId, directory);
+        if (!owner || owner.id !== data.ownerId) return { blocked: true };
         // 开关可在消息转换与最后一次预算检查之间关闭。
-        const effective = deps.enabled() ? data.after : data.before;
+        const enabled = deps.enabled();
+        const effective = enabled ? data.after : data.before;
         const overBudgetWarning = data.limit !== null && effective > data.limit;
-        const blocked = !deps.enabled() && overBudgetWarning;
-        if (deps.enabled()) deps.manage(data.sessionId, data.model);
+        const blocked = owner.kind === 'attempt' && !enabled && overBudgetWarning;
+        if (enabled) deps.manage(owner, data.sessionId, data.model);
         deps.snapshots.set(data.sessionId, { ...data, receipt, overBudgetWarning, blocked });
-        if (blocked) deps.block(data.sessionId, data.attemptId);
-        else if (summary && deps.enabled())
+        if (blocked) deps.block(owner, data.sessionId);
+        else if (summary && enabled)
           void deps.summaries.generate({
             ...summary,
             sessionId: data.sessionId,
-            attemptId: data.attemptId,
-            taskId,
+            owner,
             directory,
           });
-        deps.log.info({ ...data, effective, overBudgetWarning, blocked }, 'context budget');
+        deps.log.info({ ...data, ...ownerLog(owner), effective, overBudgetWarning, blocked }, 'context budget');
         return { blocked };
       });
     },

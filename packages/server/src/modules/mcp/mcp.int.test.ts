@@ -181,7 +181,7 @@ describe('执行 MCP（/mcp/exec）', () => {
     for (const args of [{ sessionId: source }, { directory: '/tmp' }]) {
       expect((await recall(other, args)).body.code).toBe(ErrorCode.ValidationFailed);
     }
-    expect((await recall(await activeSession(AttemptKind.Delegation), {})).body.code).toBe(ErrorCode.McpToolNotAllowed);
+    expect((await recall(await activeSession(AttemptKind.Delegation), {})).body.code).toBe(ErrorCode.NotFound);
   });
 
   it('工具页的清单（GET /mcp/tools）带允许的尝试类型与输入 schema', async () => {

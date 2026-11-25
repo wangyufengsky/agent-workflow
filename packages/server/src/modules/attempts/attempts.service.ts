@@ -22,7 +22,6 @@ import {
   OPENCODE_FUNCTIONAL_TEST_AGENT,
   PermissionDecision,
   type PermissionPayload,
-  RECALL_PAGE_MAX_CHARS,
   type RecallInput,
   type RecallOutput,
   RoleBaseAgent,
@@ -37,6 +36,7 @@ import {
   createMessageId,
   type ObjectAttemptPurpose,
   parseModelRef,
+  recallPage,
   type SessionDispatcher,
   SessionPurpose,
   sessionPermissionRules,
@@ -536,44 +536,28 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       const attempt = repo.findLatestPlan(taskId);
       return attempt === undefined ? undefined : toDto(attempt);
     },
-    async recall(
-      attempt: AttemptDTO,
-      { messageId, partId, offset, limit }: RecallInput,
-      signal?: AbortSignal,
-    ): Promise<RecallOutput> {
+    async recall(attempt: AttemptDTO, input: RecallInput, signal?: AbortSignal): Promise<RecallOutput> {
       if (attempt.opencodeSessionId === null)
         throw new AppError(ErrorCode.McpAttemptUnresolved, 'Attempt has no physical session');
-      const text = await opencode.readToolOutput({
-        sessionId: attempt.opencodeSessionId,
-        directory: attempt.directory,
-        messageId,
-        partId,
-        ...(signal && { signal }),
-      });
-      if (text === undefined)
-        throw new AppError(ErrorCode.NotFound, 'Completed text tool result not found in the current session');
-      const chars = Array.from(text);
-      const start = Math.min(offset, chars.length);
-      const end = Math.min(start + Math.min(limit, RECALL_PAGE_MAX_CHARS), chars.length);
-      return {
-        content: chars.slice(start, end).join(''),
-        offset: start,
-        totalLength: chars.length,
-        nextOffset: end < chars.length ? end : null,
-      };
+      return recallPage(opencode, attempt.opencodeSessionId, attempt.directory, input, signal);
     },
-    contextOwner(sessionId: string, directory: string, taskId: string): string | undefined {
+    hasActiveDirectory: repo.hasActiveDirectory,
+    contextOwner(sessionId: string, directory: string) {
       const session = state.live.get(sessionId);
-      return session?.directory === directory && session.taskId === taskId && session.recovery?.phase !== 'compacting'
-        ? session.attemptId
-        : undefined;
+      if (
+        !session ||
+        session.directory !== directory ||
+        session.recovery?.phase === 'compacting' ||
+        mustFind(session.attemptId).status !== AttemptStatus.Running
+      )
+        return undefined;
+      return { kind: 'attempt' as const, id: session.attemptId, taskId: session.taskId };
     },
     contextSource(id: string) {
       const a = mustFind(id);
       return {
-        attemptId: id,
+        owner: { kind: 'attempt' as const, id, taskId: a.taskId },
         sessionId: a.opencodeSessionId,
-        taskId: a.taskId,
         directory: a.directory,
         model: a.model,
         stopped: a.error?.code === ErrorCode.AttemptContextBudget,

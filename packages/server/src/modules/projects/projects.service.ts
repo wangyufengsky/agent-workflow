@@ -259,6 +259,7 @@ export function createProjectsService({
     list: (): ProjectDTO[] => repo.list(),
     /** The stored project, without the remote inference of `get`. */
     getRecord: require,
+    hasDirectory: (directory: string) => !!repo.findByRepoPath(directory),
 
     get: (id: string): Promise<ProjectDetailDTO> => detail(require(id)),
 

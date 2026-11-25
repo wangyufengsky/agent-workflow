@@ -1,4 +1,4 @@
-import { MCP_TOOL_PREFIX, McpToolName } from '@aw/shared';
+import { MCP_TOOL_PREFIX, McpToolName, SETTING_DEFAULTS } from '@aw/shared';
 import { applySummary, freezePrefix, projectHistory } from '@aw/shared/context';
 import type { Hooks } from '@opencode-ai/plugin';
 import { expect, it } from 'vitest';
@@ -110,4 +110,12 @@ it('内联图片按张估算，直接附件和工具截图的预算独立于 bas
     expect(estimate('AAAA', tool, 2) - one).toBeGreaterThan(100);
   }
   expect(estimate('AAAA', true, 1, 'a'.repeat(10000)) - estimate('AAAA', true)).toBe(10000);
+});
+
+it('默认开启，助手折叠引用指向自己的 Recall 通道', () => {
+  expect(SETTING_DEFAULTS['ai.contextEngine']).toBe(true);
+  const messages = [read('old'), read('new')] as unknown as Messages;
+  expect(projectHistory(messages, 'agent-workflow-app_recall')[0]?.parts[0]).toMatchObject({
+    state: { output: expect.stringContaining('→ agent-workflow-app_recall]') },
+  });
 });

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -194,7 +194,7 @@ export function createTaskDelegation({ attempts, clock, opencode, projects }: Ta
         const { directory } = state.runContext(task);
         const { stdout: commit } = await runGit(['rev-parse', 'HEAD'], { cwd: directory });
         // 会话从空目录启动，项目仓库的本地指令与工具配置不会由运行时加载。
-        const sessionDirectory = await mkdtemp(join(tmpdir(), 'aw-delegate-'));
+        const sessionDirectory = await mkdtemp(join(await realpath(tmpdir()), 'aw-delegate-'));
         try {
           const model = await opencode.prepareDelegationModel({
             sourceDirectory: directory,
