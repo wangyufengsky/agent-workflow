@@ -15,7 +15,8 @@ async function openUsage(page: Page) {
 
 test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分别显示', async ({ page, request }, testInfo) => {
   await createProject(request, null);
-  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
+  // 这条用量用例验证原生发送记录；受管抽屉由真实 OpenCode 测试验证。
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'ai.contextEngine': false });
   await queueAssistantTurn(request, [
     { type: 'usage', input: 37, output: 11 },
     { type: 'text', text: '本轮用量已记录。' },
