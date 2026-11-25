@@ -196,20 +196,26 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
       const { run, design } = activeRun(attempt);
       const now = clock.now();
       const sections = new Map(repo.listSections(design.id).map((section) => [section.id, section]));
-      const updates = input.findings.map((item, index) => {
+      const findings = new Map(input.findings.map((item) => [item.sectionId, item]));
+      input.findings.forEach((item, index) => {
         if (!run.targetSectionIds.includes(item.sectionId))
           invalid(['findings', index, 'sectionId'], 'Choose a section targeted by this run');
-        const section = sections.get(item.sectionId);
+      });
+      const updates = run.targetSectionIds.map((sectionId) => {
+        const section = sections.get(sectionId);
         if (section === undefined) throw new AppError(ErrorCode.DesignSectionNotFound);
-        return { ...section, reviewState: item.reviewState, reviewNotes: item.notes, updatedAt: now };
+        const finding = findings.get(sectionId);
+        return {
+          ...section,
+          reviewState: finding?.reviewState ?? DesignReviewState.None,
+          reviewNotes: finding?.notes ?? null,
+          updatedAt: now,
+        };
       });
 
       unit.transact(() => {
         for (const section of updates) repo.updateSection(section);
-        repo.updateRunDone(
-          run.id,
-          updates.map(({ id }) => id),
-        );
+        repo.updateRunDone(run.id, [...findings.keys()]);
         attempts.markSubmitted(attempt.id);
         publish(design.id, now);
       });

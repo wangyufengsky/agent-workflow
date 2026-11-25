@@ -31,6 +31,7 @@ export const submitDesignReviewInputSchema = z.strictObject({
         notes: z.array(designReviewNoteSchema),
       }),
     )
+    .min(1)
     .max(DESIGN_MAX_SECTIONS),
 });
 export type SubmitDesignReviewInput = z.infer<typeof submitDesignReviewInputSchema>;
