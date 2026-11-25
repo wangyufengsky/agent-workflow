@@ -86,7 +86,7 @@ it('轻量推荐根据根目录识别框架，忽略深层标记和外部清单�
   const web = await mkdtemp(join(tmpdir(), 'design-recommend-web-'));
   await write(web, 'package.json', '{"dependencies":{"react":"*"},"devDependencies":{"typescript":"*"}}');
   await expect(inspectDesignProject(web)).resolves.toEqual({
-    recommendedTemplateKey: BuiltinDesignTemplateKey.ReactFrontend,
+    recommendedTemplateKey: BuiltinDesignTemplateKey.General,
     techStack: ['JavaScript', 'TypeScript', 'React'],
   });
 });

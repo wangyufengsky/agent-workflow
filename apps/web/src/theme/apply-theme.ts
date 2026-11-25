@@ -1,4 +1,5 @@
 import { SYSTEM_THEME_MAP, type ThemeId, ThemePreference } from '@aw/shared';
+import { DESIGN_CODE_TOKENS } from '@aw/shared/theme';
 import { THEMES } from './registry.ts';
 import { THEME_TOKEN_NAMES } from './tokens.ts';
 
@@ -14,6 +15,9 @@ export function resolveTheme(preference: ThemePreference, prefersDark: boolean):
 export function applyTheme(id: ThemeId, root: HTMLElement = document.documentElement): void {
   const theme = THEMES[id];
   for (const name of THEME_TOKEN_NAMES) root.style.setProperty(`--${name}`, theme.tokens[name]);
+  for (const [name, value] of Object.entries(DESIGN_CODE_TOKENS[theme.colorScheme])) {
+    root.style.setProperty(`--${name}`, value);
+  }
   root.style.colorScheme = theme.colorScheme;
   root.dataset.theme = id;
 }

@@ -104,6 +104,7 @@ export const designSchema = designSummarySchema.extend({
   diagrams: z.array(designDiagramDtoSchema),
   runs: z.array(designRunSchema),
   activeRunId: id.nullable(),
+  handoffPending: z.boolean(),
 });
 export type DesignDTO = z.infer<typeof designSchema>;
 

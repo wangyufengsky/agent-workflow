@@ -31,6 +31,7 @@ import type { createDesignQueries } from './designs.queries.ts';
 import type { createDesignsRepo, DesignSection, ProjectDesign } from './designs.repo.ts';
 import type { DesignRuns } from './designs.runs.ts';
 import { scanDesignProject } from './designs.scanner.ts';
+import { readDesignSource } from './designs.source.ts';
 import { createDesignTemplates } from './designs.templates.ts';
 import { validateDesignOutline } from './designs.validator.ts';
 
@@ -110,6 +111,12 @@ export function createDesignsService({
   }
   return {
     ...queries,
+    async source(id: string, fileId: string) {
+      const design = designById(id);
+      const file = repo.findFile(id, fileId);
+      if (file === undefined || design.projectId === null) return { status: 'unavailable' } as const;
+      return readDesignSource(projects.getRecord(design.projectId).repoPath, file, design.excludePatterns);
+    },
     ...createDesignTemplates({ repo, projects, clock, unit }),
     async create(input: CreateDesignRequest) {
       const project = projects.getRecord(input.projectId);
@@ -134,7 +141,7 @@ export function createDesignsService({
         templateKey,
         templateSnapshot: { key, name, defaultSections, focusPrompt },
         theme: input.theme ?? (preference === ThemePreference.System ? SYSTEM_THEME_MAP.light : preference),
-        layoutStyle: input.layoutStyle ?? DesignLayoutStyle.Doc,
+        layoutStyle: input.layoutStyle ?? DesignLayoutStyle.Arch,
         aiReviewEnabled: input.aiReviewEnabled ?? depth === DesignDepth.Deep,
         excludePatterns,
         sourceSnapshot: scan.snapshot,

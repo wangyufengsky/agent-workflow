@@ -469,10 +469,11 @@ describe('项目中记住的模式（D101）', () => {
     expect(projectBashPatterns(commands)).toEqual(patterns);
   });
 
-  it('记住 unzip -l 后，同一项目的会话仍询问解压', () => {
+  it('研究员不继承项目记住的 Bash 批准，并保留原生只读白名单', () => {
     const rules = sessionPermissionRules(SessionAgent.Researcher, BashPolicy.Auto, {
-      allowedBash: projectBashPatterns(['unzip -l lib/x.jar']),
+      allowedBash: projectBashPatterns(['unzip -l lib/x.jar', 'make build']),
     });
+    expect(decide(rules, 'make build')).toBe('ask');
     expect(decide(rules, 'unzip -l lib/y.jar')).toBe('allow');
     expect(decide(rules, 'unzip lib/x.jar')).toBe('ask');
     expect(decide(rules, 'unzip -o lib/x.jar -d out')).toBe('ask');

@@ -52,6 +52,22 @@ export const getDesignOp = defineOperationContract({
   refs: designRef,
 });
 
+export const getDesignSourceOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'designs.source',
+  title: 'op.designs.source',
+  description: 'Read the local source file if it still matches the scanned revision',
+  input: byId.extend({ fileId: z.string().min(1) }),
+  output: z.union([
+    z.object({ status: z.literal('available'), content: z.string() }),
+    z.object({ status: z.enum(['changed', 'unavailable']) }),
+  ]),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/designs/:id/files/:fileId/source' },
+  refs: designRef,
+});
+
 export const createDesignOp = defineOperationContract({
   ...common,
   id: 'designs.create',

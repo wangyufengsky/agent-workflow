@@ -29,7 +29,26 @@ export const designEvidenceSchema = z.discriminatedUnion('evidenceClass', [
 ]);
 export type DesignEvidence = z.infer<typeof designEvidenceSchema>;
 
+export const designSubmoduleSchema = z.strictObject({
+  type: z.literal('submodule'),
+  id: z.string().trim().min(1),
+  title: designTitleSchema,
+  summary: z.string().trim().min(1),
+  files: z.array(designRelativePathSchema).min(1),
+  behaviors: z
+    .array(
+      z.strictObject({
+        title: designTitleSchema,
+        markdown: z.string().trim().min(1),
+        evidence: z.array(designEvidenceSchema).min(1),
+      }),
+    )
+    .min(1),
+});
+export type DesignSubmodule = z.infer<typeof designSubmoduleSchema>;
+
 export const designBlockSchema = z.discriminatedUnion('type', [
+  designSubmoduleSchema,
   z.strictObject({
     type: z.literal('markdown'),
     title: designTitleSchema.optional(),

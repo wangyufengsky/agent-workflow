@@ -1,6 +1,7 @@
 import { knowledgeOperations } from './knowledge.operations.ts';
 import { createKnowledgeService, type KnowledgeServiceDeps } from './knowledge.service.ts';
 
+export { readKnowledgePermissionPolicy } from './knowledge.repo.ts';
 export type { KnowledgeService, TurnEnded } from './knowledge.service.ts';
 export { knowledgeConversationsTable, knowledgeTurnsTable } from './knowledge.table.ts';
 

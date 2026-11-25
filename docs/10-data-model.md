@@ -327,7 +327,7 @@ payload / response：
 | kind | payload | response |
 | --- | --- | --- |
 | `question` | `{ question, options?: string[], blocking: boolean, defaultAssumption?: string }` | `{ answer: string }` 或 `{ assumed: true, value }`（未问用户、按假设继续时直接以 resolved 写入，作为记录） |
-| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`，任务 Bash 另有 `bashGrant`（可复用证据或 null）和 `projectGrantAvailable` | `{ decision: PermissionDecision, scope?: "task" 或 "project" }` |
+| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`，任务 Bash 另有 `bashGrant`（可复用证据或 null）和 `projectGrantAvailable`；知识问答的 Bash 请求为 `bashGrant: null`、`projectGrantAvailable: false`，仅允许本次处理 | `{ decision: PermissionDecision, scope?: "task" 或 "project" }` |
 | `acceptance` | `{}` | `{ accepted: boolean, feedback?: string }` |
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |
@@ -515,7 +515,7 @@ payload / response：
 
 ## 4a. 知识问答（v1.1）
 
-见 [18-knowledge.md §3](18-knowledge.md#3-数据模型)，迁移 `0009_knowledge`。
+见 [18-knowledge.md §3](18-knowledge.md#3-数据模型)，迁移 `0009_knowledge` 建表，`0059_knowledge_permission_mode` 增加对话权限档位。
 
 ### knowledge_conversations
 
@@ -525,7 +525,8 @@ payload / response：
 | project_id | TEXT → projects，CASCADE | |
 | title | TEXT | 第一次提问的首行（`KNOWLEDGE_TITLE_MAX_CHARS`） |
 | sources | TEXT(JSON) | `{ code, docs, database, web }`，对话开始后固定（D67） |
-| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建与结束更新 |
+| permission_mode | TEXT NOT NULL DEFAULT `ask` | 对话独立保存权限档位，升级后现有记录默认为 `ask`。模型选择仍保存在每轮对应的尝试。 |
+| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建、结束及权限档位修改更新 |
 
 索引：`(project_id)`、`(updated_at)`。
 
@@ -763,7 +764,7 @@ payload / response：
 | 表 | 字段与关系 | 索引 |
 | --- | --- | --- |
 | `project_designs` | 主键 `id`。可空的 `project_id` 引用 `projects`（SET NULL）。保存标题、分析深度、模板键与模板快照 JSON、阅读风格、主题、排除规则 JSON、复审开关、源码扫描快照 JSON、大纲确认时间、最近导出路径和时间、创建及更新时间。 | `(project_id, updated_at, id)`、`(updated_at, id)` |
-| `design_sections` | 主键 `id`，`design_id` 引用设计（CASCADE）。顺序 `seq`、是否勾选 `is_selected`（默认 true）、种类、标题、路径范围 JSON、摘要、正文块 JSON（NULL 表示待生成）、复审状态、复审意见 JSON、上一版内容 JSON、更新时间。 | `(design_id, seq)` |
+| `design_sections` | 主键 `id`，`design_id` 引用设计（CASCADE）。顺序 `seq`、是否勾选 `is_selected`（默认 true）、种类、标题、路径范围 JSON、摘要、正文块 JSON（NULL 表示待生成，submodule 保存子模块、归属文件与带证据的功能解读）、复审状态、复审意见 JSON、上一版内容 JSON、更新时间。 | `(design_id, seq)` |
 | `design_files` | 主键 `id`，`design_id` 引用设计（CASCADE），可空的 `section_id` 引用所属章节（SET NULL）。保存项目相对路径、扫描时的内容哈希、可空的职责说明、符号列表 JSON、更新时间。 | `(design_id, rel_path)` 唯一，另有 `(design_id, section_id)` |
 | `design_diagrams` | 主键 `id`，`design_id`、`section_id` 分别引用设计及章节（CASCADE）。保存图种类、标题、节点 JSON、边 JSON、更新时间。 | `(design_id, section_id)` |
 | `design_runs` | 主键 `id`，`design_id` 引用设计（CASCADE），`attempt_id` 引用尝试。保存设计内顺序 `seq`、目标及已提交的章节 ID 列表 JSON、可空的指令、创建时间。类型与状态由尝试推导。 | `(design_id, seq)`、`(attempt_id)` |
@@ -924,7 +925,7 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 
 ## 对话和任务的审批配置
 
-迁移 0053 为 `assistant_conversations` 和 `tasks` 增加 `permission_mode`，默认 `ask`。每个对象独立保存选择。普通执行尝试的 `attempts.permission_baseline` 保存创建时的规则，同一原生会话继续执行时沿用。既有 `ai.imageModel` 迁入图像处理员的空模型字段，已有角色选择优先。
+迁移 0053 为 `assistant_conversations` 和 `tasks` 增加 `permission_mode`，默认 `ask`。每个对象独立保存选择。迁移 0059 为 `knowledge_conversations` 增加独立的权限档位，默认也是 `ask`，见 §4a。普通执行尝试的 `attempts.permission_baseline` 保存创建时的规则，同一原生会话继续执行时沿用。既有 `ai.imageModel` 迁入图像处理员的空模型字段，已有角色选择优先。
 
 ### 模型思考强度
 

@@ -313,3 +313,7 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 ## 对话选择
 
 在输入框开头或空白后键入 `/`，按名称、说明或内置 Skill 的中文标题筛选。上下键选择，回车加入本轮，Esc 关闭。用户 Skill 用其 ID，内置 Skill 用 `builtin:<name>`。服务端核对助手可用范围后生成消息快照。
+
+## 项目设计分析
+
+`aw-design-analysis` 专供 `aw-designer` 在梳理大纲、生成或重写模块功能和独立复审时加载。每个生成会话聚焦一个章节。Skill 指导分析员从入口追踪功能、区分组成与依赖、用源码行支撑结论。章节数据经既有 `submit_design_section` 提交。

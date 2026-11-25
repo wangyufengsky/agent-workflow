@@ -25,6 +25,7 @@ import {
   KnowledgeTurnStatus,
   knowledgeTurnStatusOf,
   type ListKnowledgeQuery,
+  PermissionMode,
   ServerEventType,
   SessionAgent,
   type SubmitAnswerInput,
@@ -146,6 +147,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       id: conversation.id,
       title: conversation.title,
       sources: conversation.sources,
+      permissionMode: conversation.permissionMode,
       project: {
         id: project.id,
         name: project.name,
@@ -218,6 +220,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         model,
         agent: SessionAgent.Researcher,
         system: undefined,
+        web: conversation.sources.web,
       }),
       first: () => ({
         id: attemptId,
@@ -324,6 +327,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         return {
           id: conversation.id,
           title: conversation.title,
+          permissionMode: conversation.permissionMode,
           project: { id: conversation.projectId, name: projectNameOf(projectList, conversation.projectId) },
           turnCount: turns.filter((t) => t.conversationId === conversation.id).length,
           latest: {
@@ -341,7 +345,13 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     },
 
     /** A new conversation and its first question (`knowledge.ask`). */
-    async ask({ projectId, question, sources, model }: AskKnowledgeRequest): Promise<KnowledgeConversationDTO> {
+    async ask({
+      projectId,
+      question,
+      sources,
+      model,
+      permissionMode = PermissionMode.Ask,
+    }: AskKnowledgeRequest): Promise<KnowledgeConversationDTO> {
       projects.getRecord(projectId);
       assertDatabaseSelectable(projectId, sources);
       attempts.requireReady();
@@ -351,12 +361,22 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         projectId,
         title: firstLine(question),
         sources,
+        permissionMode,
         createdAt: now,
         updatedAt: now,
       };
       repo.insertConversation(conversation);
       await startTurn(conversation, question, model);
       return detail(conversation.id);
+    },
+
+    setPermissionMode(id: string, permissionMode: PermissionMode): KnowledgeConversationDTO {
+      mustFind(id);
+      unit.transact(() => {
+        repo.setPermissionMode(id, permissionMode, clock.now());
+        publish(id);
+      });
+      return detail(id);
     },
 
     /** The next question of a conversation whose previous one finished (`knowledge.followUp`). */

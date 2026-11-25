@@ -165,3 +165,42 @@ it('复审仅引用文件时也拒绝扫描后替换为敏感文件的符号链�
     ),
   ).rejects.toMatchObject(issue(['findings', 0, 'notes', 0, 'relPath']));
 });
+
+it('子模块引用本章的文件；每项功能的静态证据须指向真实源码范围', async () => {
+  const context = await scopedProject();
+  const block = {
+    type: 'submodule',
+    id: 'order',
+    title: '订单',
+    summary: '导出订单',
+    files: [source],
+    behaviors: [
+      {
+        title: '读取订单',
+        markdown: '向调用方提供订单。',
+        evidence: [{ evidenceClass: DesignEvidenceClass.Static, relPath: source, lineStart: 1, lineEnd: 2 }],
+      },
+    ],
+  } as const;
+  const behavior = { ...block.behaviors[0], evidence: [...block.behaviors[0].evidence] };
+  const submodule = { ...block, files: [source], behaviors: [behavior] };
+  const submitted = { ...section, files: [{ relPath: source, responsibility: '导出订单', symbols: [] }] };
+  await expect(validateDesignSection({ ...submitted, blocks: [submodule] }, context)).resolves.toBeUndefined();
+  await expect(validateDesignSection({ ...section, blocks: [submodule] }, context)).rejects.toMatchObject(
+    issue(['blocks', 0, 'files', 0]),
+  );
+  await expect(
+    validateDesignSection({ ...submitted, blocks: [submodule, { ...submodule, id: 'other' }] }, context),
+  ).rejects.toMatchObject(issue(['blocks', 1, 'files', 0]));
+  await expect(
+    validateDesignSection(
+      {
+        ...submitted,
+        blocks: [
+          { ...submodule, behaviors: [{ ...behavior, evidence: [{ ...block.behaviors[0].evidence[0], lineEnd: 3 }] }] },
+        ],
+      },
+      context,
+    ),
+  ).rejects.toMatchObject(issue(['blocks', 0, 'behaviors', 0, 'evidence', 0]));
+});

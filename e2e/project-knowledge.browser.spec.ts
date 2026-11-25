@@ -57,10 +57,16 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   await page.goto(`/knowledge?projectId=${project.id}`);
   await expect(page.getByRole('heading', { name: '关于这个项目，你想了解什么？' })).toBeVisible();
   await expect(page.getByText(/将从 代码 · 文档 中查找依据 · 网络检索关闭/)).toBeVisible();
+  await page.getByRole('button', { name: '问答权限 · 始终询问' }).click();
+  await page
+    .getByRole('group', { name: '问答权限' })
+    .getByRole('button', { name: /帮我批准/ })
+    .click();
   await page.getByLabel('向项目提问').fill('退款金额在哪里四舍五入？');
   await page.getByLabel('向项目提问').press('Enter');
 
   await expect(page).toHaveURL(/\/knowledge\/[0-9a-f-]+/);
+  await expect(page.getByRole('button', { name: '问答权限 · 帮我批准' })).toBeVisible();
   const turn = page.getByTestId('knowledge-turn').first();
   await expect(turn).toContainText('退款金额在哪里四舍五入？');
   await expect(turn.getByRole('button', { name: '引用 1' })).toBeVisible();
@@ -86,6 +92,17 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   await expect(lines.locator('[data-cited="true"]')).toHaveText(/Refunds are rounded to cents\./);
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
+
+  await page.getByRole('button', { name: '问答权限 · 帮我批准' }).click();
+  const permissions = page.getByRole('group', { name: '问答权限' });
+  const full = permissions.getByRole('button', { name: /完全访问/ });
+  await expect(full).toContainText('资料范围和网络检索设置继续生效');
+  await full.click();
+  await expect(page.getByRole('button', { name: '问答权限 · 完全访问' })).toBeEnabled();
+  await expect(page.getByText(/将从 代码 · 文档 中查找依据 · 网络检索关闭/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /将从 代码 · 文档 中查找依据/ })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: '问答权限 · 完全访问' })).toBeEnabled();
 
   await queueResearchTurn(request, project, [
     answer('手续费 `fee` 先从金额中扣除 [1]。', [file('src/refund.ts', 2, 2)]),
@@ -197,6 +214,15 @@ test('J14 回答流式出现：引用先待核对、提交通过后可点击；�
   const draft = turn.getByTestId('answer-draft');
   await expect(draft).toContainText('退款在 refund() 中四舍五入到分');
   await expect(draft).toContainText('正在写回答 · 引用待核对');
+  const pendingApproval = turn.getByText('研究员想运行一条只读白名单以外的命令，等待你允许。', { exact: true });
+  await expect(pendingApproval).toBeVisible();
+  await page.getByRole('button', { name: '问答权限 · 始终询问' }).click();
+  await page
+    .getByRole('group', { name: '问答权限' })
+    .getByRole('button', { name: /帮我批准/ })
+    .click();
+  await expect(page.getByRole('button', { name: '问答权限 · 帮我批准' })).toBeEnabled();
+  await expect(pendingApproval).toBeVisible();
   await expect(draft.getByTitle(/待核对/)).toHaveText('1');
   await expect(turn.getByRole('button', { name: '引用 1' })).toHaveCount(0);
   await expect(turn).toContainText('opencode/fake-model-2');

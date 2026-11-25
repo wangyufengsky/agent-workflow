@@ -6,6 +6,7 @@ export const SkillAudience = {
   Assistant: 'assistant',
   Researcher: 'researcher',
   GitReviewer: SessionAgent.CodeReviewer,
+  Designer: SessionAgent.Designer,
   Unconfigured: 'unconfigured',
 } as const;
 export type Audience = { id: string; name: string };
@@ -26,11 +27,13 @@ const assistant: Audience = { id: SkillAudience.Assistant, name: C.assistant };
 const researcher: Audience = { id: SkillAudience.Researcher, name: C.researcher };
 const functionalTest: Audience = { id: FUNCTIONAL_TEST_WORKFLOW_KEY, name: C.functionalTest };
 const gitReviewer: Audience = { id: SkillAudience.GitReviewer, name: C.gitReviewer };
+const designer: Audience = { id: SkillAudience.Designer, name: C.designer };
 export const audienceOptions = (roles: RoleDTO[]): Audience[] => [
   assistant,
   ...roles,
   researcher,
   gitReviewer,
+  designer,
   functionalTest,
 ];
 
@@ -72,6 +75,7 @@ export function catalogEntries(
           ...roles.filter((role) => skill.agents.includes(role.baseAgent)),
           ...(skill.workflows?.includes(functionalTest.id) ? [functionalTest] : []),
           ...(skill.agents.includes(SessionAgent.Researcher) ? [researcher] : []),
+          ...(skill.agents.includes(SessionAgent.Designer) ? [designer] : []),
           ...(skill.agents.includes(SessionAgent.CodeReviewer) ? [gitReviewer] : []),
         ],
       };

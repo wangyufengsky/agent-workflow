@@ -22,6 +22,7 @@ export const SKILLS_COPY = {
   researcher: '知识问答研究员',
   functionalTest: '功能测试流程',
   gitReviewer: 'Git 工作台代码审查',
+  designer: '项目设计分析员',
   assistantOn: '在对话中手动选用，仅用于当次消息。',
   assistantOff: '未在助手中启用。',
   noAssistantSkills: '暂无允许助手选用的 Skill。',
@@ -82,6 +83,11 @@ export const SKILLS_COPY = {
 } as const;
 
 export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; description: string; trigger: string }>> = {
+  'aw-design-analysis': {
+    title: '项目架构与功能解读',
+    description: '梳理模块职责、输入输出和关键分支，将功能说明关联到源码证据。',
+    trigger: '设计分析员拟定大纲、生成或重写模块章节、复审跨模块关系时。',
+  },
   'aw-functional-testing': {
     title: '功能测试',
     description: '编写或导入用例，准备环境，执行测试并根据记录提交报告。',

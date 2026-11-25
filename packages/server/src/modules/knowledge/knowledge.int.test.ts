@@ -19,8 +19,12 @@ import {
   KnowledgeTurnStatus,
   knowledgeCitationOp,
   listKnowledgeOp,
+  PermissionDecision,
+  PermissionMode,
   readonlyBashRules,
+  resolveInboxOp,
   ServerEventType,
+  setKnowledgePermissionModeOp,
   snapshotKnowledgeTaskMaterialOp,
   stopKnowledgeOp,
   type TranscriptPage,
@@ -30,7 +34,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
+import { addProject, inboxOpens, workflowId } from '../../../test/helpers/tasks.ts';
 
 const RESEARCHER = { agent: 'aw-researcher' };
 const CODE_AND_DOCS: KnowledgeSources = { code: true, docs: true, database: false, web: false };
@@ -283,6 +287,67 @@ describe('知识问答', () => {
       { permission: 'webfetch', pattern: '*', action: 'allow' },
       { permission: 'websearch', pattern: '*', action: 'allow' },
     ]);
+  });
+
+  it('研究中切档保留现有审批，只自动批准后续选中资料内的只读操作，追问沿用档位', async () => {
+    const { project: p } = await addProject(t, {
+      files: { 'src/退款规则.js': 'export const refund = 1;', 'docs/example.md': 'Example' },
+    });
+    const checksum = { command: 'cksum src/退款规则.js' };
+    const unsafe = { command: 'cksum src/退款规则.js > output.txt' };
+    const excluded = { command: 'cksum docs/example.md' };
+    t.fake.enqueue(
+      script()
+        .requestPermission('bash', [checksum.command], checksum)
+        .requestPermission('bash', [checksum.command], checksum)
+        .requestPermission('bash', [unsafe.command], unsafe)
+        .requestPermission('bash', [excluded.command], excluded)
+        .callTool('submit_answer', { answer: 'Done', citations: [] }),
+      RESEARCHER,
+    );
+    const asked = inboxOpens(t, 'permission');
+    const { body: first } = await t.call(askKnowledgeOp, {
+      projectId: p.id,
+      question: 'Check the refund rule',
+      sources: { ...CODE_AND_DOCS, docs: false },
+    });
+    const { item } = await asked;
+    expect(first.permissionMode).toBe(PermissionMode.Ask);
+    const { body: changed } = await t.call(setKnowledgePermissionModeOp, {
+      id: first.id,
+      permissionMode: PermissionMode.Full,
+    });
+    expect(changed.permissionMode).toBe(PermissionMode.Full);
+    expect(changed.turns[0]?.awaitingInput).toBe(true);
+    expect(t.fake.permissionReplies).toEqual([]);
+
+    let pendingId = item.id;
+    for (const request of [unsafe, excluded]) {
+      const before = inboxOpens(t, 'permission');
+      await t.call(resolveInboxOp, { id: pendingId, response: { decision: PermissionDecision.Once } });
+      const pending = (await before).item;
+      pendingId = pending.id;
+      expect(pending.title).toContain(request.command);
+    }
+    const ended = turnEnds();
+    await t.call(resolveInboxOp, { id: pendingId, response: { decision: PermissionDecision.Once } });
+    await ended;
+    await t.fake.settled();
+    expect(t.fake.permissionReplies.map(({ reply }) => reply)).toEqual(['once', 'once', 'once', 'once']);
+
+    t.fake.enqueue(
+      script()
+        .requestPermission('bash', [checksum.command], checksum)
+        .callTool('submit_answer', { answer: 'Checked again', citations: [] }),
+      RESEARCHER,
+    );
+    const continued = turnEnds();
+    await t.call(followUpKnowledgeOp, { id: first.id, question: 'Check again' });
+    await continued;
+    const { body: final } = await t.call(getKnowledgeOp, { id: first.id });
+    expect(final.permissionMode).toBe(PermissionMode.Full);
+    expect(final.turns.at(-1)).toMatchObject({ answer: 'Checked again' });
+    expect(t.fake.permissionReplies).toHaveLength(5);
   });
 
   it('续问沿用同一 opencode 会话；研究中不能续问或删除，停止后可以继续追问', async () => {

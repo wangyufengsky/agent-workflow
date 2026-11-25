@@ -24,7 +24,7 @@ export function createDesignSubmissionTools(designs: DesignSubmissions) {
     defineMcpTool({
       name: McpToolName.SubmitDesignSection,
       description:
-        'Submit one complete target section, including its blocks, files and diagrams. The result lists sections still to submit.',
+        'Submit one complete target section, with evidence-backed behaviors, optional submodules, analyzed files and diagrams. Quote exact source lines in code blocks.',
       allowedKinds: [AttemptKind.DesignGenerate, AttemptKind.DesignRevise],
       input: submitDesignSectionInputSchema,
       output: submitDesignSectionOutputSchema,

@@ -1,7 +1,7 @@
 import { cp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { layoutDesignDiagram, THEME_IDS, ThemeId } from '@aw/shared';
+import { layoutDesignDiagram, SYSTEM_THEME_MAP } from '@aw/shared';
 import { THEMES } from '@aw/shared/theme';
 import { expect, test } from '@playwright/test';
 
@@ -48,12 +48,42 @@ const model = {
         { type: 'diagram_ref', diagramId: 'graph' },
       ],
     },
-    { id: 'orders', kind: 'module', title: '订单模块', summary: '保存订单。', blocks: [] },
+    {
+      id: 'orders',
+      kind: 'module',
+      title: '订单模块',
+      summary: '保存订单。',
+      blocks: [
+        {
+          type: 'submodule',
+          id: 'persistence',
+          title: '存储子模块',
+          summary: '执行写入。',
+          files: ['src/store.ts'],
+          behaviors: [
+            {
+              title: '如何写入订单？',
+              markdown: '通过提交函数保存订单。',
+              evidence: [{ evidenceClass: 'static', relPath: 'src/store.ts', lineStart: 4, lineEnd: 4 }],
+            },
+          ],
+        },
+        {
+          type: 'code',
+          relPath: 'src/store.ts',
+          language: 'typescript',
+          lineStart: 3,
+          lineEnd: 4,
+          code: 'function commit() {\n  return 42;',
+        },
+      ],
+    },
+    { id: 'flow', kind: 'flow', title: '异常路径', summary: '请求失败时响应错误。', blocks: [] },
   ],
   files: [
     {
       id: 'store-file',
-      sectionId: 'overview',
+      sectionId: 'orders',
       relPath: 'src/store.ts',
       responsibility: '保存订单',
       symbols: [
@@ -100,26 +130,51 @@ test('离线图谱置顶并允许键盘查看边证据及下钻符号', async ({
   });
   const index = pathToFileURL(join(root, 'index.html')).href;
   const stylesheet = await readFile(join(assets, 'style.css'), 'utf8');
-  const open = async (layoutStyle: 'arch' | 'doc', theme: ThemeId = ThemeId.Dracula) => {
-    await writeFile(join(root, 'assets', 'style.css'), designSiteStylesheet(theme, stylesheet));
+  const open = async (layoutStyle: 'arch' | 'doc', sections = model.sections) => {
+    await writeFile(join(root, 'assets', 'style.css'), designSiteStylesheet(stylesheet));
     await writeFile(
       join(root, 'model.js'),
-      `window.__AW_DESIGN_SITE_COPY__ = ${labels};window.__AW_DESIGN_DATA__ = ${JSON.stringify({ ...model, layoutStyle, theme })};`,
+      `window.__AW_DESIGN_SITE_COPY__ = ${labels};window.__AW_DESIGN_DATA__ = ${JSON.stringify({ ...model, sections, layoutStyle })};`,
     );
     await page.goto(index);
   };
   await open('arch');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dracula');
+  await expect(page.getByRole('heading', { name: model.title })).toBeVisible();
+  const main = page.getByRole('main');
+  await expect(main.getByRole('heading', { name: '项目大纲' })).toBeVisible();
+  const homeGraph = main.getByRole('group', { name: '组成', exact: true });
+  await expect(homeGraph.getByRole('link', { name: '异常路径' })).toHaveCount(0);
+  await main.getByRole('link', { name: /异常路径/ }).click();
+  await expect(main.getByRole('heading', { name: '异常路径' })).toBeVisible();
+  await main.getByRole('navigation', { name: '面包屑' }).getByRole('link', { name: model.title }).click();
+  await expect(homeGraph).toBeVisible();
+  const initialViewBox = await homeGraph.getAttribute('viewBox');
+  await homeGraph.press('ArrowRight');
+  await expect(homeGraph).not.toHaveAttribute('viewBox', initialViewBox ?? '');
+  await homeGraph.press('+');
+  await homeGraph.press('Home');
+  await expect(homeGraph).toHaveAttribute('viewBox', initialViewBox ?? '');
+
+  await homeGraph.getByRole('link', { name: '订单模块' }).press('Space');
+  await expect(main.getByRole('heading', { name: '订单模块' })).toBeVisible();
+  await main.getByRole('group', { name: '组成', exact: true }).getByRole('link', { name: '存储子模块' }).press('Enter');
+  await expect(main.getByRole('heading', { name: '如何写入订单？' })).toBeVisible();
+  await main.getByRole('link', { name: 'src/store.ts:4' }).click();
+  await expect(page.locator('.code-line[data-focus]')).toHaveAttribute('data-line', '4');
+  await expect(page.locator('.code-line[data-line="4"] .syntax-keyword')).toHaveText('return');
+  await expect(
+    page.getByRole('navigation', { name: '面包屑' }).getByRole('link', { name: '存储子模块' }),
+  ).toBeVisible();
+  await page.getByRole('navigation', { name: '章节目录' }).getByRole('link', { name: '项目总览', exact: true }).click();
   const article = page.locator('main article').first();
   const graph = article.getByRole('group', { name: '订单调用图' });
   await expect(graph).toHaveCount(1);
   const graphPrecedesText = () =>
-    article.locator('.graph-canvas').evaluate((canvas) => {
+    graph.evaluate((canvas) => {
       const prose = canvas.closest('article')?.querySelector('.content-block');
       return prose != null && Boolean(canvas.compareDocumentPosition(prose) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
   expect(await graphPrecedesText()).toBe(true);
-  await expect(article.locator('.architecture-card').filter({ hasText: '订单模块' })).toBeVisible();
 
   const evidence = page.getByRole('region', { name: '关系证据' });
   const direct = graph.getByRole('button', { name: /存入.*静态确认/ });
@@ -138,12 +193,22 @@ test('离线图谱置顶并允许键盘查看边证据及下钻符号', async ({
   await expect(page.locator('.symbol.highlight')).toContainText('Store.commit');
 
   await open('doc');
-  await expect(page.getByRole('heading', { name: '正文' })).toBeVisible();
+  await page.getByRole('navigation', { name: '章节目录' }).getByRole('link', { name: '项目总览', exact: true }).click();
+  await expect(main.getByRole('heading', { name: '项目总览', exact: true })).toBeVisible();
+  await expect(graph).toBeVisible();
   expect(await graphPrecedesText()).toBe(false);
   await expect(page.getByRole('heading', { name: '模块与文件' })).toHaveCount(0);
-  for (const theme of THEME_IDS) {
-    await open('doc', theme);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await page.goto(`${index}#file/store-file//4/4`);
+  const source = page.locator('.source-excerpts pre');
+  const codeLine = source.locator('.code-line[data-focus]');
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    const theme = SYSTEM_THEME_MAP[scheme];
+    await expect(source).toHaveCSS('background-color', scheme === 'light' ? 'rgb(23, 34, 53)' : 'rgb(14, 21, 32)');
+    await expect(codeLine).toHaveCSS('background-color', scheme === 'light' ? 'rgb(41, 62, 96)' : 'rgb(34, 57, 83)');
+    await expect(codeLine.locator('.syntax-keyword')).toHaveCSS('color', 'rgb(200, 183, 255)');
+    await expect(codeLine.locator('.syntax-number')).toHaveCSS('color', 'rgb(255, 209, 140)');
+    await expect(codeLine.locator('.code-number')).toHaveCSS('color', 'rgb(168, 184, 206)');
     const actual = await page.locator('html').evaluate((root) => {
       const computed = getComputedStyle(root);
       return [
@@ -154,5 +219,12 @@ test('离线图谱置顶并允许键盘查看边证据及下钻符号', async ({
     });
     expect(actual).toEqual([THEMES[theme].colorScheme, THEMES[theme].tokens.bg, THEMES[theme].tokens.ink]);
   }
+  await open(
+    'arch',
+    model.sections.filter(({ kind }) => kind !== 'overview'),
+  );
+  await expect(main.locator('.summary')).toHaveText('保存订单。');
+  await expect(homeGraph.getByRole('link', { name: '订单模块' })).toBeVisible();
+  await expect(homeGraph.getByRole('link', { name: '异常路径' })).toHaveCount(0);
   expect(external).toEqual([]);
 });

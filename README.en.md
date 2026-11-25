@@ -44,7 +44,8 @@ The app and its task data run locally. **Local-first does not mean offline infer
 | Parallel work | Independent tasks, batch runs, scheduled workflows, and larger initiatives split into stages and work packages. Scheduled execution still leaves merging to you. |
 | Delivery | File diffs, local merge strategies, GitHub PRs / GitLab MRs, and a feedback loop for selected review comments. |
 | Browser preview | Start a preview in a task's worktree; inspect the same page the AI uses, with desktop, tablet, and phone sizes. |
-| Project knowledge | Read-only questions about code, documents, and linked databases, with citations. Web search is separately controlled and off by default. |
+| Project knowledge | Read-only questions about code, documents, and linked databases, with citations. Each knowledge conversation has its own approval mode. A new question delegated by the assistant inherits its conversation’s mode. Web search is separately controlled and off by default. |
+| Architecture explorer | Follow the project graph from modules to files and cited source lines. Chapters run in separate sessions. The offline HTML report includes cited excerpts. |
 | Assistant and documents | Use the in-app assistant, delegate text or image analysis to specialist agents, work with Word / Excel files, and create presentations for PowerPoint or PDF export. |
 | Professional mode | Custom workflows and roles, plan editing, a Git workbench, read-only database access for AI, and usage / quality views. |
 

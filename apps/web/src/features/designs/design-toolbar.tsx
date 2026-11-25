@@ -1,12 +1,4 @@
-import {
-  DESIGN_TITLE_MAX_CHARS,
-  type DesignDTO,
-  DesignStatus,
-  designLayoutStyleSchema,
-  StatusTone,
-  THEME_IDS,
-  themeIdSchema,
-} from '@aw/shared';
+import { DESIGN_TITLE_MAX_CHARS, type DesignDTO, DesignStatus, designLayoutStyleSchema, StatusTone } from '@aw/shared';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -17,7 +9,6 @@ import { StatusBadge } from '../../components/status-badge.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
 import { DESIGN_LAYOUT_LABEL, DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
-import { THEME_LABEL } from '../../copy/themes.ts';
 import styles from './design-workbench.module.css';
 import { useUpdateDesign } from './designs.queries.ts';
 
@@ -160,7 +151,10 @@ export function DesignToolbar({
         </div>
         <div className={styles.headline}>
           <DesignTitle design={design} disabled={busy} />
-          <StatusBadge tone={statusTone(design.status)} label={DESIGN_STATUS_LABEL[design.status]} />
+          <StatusBadge
+            tone={design.handoffPending ? StatusTone.Run : statusTone(design.status)}
+            label={design.handoffPending ? C.handoffPending : DESIGN_STATUS_LABEL[design.status]}
+          />
         </div>
         <div className={styles.meta}>
           <span className="mono" title={design.sourceSnapshot.dirty ? C.dirty : undefined}>
@@ -241,23 +235,6 @@ export function DesignToolbar({
                 {Object.entries(DESIGN_LAYOUT_LABEL).map(([id, label]) => (
                   <option key={id} value={id}>
                     {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="col">
-              <span>{C.theme}</span>
-              <select
-                className="select"
-                disabled={update.isPending || design.projectId === null}
-                value={design.theme}
-                onChange={(event) =>
-                  update.mutate({ id: design.id, theme: themeIdSchema.parse(event.currentTarget.value) })
-                }
-              >
-                {THEME_IDS.map((theme) => (
-                  <option key={theme} value={theme}>
-                    {THEME_LABEL[theme]}
                   </option>
                 ))}
               </select>

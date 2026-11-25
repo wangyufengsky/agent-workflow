@@ -702,7 +702,7 @@ class AppError extends Error {
 
 功能测试执行使用 `FunctionalTestStatus`。执行期间为 `running`，完成后由证据推导 `passed`、`failed` 或 `blocked`。尚未执行的用例在报告中标作 `not_run`。功能测试不改变任务状态机。
 
-权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。在 ask 和 assisted 下，已明确记住的 Bash 调用可在授权范围内复用；工作目录、完整命令、脚本入口或参数变化时重新判定。审批员只能批准本次。
+权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。知识问答按对话保存该枚举，所有档位都适用研究员的只读角色与资料来源规则（[18](18-knowledge.md#研究员权限范围)）。助手原生 Bash 可按助手对话复用用户已记住的授权，任务尝试可按该任务或所属项目复用符合当前角色规则的授权；工作目录、完整命令、脚本入口或参数变化时重新判定。知识问答的 Bash 审批只处理本次，审批员也只能批准本次。
 
 ### 模型思考强度
 
@@ -716,7 +716,7 @@ class AppError extends Error {
 `none / passed / needs_attention`。显示状态由选中章节的完成数、大纲确认时间和最近一次尝试推导，
 取值为 `outlining / outline_ready / generating / reviewing / incomplete / ready / failed`。
 
-`designer` 对应 `aw-designer`。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
+`designer` 对应 `aw-designer`。`design_generate` 每章独占一个全新的会话，独立复审另开会话。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
 `design_review`。实体类型为 `design`，设计更新事件为 `design.updated`。
 
 | 错误码 | HTTP | 含义 |

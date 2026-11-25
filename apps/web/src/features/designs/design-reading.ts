@@ -9,22 +9,46 @@ import {
 } from '@aw/shared';
 
 export type ReadingTarget =
+  | { kind: 'overview' }
   | { kind: 'section'; sectionId: string }
-  | { kind: 'file'; sectionId: string; fileId: string; symbolId?: string }
+  | { kind: 'submodule'; sectionId: string; submoduleId: string }
+  | { kind: 'file'; sectionId: string; fileId: string; symbolId?: string; lines?: { start: number; end: number } }
   | { kind: 'diagram'; sectionId: string; diagramId: string };
 
 export function targetKey(target: ReadingTarget): string {
+  if (target.kind === 'overview') return 'overview';
   if (target.kind === 'section') return `section:${target.sectionId}`;
+  if (target.kind === 'submodule') return `submodule:${target.sectionId}:${target.submoduleId}`;
   if (target.kind === 'diagram') return `diagram:${target.diagramId}`;
-  return `file:${target.fileId}${target.symbolId === undefined ? '' : `:${target.symbolId}`}`;
+  return `file:${target.fileId}:${target.symbolId ?? ''}:${target.lines?.start ?? ''}:${target.lines?.end ?? ''}`;
 }
 
-export function fileTarget(file: DesignFileDTO, sectionId: string, symbolId?: string): ReadingTarget {
+export function basename(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1);
+}
+
+export type DesignSubmodule = Extract<DesignBlock, { type: 'submodule' }>;
+
+export function submodulesOf(section: DesignSectionDTO): DesignSubmodule[] {
+  return section.blocks?.filter((block) => block.type === 'submodule') ?? [];
+}
+
+export function fileSubmodule(file: DesignFileDTO, section: DesignSectionDTO): DesignSubmodule | undefined {
+  return submodulesOf(section).find(({ files }) => files.includes(file.relPath));
+}
+
+export function fileTarget(
+  file: DesignFileDTO,
+  sectionId: string,
+  symbolId?: string,
+  lines?: { start: number; end: number },
+): Extract<ReadingTarget, { kind: 'file' }> {
   return {
     kind: 'file',
     sectionId: file.sectionId ?? sectionId,
     fileId: file.id,
     ...(symbolId === undefined ? {} : { symbolId }),
+    ...(lines === undefined ? {} : { lines }),
   };
 }
 
@@ -52,6 +76,8 @@ function blockText(block: DesignBlock): string[] {
       return [block.title ?? '', block.relPath, block.code];
     case 'table':
       return [block.title, block.caption ?? '', ...block.columns, ...block.rows.flat()];
+    case 'submodule':
+      return [];
     case 'diagram_ref':
       return [];
   }
@@ -70,11 +96,29 @@ export function readingIndex(design: Pick<DesignDTO, 'sections' | 'diagrams' | '
       kind: 'section',
       sectionId: id,
     });
+    for (const block of blocks ?? []) {
+      if (block.type !== 'submodule') continue;
+      add(
+        block.title,
+        title,
+        [block.summary, ...block.files, ...block.behaviors.flatMap(({ title, markdown }) => [title, markdown])],
+        {
+          kind: 'submodule',
+          sectionId: id,
+          submoduleId: block.id,
+        },
+      );
+    }
   }
   for (const file of design.files) {
     if (file.sectionId === null || !sections.has(file.sectionId) || file.responsibility === null) continue;
     const section = sections.get(file.sectionId);
-    add(file.relPath, section?.title ?? '', [file.responsibility], fileTarget(file, file.sectionId));
+    add(
+      basename(file.relPath),
+      file.relPath,
+      [file.responsibility, section?.title ?? ''],
+      fileTarget(file, file.sectionId),
+    );
     for (const symbol of file.symbols) {
       add(
         symbol.qualifiedName,
@@ -116,6 +160,11 @@ export function graphNodeTarget(
       ({ id, selected, title }) => selected && (id === node.targetId || title === node.targetId),
     );
     if (target !== undefined) return { kind: 'section', sectionId: target.id };
+    for (const chapter of design.sections) {
+      if (!chapter.selected) continue;
+      const module = submodulesOf(chapter).find(({ id, title }) => id === node.targetId || title === node.targetId);
+      if (module !== undefined) return { kind: 'submodule', sectionId: chapter.id, submoduleId: module.id };
+    }
   }
   const file = design.files.find(
     ({ id, relPath }) => id === node.targetId || relPath === node.relPath || relPath === node.targetId,

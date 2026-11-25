@@ -4,6 +4,7 @@ import {
   AppError,
   DESIGN_SCAN_MAX_FILE_BYTES,
   DesignDiagramKind,
+  type DesignEvidence,
   DesignEvidenceClass,
   ErrorCode,
   type SubmitDesignReviewInput,
@@ -50,7 +51,7 @@ function requireUnique(values: readonly string[], field: Field, key: string) {
 async function sourceChecks(context: Context) {
   const authorized = new Set(context.files.map((file) => file.relPath));
   const root = await realpath(context.root);
-  const counts = new Map<string, number>();
+  const contents = new Map<string, string[]>();
   const resolved = new Map<string, string>();
   async function path(relPath: string, field: Field) {
     const cached = resolved.get(relPath);
@@ -65,14 +66,21 @@ async function sourceChecks(context: Context) {
   }
   async function lines(relPath: string, start: number, end: number, field: Field) {
     const real = await path(relPath, field);
-    let count = counts.get(relPath);
-    if (count === undefined) {
-      count = linesOf(await readFile(real, 'utf8')).length;
-      counts.set(relPath, count);
+    let text = contents.get(relPath);
+    if (text === undefined) {
+      text = linesOf(await readFile(real, 'utf8'));
+      contents.set(relPath, text);
     }
-    if (end < start || end > count) invalid(field, 'Line range is outside the source file');
+    if (end < start || end > text.length) invalid(field, 'Line range is outside the source file');
+    return text;
   }
-  return { path, lines };
+  async function evidence(entries: readonly DesignEvidence[], field: Field) {
+    for (const [index, entry] of entries.entries()) {
+      if (entry.evidenceClass === DesignEvidenceClass.Static)
+        await lines(entry.relPath, entry.lineStart, entry.lineEnd, [...field, index]);
+    }
+  }
+  return { path, lines, evidence };
 }
 
 export async function validateDesignSection(input: SubmitDesignSectionInput, context: Context) {
@@ -90,16 +98,29 @@ export async function validateDesignSection(input: SubmitDesignSectionInput, con
     'id',
   );
   const diagrams = new Set(input.diagrams.map((diagram) => diagram.id));
+  const chapterFiles = new Set(input.files.map(({ relPath }) => relPath));
+  const assignedFiles = new Set<string>();
+  const submodules = new Set<string>();
   for (const [i, block] of input.blocks.entries()) {
     const field = ['blocks', i];
     if (block.type === 'diagram_ref' && !diagrams.has(block.diagramId))
       invalid([...field, 'diagramId'], 'Diagram is not part of this section');
-    if (block.type === 'code') await source.lines(block.relPath, block.lineStart, block.lineEnd, [...field, 'lineEnd']);
-    if (block.type === 'markdown') {
-      for (const [j, evidence] of (block.evidence ?? []).entries()) {
-        if (evidence.evidenceClass === DesignEvidenceClass.Static)
-          await source.lines(evidence.relPath, evidence.lineStart, evidence.lineEnd, [...field, 'evidence', j]);
+    if (block.type === 'code') {
+      const lines = await source.lines(block.relPath, block.lineStart, block.lineEnd, [...field, 'lineEnd']);
+      if (linesOf(block.code).join('\n') !== lines.slice(block.lineStart - 1, block.lineEnd).join('\n'))
+        invalid([...field, 'code'], 'Quote the exact source lines in the specified range');
+    }
+    if (block.type === 'markdown' && block.evidence) await source.evidence(block.evidence, [...field, 'evidence']);
+    if (block.type === 'submodule') {
+      if (submodules.has(block.id)) invalid([...field, 'id'], 'Duplicate submodule identifier');
+      submodules.add(block.id);
+      for (const [j, path] of block.files.entries()) {
+        if (!chapterFiles.has(path) || assignedFiles.has(path))
+          invalid([...field, 'files', j], 'Assign a file listed in this section to only one submodule');
+        assignedFiles.add(path);
       }
+      for (const [j, behavior] of block.behaviors.entries())
+        await source.evidence(behavior.evidence, [...field, 'behaviors', j, 'evidence']);
     }
   }
   for (const [i, file] of input.files.entries()) {

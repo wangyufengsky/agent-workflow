@@ -19,7 +19,7 @@ import {
 
 type TargetDialogProps = {
   design: DesignDTO;
-  target: ReadingTarget;
+  target: Exclude<ReadingTarget, { kind: 'overview' }>;
   title: string;
   close: () => void;
 };

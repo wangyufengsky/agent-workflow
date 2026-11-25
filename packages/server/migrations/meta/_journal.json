@@ -414,6 +414,13 @@
       "when": 1795607977197,
       "tag": "0058_project_designs",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1795621010711,
+      "tag": "0059_knowledge_permission_mode",
+      "breakpoints": true
     }
   ]
 }

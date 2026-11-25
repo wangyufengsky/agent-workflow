@@ -45,6 +45,7 @@ describe('操作清单的标注（M5-10）', () => {
         'initiatives.delete',
         'initiatives.deliverPhase',
         'knowledge.delete',
+        'knowledge.setPermissionMode',
         'memory.create',
         'memory.delete',
         'projects.delete',

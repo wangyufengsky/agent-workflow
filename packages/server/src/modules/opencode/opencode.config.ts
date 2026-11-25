@@ -334,8 +334,8 @@ const OFFLINE_WEB_RULES: readonly PermissionRule[] = [{ permission: 'webfetch', 
  * Read-only sessions may also run `checkCommands` (the project check and the node's command checks) and the usual
  * test commands of the same tool without asking: running the checks is how a planner or reviewer learns the state of
  * the code, and asking would interrupt the user on every review (D51, D64). The researcher runs no checks; `web`
- * turns its web tools on (D69), offline only reading pages (D168). `allowedBash` are the patterns the user always allowed in the project (D101); every
- * read-only set takes them, executors under `auto` already run everything but Git.
+ * turns its web tools on (D69), offline only reading pages (D168). Task sessions inherit the project's saved Bash
+ * patterns (D101). Knowledge sessions use their own approval policy.
  */
 export function sessionPermissionRules(
   base: SessionAgent,
@@ -414,7 +414,7 @@ export function sessionPermissionRules(
   }
   if (base === SessionAgent.Researcher) {
     const webRules = offline ? OFFLINE_WEB_RULES : WEB_RULES;
-    return [...readonlyBashRules([], allowedBash), ...(web ? webRules : [])];
+    return [...readonlyBashRules([]), ...(web ? webRules : [])];
   }
   if (base === SessionAgent.SlidesWriter || base === SessionAgent.CodeReviewer)
     return readonlyBashRules([], allowedBash);

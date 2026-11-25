@@ -3,6 +3,7 @@ import {
   type KnowledgeConversationDTO,
   type KnowledgeTurnDTO,
   KnowledgeTurnStatus,
+  PermissionMode,
   UiMode,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
@@ -16,12 +17,19 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
+import { PermissionPicker } from '../permissions/permission-picker.tsx';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { Answer, DraftAnswer } from './answer.tsx';
 import { Composer } from './composer.tsx';
 import styles from './knowledge.module.css';
-import { knowledgeConversationQuery, useAskKnowledge, useFollowUp, useStopKnowledge } from './knowledge.queries.ts';
+import {
+  knowledgeConversationQuery,
+  useAskKnowledge,
+  useFollowUp,
+  useSetKnowledgePermissionMode,
+  useStopKnowledge,
+} from './knowledge.queries.ts';
 import { KnowledgeTaskAction } from './knowledge-task-action.tsx';
 import { ModelPicker } from './model-picker.tsx';
 import { ResearchCard } from './research-card.tsx';
@@ -76,6 +84,7 @@ export function KnowledgeWelcomePage() {
   const [example, setExample] = useState<string | undefined>(undefined);
   const [model, setModel] = useState(useSettings()['ai.defaultModel']);
   const ask = useAskKnowledge();
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(PermissionMode.Ask);
 
   return (
     <div className={styles.page}>
@@ -115,11 +124,21 @@ export function KnowledgeWelcomePage() {
             blockedReason={hasSource(sources) ? undefined : C.needSource}
             researching={false}
             pending={ask.isPending}
-            tools={<ModelPicker value={model} projectId={projectId ?? null} onChange={setModel} />}
+            tools={
+              <>
+                <ModelPicker value={model} projectId={projectId ?? null} onChange={setModel} />
+                <PermissionPicker
+                  knowledge
+                  value={permissionMode}
+                  disabled={ask.isPending}
+                  onChange={setPermissionMode}
+                />
+              </>
+            }
             onSend={(question) => {
               if (projectId === undefined) return;
               ask.mutate(
-                { projectId, question, sources, model },
+                { projectId, question, sources, model, permissionMode },
                 {
                   onSuccess: (c) =>
                     void navigate({ to: ROUTES.knowledgeConversation, params: { conversationId: c.id } }),
@@ -165,6 +184,7 @@ function Turn({
   isLatest,
   activeCitation,
   onCite,
+  askAgainDisabled,
   onAskAgain,
 }: {
   turn: KnowledgeTurnDTO;
@@ -175,6 +195,7 @@ function Turn({
   isLatest: boolean;
   activeCitation: number | undefined;
   onCite(index: number, trigger: HTMLElement): void;
+  askAgainDisabled: boolean;
   onAskAgain(): void;
 }) {
   const ended = turn.status === KnowledgeTurnStatus.Stopped || turn.status === KnowledgeTurnStatus.Failed;
@@ -208,7 +229,7 @@ function Turn({
         <div className={styles.ended}>
           <span className="grow">{turn.status === KnowledgeTurnStatus.Stopped ? C.stopped : C.failed}</span>
           {isLatest && (
-            <Button size="sm" icon="refresh" onClick={onAskAgain}>
+            <Button size="sm" icon="refresh" disabled={askAgainDisabled} onClick={onAskAgain}>
               {C.askAgain}
             </Button>
           )}
@@ -228,6 +249,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
   const pro = useSettings()['ui.mode'] === UiMode.Pro || details === true;
   const followUp = useFollowUp();
   const stop = useStopKnowledge();
+  const changeMode = useSetKnowledgePermissionMode();
   const trigger = useRef<HTMLElement | null>(null);
   const latest = conversation.turns.at(-1);
   const researching = latest?.status === KnowledgeTurnStatus.Researching;
@@ -247,6 +269,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
     void navigate({ search: (prev) => ({ ...prev, turn: undefined, cite: undefined }), replace: true });
     trigger.current?.focus();
   };
+  const pending = followUp.isPending || changeMode.isPending;
   const ask = (question: string, clear?: () => void) =>
     followUp.mutate({ id: conversation.id, question, model }, { onSuccess: () => clear?.() });
 
@@ -267,10 +290,12 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
                 isLatest={turn === latest}
                 activeCitation={turn.id === openTurn ? cite : undefined}
                 onCite={(index, from) => openCitation(turn.id, index, from)}
+                askAgainDisabled={pending}
                 onAskAgain={() => ask(turn.question)}
               />
             ))}
             {followUp.isError && <ErrorState error={followUp.error} />}
+            {changeMode.isError && <ErrorState error={changeMode.error} />}
             {stop.isError && <ErrorState error={stop.error} />}
           </div>
         </div>
@@ -278,10 +303,20 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
           placeholder={C.followUpPlaceholder}
           blockedReason={researching ? C.busyHint : undefined}
           researching={researching}
-          pending={followUp.isPending}
+          pending={pending}
           onSend={ask}
           onStop={() => stop.mutate(conversation.id)}
-          tools={<ModelPicker value={model} projectId={conversation.project.id} onChange={setModel} />}
+          tools={
+            <>
+              <ModelPicker value={model} projectId={conversation.project.id} onChange={setModel} />
+              <PermissionPicker
+                knowledge
+                value={conversation.permissionMode}
+                disabled={pending}
+                onChange={(permissionMode) => changeMode.mutate({ id: conversation.id, permissionMode })}
+              />
+            </>
+          }
         >
           <SourcesPicker sources={conversation.sources} databaseCount={conversation.project.databaseCount} />
         </Composer>

@@ -1,7 +1,14 @@
-import { type CitationDTO, citationSchema, type KnowledgeSources, knowledgeSourcesSchema } from '@aw/shared';
+import {
+  type CitationDTO,
+  citationSchema,
+  type KnowledgeSources,
+  knowledgeSourcesSchema,
+  type PermissionMode,
+} from '@aw/shared';
 import { and, asc, desc, eq, exists, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
+import type { KnowledgePermissionPolicy } from '../permissions/index.ts';
 import { knowledgeConversationsTable, knowledgeTurnsTable } from './knowledge.table.ts';
 
 type ConversationRow = typeof knowledgeConversationsTable.$inferSelect;
@@ -25,6 +32,23 @@ const toTurn = ({ citations, ...row }: TurnRow): Turn => ({
 /** `%`, `_` and the escape character itself match literally in a LIKE pattern. */
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
+export function readKnowledgePermissionPolicy(
+  db: DbExecutor,
+  attemptId: string,
+): KnowledgePermissionPolicy | undefined {
+  const row = db
+    .select({
+      mode: knowledgeConversationsTable.permissionMode,
+      intent: knowledgeTurnsTable.question,
+      sources: knowledgeConversationsTable.sources,
+    })
+    .from(knowledgeTurnsTable)
+    .innerJoin(knowledgeConversationsTable, eq(knowledgeTurnsTable.conversationId, knowledgeConversationsTable.id))
+    .where(eq(knowledgeTurnsTable.attemptId, attemptId))
+    .get();
+  return row && { ...row, sources: knowledgeSourcesSchema.parse(JSON.parse(row.sources)) };
+}
+
 export function createKnowledgeRepo(db: DbExecutor) {
   const c = knowledgeConversationsTable;
   const t = knowledgeTurnsTable;
@@ -38,6 +62,9 @@ export function createKnowledgeRepo(db: DbExecutor) {
     findConversation(id: string): Conversation | undefined {
       const row = db.select().from(c).where(eq(c.id, id)).get();
       return row === undefined ? undefined : toConversation(row);
+    },
+    setPermissionMode(id: string, permissionMode: PermissionMode, updatedAt: number): void {
+      db.update(c).set({ permissionMode, updatedAt }).where(eq(c.id, id)).run();
     },
     touchConversation(id: string, updatedAt: number): void {
       db.update(c).set({ updatedAt }).where(eq(c.id, id)).run();

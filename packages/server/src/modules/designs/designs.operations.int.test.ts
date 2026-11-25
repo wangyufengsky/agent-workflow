@@ -49,11 +49,14 @@ it('通过 HTTP 轻量推荐、复制分析模板并保护设计引用的模板�
   const listed = await t.call(listDesignTemplatesOp, { projectId: project.id });
   expect(listed.status).toBe(200);
   expect(listed.body.suggested).toEqual({
-    recommendedTemplateKey: BuiltinDesignTemplateKey.ReactFrontend,
+    recommendedTemplateKey: BuiltinDesignTemplateKey.General,
     techStack: ['JavaScript', 'React'],
   });
-  const base = listed.body.items.find((item) => item.key === BuiltinDesignTemplateKey.ReactFrontend);
-  if (base === undefined) throw new Error('React template not found');
+  expect(listed.body.items).toMatchObject([
+    { key: BuiltinDesignTemplateKey.General, name: '架构探索', kind: DesignTemplateKind.Builtin },
+  ]);
+  const base = listed.body.items.find((item) => item.key === BuiltinDesignTemplateKey.General);
+  if (base === undefined) throw new Error('Built-in architecture template not found');
 
   const created = await t.call(createDesignTemplateOp, {
     baseKey: base.key,
@@ -170,22 +173,27 @@ it('生成过程中从 HTTP 切换阅读设置，原有尝试继续写入章节'
     diagrams: [],
   });
   const waiting = inboxOpens(t, InboxKind.Permission);
-  const finished = waitForEvent(
-    t.app.events,
-    ServerEventType.AttemptUpdated,
-    ({ attempt }) => attempt.kind === AttemptKind.DesignGenerate && attempt.status === AttemptStatus.Succeeded,
-  );
+  const designer = { agent: OPENCODE_AGENT_NAME.designer };
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, submit(overview.id, '总览已提交')), designer);
   t.fake.enqueue(
     script()
-      .callTool(McpToolName.SubmitDesignSection, submit(overview.id, '总览已提交'))
       .requestPermission('bash', ['rg -n value src/index.ts'])
       .callTool(McpToolName.SubmitDesignSection, submit(module.id, '模块已提交')),
-    { agent: OPENCODE_AGENT_NAME.designer },
+    designer,
   );
   expect((await t.call(generateDesignOp, { id })).status).toBe(200);
   const { item } = await waiting;
   const before = (await t.call(getDesignOp, { id })).body;
   expect(before).toMatchObject({ status: DesignStatus.Generating, doneSections: 1 });
+  const finishingAttempt = before.runs.at(-1)?.attempt.id;
+  const finished = waitForEvent(
+    t.app.events,
+    ServerEventType.AttemptUpdated,
+    ({ attempt }) =>
+      attempt.id === finishingAttempt &&
+      attempt.kind === AttemptKind.DesignGenerate &&
+      attempt.status === AttemptStatus.Succeeded,
+  );
 
   const updated = await t.call(updateDesignOp, { id, theme: ThemeId.Dracula, layoutStyle: DesignLayoutStyle.Arch });
   expect(updated.status).toBe(200);
@@ -220,5 +228,5 @@ it('生成过程中从 HTTP 切换阅读设置，原有尝试继续写入章节'
     sections: [{ summary: '总览已提交' }, { summary: '模块已提交' }],
   });
   expect(completed.runs.map(({ attempt }) => attempt.id)).toEqual(before.runs.map(({ attempt }) => attempt.id));
-  expect(t.fake.prompts).toHaveLength(1);
+  expect(t.fake.prompts).toHaveLength(2);
 });

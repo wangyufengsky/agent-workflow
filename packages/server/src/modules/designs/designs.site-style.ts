@@ -1,5 +1,5 @@
-import type { ThemeId } from '@aw/shared';
-import { THEMES, type ThemeTokenName } from '@aw/shared/theme';
+import { SYSTEM_THEME_MAP, type ThemeId } from '@aw/shared';
+import { DESIGN_CODE_TOKENS, THEMES, type ThemeTokenName } from '@aw/shared/theme';
 
 const offlineTokens = [
   'bg',
@@ -9,11 +9,25 @@ const offlineTokens = [
   'accent',
   'line',
   'bg-sunken',
+  'accent-fill',
+  'ok',
+  'warn',
 ] as const satisfies readonly ThemeTokenName[];
 
-/** 样式随站点写出，使用与应用一致的主题值，无需在离线浏览器加载运行时。 */
-export function designSiteStylesheet(id: ThemeId, stylesheet: string): string {
+function themeRule(selector: string, id: ThemeId): string {
   const { colorScheme, tokens } = THEMES[id];
-  const variables = offlineTokens.map((name) => `  --${name}: ${tokens[name]};`).join('\n');
-  return `:root {\n  color-scheme: ${colorScheme};\n${variables}\n}\n${stylesheet}`;
+  const variables = [
+    ...offlineTokens.map((name) => [name, tokens[name]]),
+    ...Object.entries(DESIGN_CODE_TOKENS[colorScheme]),
+  ]
+    .map(([name, value]) => `  --${name}: ${value};`)
+    .join('\n');
+  return `${selector} {\n  color-scheme: ${colorScheme};\n${variables}\n}\n`;
+}
+
+/** 离线站点根据系统明暗选择应用的对应调色板。 */
+export function designSiteStylesheet(stylesheet: string): string {
+  const light = themeRule(':root', SYSTEM_THEME_MAP.light);
+  const dark = themeRule(':root', SYSTEM_THEME_MAP.dark);
+  return `${light}@media (prefers-color-scheme: dark) {\n${dark}}\n${stylesheet}`;
 }

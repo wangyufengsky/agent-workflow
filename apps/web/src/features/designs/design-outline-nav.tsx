@@ -1,15 +1,30 @@
-import { type DesignDTO, DesignReviewState, type DesignRunDTO, type DesignSectionDTO } from '@aw/shared';
-import { useMemo, useRef, useState } from 'react';
+import {
+  type DesignDTO,
+  type DesignFileDTO,
+  DesignReviewState,
+  type DesignRunDTO,
+  type DesignSectionDTO,
+} from '@aw/shared';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { DESIGN_WORKBENCH_COPY as C, DESIGN_REVIEW_LABEL } from '../../copy/design-workbench.ts';
-import { fileTarget, matchingReadingItems, type ReadingTarget, readingIndex, targetKey } from './design-reading.ts';
+import {
+  basename,
+  fileSubmodule,
+  fileTarget,
+  matchingReadingItems,
+  type ReadingTarget,
+  readingIndex,
+  submodulesOf,
+  targetKey,
+} from './design-reading.ts';
 import styles from './design-workbench.module.css';
 
 const MIN_NAV = 180;
 const MAX_NAV = 380;
 const NAV_STEP = 16;
-export const DEFAULT_NAV = 232;
+export const DEFAULT_NAV = 245;
 
 function sectionStatus(section: DesignSectionDTO, workingId: string | undefined, failedIds: ReadonlySet<string>) {
   if (section.id === workingId) return { label: C.working, tone: 'working' };
@@ -29,20 +44,85 @@ type NavProps = {
   onCollapse: () => void;
 };
 
-function readableSection(design: DesignDTO, id: string) {
-  return {
-    graphs: design.diagrams.filter(({ sectionId }) => sectionId === id),
-    files: design.files.filter(({ sectionId, responsibility }) => sectionId === id && responsibility !== null),
-  };
+function FileTreeItem({
+  file,
+  sectionId,
+  current,
+  onNavigate,
+}: {
+  file: DesignFileDTO;
+  sectionId: string;
+  current: string;
+  onNavigate: NavProps['onNavigate'];
+}) {
+  const target = fileTarget(file, sectionId);
+  return (
+    <li>
+      <button
+        type="button"
+        title={file.relPath}
+        aria-current={targetKey(target) === current ? 'page' : undefined}
+        onClick={() => onNavigate(target)}
+      >
+        <Icon name="file" size="sm" />
+        <span>{basename(file.relPath)}</span>
+      </button>
+      {file.symbols.length > 0 && (
+        <details className={styles.treeGroup}>
+          <summary>
+            {C.symbol} · {file.symbols.length}
+          </summary>
+          <ul>
+            {file.symbols.map((symbol) => {
+              const selected = fileTarget(file, sectionId, symbol.id);
+              return (
+                <li key={symbol.id}>
+                  <button
+                    type="button"
+                    className="mono"
+                    aria-current={targetKey(selected) === current ? 'page' : undefined}
+                    onClick={() => onNavigate(selected)}
+                    title={symbol.qualifiedName}
+                  >
+                    {symbol.name}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+    </li>
+  );
 }
 
 export function DesignOutlineNav({ design, hidden, target, active, failedIds, onNavigate, onCollapse }: NavProps) {
   const [search, setSearch] = useState('');
   const items = useMemo(() => readingIndex(design), [design]);
   const matches = matchingReadingItems(items, search);
-  const current = targetKey(target);
+  const current =
+    target.kind === 'file'
+      ? targetKey({
+          kind: 'file',
+          sectionId: target.sectionId,
+          fileId: target.fileId,
+          ...(target.symbolId === undefined ? {} : { symbolId: target.symbolId }),
+        })
+      : targetKey(target);
   const workingId = active?.targetSectionIds.find((id) => !active.doneSectionIds.includes(id));
   const go = (next: ReadingTarget) => () => onNavigate(next);
+  const tree = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (search.trim() !== '' || current === 'overview') return;
+    const activeButton = tree.current?.querySelector('[aria-current="page"]');
+    for (
+      let parent = activeButton?.closest('details');
+      parent instanceof HTMLDetailsElement;
+      parent = parent.parentElement?.closest('details')
+    ) {
+      parent.open = true;
+    }
+  }, [current, search]);
 
   return (
     <aside className={styles.navigator} aria-label={C.outline} hidden={hidden}>
@@ -82,11 +162,25 @@ export function DesignOutlineNav({ design, hidden, target, active, failedIds, on
           </ul>
         </div>
       ) : (
-        <nav className={styles.tree} aria-label={C.outline}>
+        <nav className={styles.tree} aria-label={C.outline} ref={tree}>
+          <button
+            type="button"
+            className={styles.chapter}
+            aria-current={target.kind === 'overview' ? 'page' : undefined}
+            onClick={go({ kind: 'overview' })}
+          >
+            <Icon name="book" size="sm" />
+            <span>{C.overview}</span>
+          </button>
           {design.sections
             .filter(({ selected }) => selected)
             .map((section) => {
-              const { graphs, files } = readableSection(design, section.id);
+              const graphs = design.diagrams.filter(({ sectionId }) => sectionId === section.id);
+              const files = design.files.filter(
+                ({ sectionId, responsibility }) => sectionId === section.id && responsibility !== null,
+              );
+              const modules = submodulesOf(section);
+              const looseFiles = files.filter((file) => fileSubmodule(file, section) === undefined);
               const status = sectionStatus(section, workingId, failedIds);
               const sectionTarget = { kind: 'section', sectionId: section.id } as const;
               return (
@@ -108,10 +202,42 @@ export function DesignOutlineNav({ design, hidden, target, active, failedIds, on
                     />
                     <span>{section.title}</span>
                   </button>
-                  {(graphs.length > 0 || files.length > 0) && (
+                  {modules.map((module) => {
+                    const next = { kind: 'submodule', sectionId: section.id, submoduleId: module.id } as const;
+                    const nested = files.filter(({ relPath }) => module.files.includes(relPath));
+                    return (
+                      <div key={module.id} className={styles.treeSubmodule}>
+                        <button
+                          type="button"
+                          aria-current={targetKey(next) === current ? 'page' : undefined}
+                          onClick={go(next)}
+                        >
+                          <Icon name="layers" size="sm" />
+                          <span>{module.title}</span>
+                        </button>
+                        {nested.length > 0 && (
+                          <details className={styles.treeGroup}>
+                            <summary>{C.fileChildCount(nested.length)}</summary>
+                            <ul>
+                              {nested.map((file) => (
+                                <FileTreeItem
+                                  key={file.id}
+                                  file={file}
+                                  sectionId={section.id}
+                                  current={current}
+                                  onNavigate={onNavigate}
+                                />
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(graphs.length > 0 || looseFiles.length > 0) && (
                     <details className={styles.treeGroup}>
                       <summary>
-                        {C.relatedFiles} · {graphs.length + files.length}
+                        {C.relatedFiles} · {graphs.length + looseFiles.length}
                       </summary>
                       <ul>
                         {graphs.map((graph) => {
@@ -129,45 +255,15 @@ export function DesignOutlineNav({ design, hidden, target, active, failedIds, on
                             </li>
                           );
                         })}
-                        {files.map((file) => {
-                          const next = fileTarget(file, section.id);
-                          return (
-                            <li key={file.id}>
-                              <button
-                                type="button"
-                                aria-current={targetKey(next) === current ? 'page' : undefined}
-                                onClick={go(next)}
-                              >
-                                <Icon name="file" size="sm" />
-                                <span>{file.relPath}</span>
-                              </button>
-                              {file.symbols.length > 0 && (
-                                <details className={styles.treeGroup}>
-                                  <summary>
-                                    {C.symbol} · {file.symbols.length}
-                                  </summary>
-                                  <ul>
-                                    {file.symbols.map((symbol) => {
-                                      const symbolTarget = fileTarget(file, section.id, symbol.id);
-                                      return (
-                                        <li key={symbol.id}>
-                                          <button
-                                            type="button"
-                                            className="mono"
-                                            aria-current={targetKey(symbolTarget) === current ? 'page' : undefined}
-                                            onClick={go(symbolTarget)}
-                                          >
-                                            {symbol.name}
-                                          </button>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                </details>
-                              )}
-                            </li>
-                          );
-                        })}
+                        {looseFiles.map((file) => (
+                          <FileTreeItem
+                            key={file.id}
+                            file={file}
+                            sectionId={section.id}
+                            current={current}
+                            onNavigate={onNavigate}
+                          />
+                        ))}
                       </ul>
                     </details>
                   )}

@@ -153,6 +153,52 @@ describe('项目设计离线导出', () => {
     expect(style).toContain(`color-scheme: ${THEMES[ThemeId.Codex].colorScheme};`);
   });
 
+  it('只为已有引用片段建立文件入口，未引用文件与仓库全文不随站点导出', async () => {
+    const source = contents(project);
+    const filename = 'src/evidence.ts';
+    await mkdir(join(project, 'src'), { recursive: true });
+    await writeFile(join(project, filename), 'const PRIVATE_UNQUOTED_LINE = true;\nreturn 42;\n');
+    const selected = source.sections.map((section) => ({
+      ...section,
+      blocks: [
+        ...(section.blocks ?? []),
+        {
+          type: 'code' as const,
+          relPath: filename,
+          lineStart: 2,
+          lineEnd: 2,
+          language: 'typescript',
+          code: 'return 42;',
+        },
+      ],
+    }));
+    const files = [
+      ...source.files,
+      {
+        id: 'evidence-only',
+        designId: source.design.id,
+        sectionId: null,
+        relPath: filename,
+        contentHash: 'b'.repeat(64),
+        responsibility: null,
+        symbols: [],
+        updatedAt: 1,
+      },
+    ];
+    await exportDesignSite({ ...source, sections: selected, files, projectRoot: project, targetDir: site });
+    const exported = await readFile(join(site, 'design-model.json'), 'utf8');
+    expect(JSON.parse(exported).files).toContainEqual({
+      id: 'evidence-only',
+      sectionId: selected[0]?.id,
+      relPath: filename,
+      responsibility: null,
+      symbols: [],
+    });
+    expect(exported).toContain('return 42;');
+    expect(exported).not.toContain('PRIVATE_UNQUOTED_LINE');
+    expect(exported).not.toContain('PRIVATE_SCANNED_PATH');
+  });
+
   it('显式确认后覆盖同名入口，保留其他文件，并依次处理同目录的导出', async () => {
     await mkdir(join(site, 'assets'), { recursive: true });
     await writeFile(join(site, 'index.html'), 'hand-written index');

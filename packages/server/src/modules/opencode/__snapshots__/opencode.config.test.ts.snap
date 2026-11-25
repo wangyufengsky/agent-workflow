@@ -10052,7 +10052,10 @@ exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 br
         "grep": "allow",
         "question": "deny",
         "read": "allow",
-        "skill": "deny",
+        "skill": {
+          "*": "deny",
+          "aw-design-analysis": "allow",
+        },
         "task": "deny",
         "webfetch": "deny",
         "websearch": "deny",

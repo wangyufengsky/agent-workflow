@@ -84,7 +84,7 @@ type GraphProps = {
   diagram: DesignDiagramDTO;
   targetOf: (node: DesignDiagramNode) => ReadingTarget | undefined;
   onNavigate: (target: ReadingTarget) => void;
-  source: (path: string, line?: number) => ReactNode;
+  source: (path: string, line?: number, end?: number) => ReactNode;
 };
 
 function coordinates(
@@ -255,7 +255,8 @@ function Board({ diagram, targetOf, onNavigate, source }: GraphProps) {
                 />
               )}
             </div>
-            {described.evidencePath !== undefined && source(described.evidencePath, described.lineStart)}
+            {described.evidencePath !== undefined &&
+              source(described.evidencePath, described.lineStart, described.lineEnd)}
             {described.rationale !== undefined && <p className="hint">{described.rationale}</p>}
           </aside>
         )}
@@ -303,7 +304,7 @@ export function DesignDiagram({ diagram, targetOf, onNavigate, source }: GraphPr
                   {endpoint(edge.from)} <span aria-hidden="true">→</span> {edge.label ?? edge.kind}
                   <span aria-hidden="true">→</span> {endpoint(edge.to)}
                   <span className={styles.sourceTag}>{evidenceLabel(edge)}</span>
-                  {edge.evidencePath !== undefined && source(edge.evidencePath, edge.lineStart)}
+                  {edge.evidencePath !== undefined && source(edge.evidencePath, edge.lineStart, edge.lineEnd)}
                 </div>
                 {edge.rationale !== undefined && <p className="hint">{edge.rationale}</p>}
               </li>

@@ -37,7 +37,7 @@ export function DesignRunPanel({ design, active, canGenerate, latest, onRetry, o
             max={Math.max(1, design.totalSections)}
             aria-label={C.progress(design.doneSections, design.totalSections)}
           />
-          {title !== undefined && <span className="hint">{C.current(title)}</span>}
+          {!design.handoffPending && title !== undefined && <span className="hint">{C.current(title)}</span>}
           {shown?.attempt.progress !== null && shown?.attempt.progress !== undefined && <p>{shown.attempt.progress}</p>}
         </div>
         {shown === undefined ? (

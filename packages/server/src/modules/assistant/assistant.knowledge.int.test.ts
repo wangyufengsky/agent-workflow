@@ -9,6 +9,7 @@ import {
   OPENCODE_ASSISTANT_AGENT,
   ServerEventType,
   sendAssistantMessageOp,
+  setConversationPermissionModeOp,
   type TranscriptPage,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -68,6 +69,14 @@ describe('应用助手调用知识问答（18 §4a）', () => {
       }),
       RESEARCHER,
     );
+    const { tools } = await mcp.listTools();
+    const ask = tools.find(({ name }) => name === 'knowledge_ask');
+    expect(ask?.inputSchema.properties).toBeDefined();
+    expect(ask?.inputSchema.properties).not.toHaveProperty('permissionMode');
+    expect(tools.map(({ name }) => name).filter((name) => name.startsWith('knowledge_'))).not.toContain(
+      'knowledge_setPermissionMode',
+    );
+
     const delivered = relayed();
     const result = await callTool(mcp, 'knowledge_ask', {
       projectId,
@@ -90,14 +99,29 @@ describe('应用助手调用知识问答（18 §4a）', () => {
     expect(await entityRefs()).toEqual([
       { kind: EntityKind.KnowledgeConversation, id: knowledgeId, title: 'Where is the refund rounded?' },
     ]);
+
+    expect(knowledge.permissionMode).toBe('ask');
+    await t.call(setConversationPermissionModeOp, { id: conversationId, permissionMode: 'full' });
+    t.fake.enqueue(script().hang(), RESEARCHER);
+    const followUp = await callTool(mcp, 'knowledge_followUp', {
+      id: knowledgeId,
+      question: 'Read the citation again',
+      ...session,
+    });
+    expect(followUp.body).toMatchObject({ status: 'researching' });
+    const updated = (await t.call(getKnowledgeOp, { id: knowledgeId })).body;
+    expect(updated.permissionMode).toBe('ask');
+    expect(updated.turns).toHaveLength(2);
   });
 
   it('提问一建好就在助手对话里放导航卡片，不等研究完成', async () => {
+    await t.call(setConversationPermissionModeOp, { id: conversationId, permissionMode: 'full' });
     t.fake.enqueue(script().hang(), RESEARCHER);
     const result = await callTool(mcp, 'knowledge_ask', { projectId, question: 'q', sources: SOURCES, ...session });
 
     const { body: knowledge } = await t.call(getKnowledgeOp, { id: String(result.body.knowledge_conversation_id) });
     expect(knowledge.turns[0]?.status).toBe(KnowledgeTurnStatus.Researching);
+    expect(knowledge.permissionMode).toBe('full');
     expect(await entityRefs()).toEqual([{ kind: EntityKind.KnowledgeConversation, id: knowledge.id, title: 'q' }]);
   });
 

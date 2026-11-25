@@ -9,11 +9,13 @@ export function PermissionPicker({
   value,
   onChange,
   task = false,
+  knowledge = false,
   disabled = false,
 }: {
   value: PermissionMode;
   onChange(mode: PermissionMode): void;
   task?: boolean;
+  knowledge?: boolean;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false),
@@ -55,7 +57,7 @@ export function PermissionPicker({
       window.removeEventListener('scroll', place, true);
     };
   }, [open]);
-  const label = task ? C.task : C.conversation;
+  const label = knowledge ? C.knowledge.label : task ? C.task : C.conversation;
   return (
     <>
       <button
@@ -66,10 +68,10 @@ export function PermissionPicker({
         disabled={disabled}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={label + ' · ' + C[value].name}
+        aria-label={`${label} · ${C[value].name}`}
         onClick={() => setOpen(!open)}
       >
-        {task ? label + ' · ' : ''}
+        {task ? `${label} · ` : ''}
         {C[value].name}
       </button>
       {open &&
@@ -80,6 +82,7 @@ export function PermissionPicker({
               <button
                 key={m}
                 type="button"
+                disabled={disabled}
                 aria-pressed={m === value}
                 data-full={m === PermissionMode.Full}
                 onClick={() => {
@@ -91,7 +94,7 @@ export function PermissionPicker({
                 <Icon name={m === PermissionMode.Full ? 'alert' : 'shield'} size="sm" />
                 <span>
                   <strong>{C[m].name}</strong>
-                  <small>{C[m].description}</small>
+                  <small>{knowledge ? C.knowledge[m] : C[m].description}</small>
                 </span>
                 {m === value && <Icon name="check" size="sm" />}
               </button>

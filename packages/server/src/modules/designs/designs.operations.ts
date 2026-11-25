@@ -6,6 +6,7 @@ import {
   exportDesignOp,
   generateDesignOp,
   getDesignOp,
+  getDesignSourceOp,
   listDesignsOp,
   listDesignTemplatesOp,
   restoreDesignSectionOp,
@@ -23,6 +24,7 @@ import type { DesignsService } from './designs.service.ts';
 export function designsOperations(service: DesignsService) {
   return [
     implement(listDesignsOp, (input) => service.list(input)),
+    implement(getDesignSourceOp, ({ id, fileId }) => service.source(id, fileId)),
     implement(getDesignOp, ({ id }) => service.get(id)),
     implement(createDesignOp, (input) => service.create(input)),
     implement(updateDesignOp, (input) => service.update(input)),

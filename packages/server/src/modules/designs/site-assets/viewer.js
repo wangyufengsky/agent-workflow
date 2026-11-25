@@ -81,7 +81,9 @@
   function pathLink(path, start, end) {
     const target = fileByPath.get(path);
     const label = path + (start === undefined ? '' : `:${start}${end === start || end === undefined ? '' : `–${end}`}`);
-    return target === undefined ? el('code', label) : link(label, hash('file', target.id), 'source-link');
+    return target === undefined
+      ? el('code', label)
+      : link(label, hash('file', target.id, ...(start === undefined ? [] : ['', start, end ?? start])), 'source-link');
   }
 
   function inline(parent, value) {
@@ -214,6 +216,67 @@
     return list;
   }
 
+  // 只给已引用的文本着色，不解析或补齐缺失源码。
+  const syntaxPattern =
+    /(\/\/.*|#.*|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`|\b(?:class|interface|enum|record|extends|const|let|var|public|protected|private|static|final|new|return|if|else|for|while|import|export|from|async|await|function|package|try|catch|throw|throws|switch|case|def|fn|struct|true|false|null|None|SELECT|FROM|WHERE|INSERT|UPDATE|const)\b|\b\d+(?:\.\d+)?\b)/g;
+  function coloredLine(line) {
+    const pieces = document.createDocumentFragment();
+    let cursor = 0;
+    for (const match of line.matchAll(syntaxPattern)) {
+      const value = match[0];
+      pieces.append(line.slice(cursor, match.index));
+      const kind =
+        value.startsWith('//') || value.startsWith('#')
+          ? 'comment'
+          : value.startsWith('"') || value.startsWith("'") || value.startsWith('`')
+            ? 'string'
+            : /^\d/.test(value)
+              ? 'number'
+              : 'keyword';
+      pieces.append(el('span', value, `syntax-${kind}`));
+      cursor = match.index + value.length;
+    }
+    pieces.append(line.slice(cursor));
+    return pieces;
+  }
+
+  function codeExcerpt(block, focus) {
+    const pre = el('pre');
+    const code = el('code');
+    for (const [index, line] of block.code.split(/\r?\n/).entries()) {
+      const row = el('span', undefined, 'code-line');
+      const coordinate = block.lineStart + index;
+      if (coordinate > block.lineEnd) break;
+      row.dataset.line = String(coordinate);
+      if (focus !== undefined && coordinate >= focus.start && coordinate <= focus.end) row.dataset.focus = 'true';
+      const number = el('span', String(coordinate), 'code-number');
+      number.setAttribute('aria-hidden', 'true');
+      row.append(number, coloredLine(line));
+      code.append(row);
+    }
+    pre.append(code);
+    return pre;
+  }
+
+  function sourceExcerpts(file, focus) {
+    const excerpts = model.sections.flatMap(({ blocks }) =>
+      blocks.filter((block) => block.type === 'code' && block.relPath === file.relPath),
+    );
+    const area = el('section', undefined, 'source-excerpts');
+    area.append(el('h2', C.sourceExcerpts));
+    const found =
+      focus === undefined || excerpts.some((block) => block.lineStart <= focus.end && block.lineEnd >= focus.start);
+    if (excerpts.length === 0 || !found) area.append(el('p', C.noExcerpt, 'muted'));
+    const distinct = new Map(excerpts.map((block) => [`${block.lineStart}:${block.lineEnd}`, block]));
+    for (const block of distinct.values()) {
+      area.append(
+        el('p', copy('symbolLines', { start: block.lineStart, end: block.lineEnd }), 'hint'),
+        codeExcerpt(block, focus),
+      );
+    }
+    return area;
+  }
+
   function renderBlock(block) {
     if (block.type === 'diagram_ref') {
       const diagram = diagramById.get(block.diagramId);
@@ -228,17 +291,7 @@
       area.append(table(block.columns, block.rows, block.caption));
     } else if (block.type === 'code') {
       area.append(pathLink(block.relPath, block.lineStart, block.lineEnd));
-      const pre = el('pre');
-      const code = el('code');
-      for (const [index, line] of block.code.split('\n').entries()) {
-        const row = el('span', undefined, 'code-line');
-        const number = el('span', String(block.lineStart + index), 'code-number');
-        number.setAttribute('aria-hidden', 'true');
-        row.append(number, line);
-        code.append(row);
-      }
-      pre.append(code);
-      area.append(pre);
+      area.append(codeExcerpt(block));
     } else if (block.type === 'callout') {
       area.classList.add('callout', block.tone === 'warn' ? 'warning' : 'info');
       area.append(markdown(block.body));
@@ -259,44 +312,228 @@
     return area;
   }
 
-  function architectureCards(section, files) {
-    const modules =
-      section.kind === 'overview' || section.kind === 'architecture'
-        ? model.sections.filter((candidate) => candidate.kind === 'module')
-        : [];
-    if (modules.length + files.length === 0) return null;
+  function submoduleTarget(section, submodule) {
+    return hash('submodule', section.id, submodule.id);
+  }
+
+  function partsOf(section) {
+    return section.blocks.filter(({ type }) => type === 'submodule');
+  }
+
+  function filesOf(section) {
+    return model.files.filter(({ sectionId }) => sectionId === section.id);
+  }
+
+  const sectionItem = (section) => ({
+    title: section.title,
+    summary: section.summary,
+    kind: section.kind === 'module' ? C.module : C.chapter,
+    target: hash('section', section.id),
+  });
+  const submoduleItem = (section, item) => ({
+    title: item.title,
+    summary: item.summary,
+    kind: C.submodule,
+    target: submoduleTarget(section, item),
+  });
+  const fileItem = (file) => ({
+    title: file.relPath,
+    summary: file.responsibility,
+    kind: C.file,
+    target: hash('file', file.id),
+  });
+
+  function structure(title, children) {
+    const frame = el('div', undefined, 'structure-frame');
+    if (children.length === 0) {
+      frame.append(el('p', C.noComposition, 'muted'));
+      return frame;
+    }
+    const controls = el('div', undefined, 'graph-controls');
+    const cols = Math.min(4, children.length);
+    const width = Math.max(380, cols * 220);
+    const height = 130 + Math.ceil(children.length / cols) * 100;
+    const canvas = svg('svg', { role: 'group', 'aria-label': C.structure, class: 'graph-canvas composition-canvas' });
+    const endPoints = children.map((_, i) => {
+      const row = Math.floor(i / cols);
+      const inRow = Math.min(cols, children.length - row * cols);
+      return { x: width / 2 + ((i % cols) - (inRow - 1) / 2) * 220, y: 119 + row * 100 };
+    });
+    for (const { x, y } of endPoints) {
+      canvas.append(
+        svg('path', {
+          d: `M ${width / 2} 66 V ${y - 22} H ${x} V ${y}`,
+          class: 'graph-edge',
+        }),
+      );
+    }
+    function node(item, x, y) {
+      const graphic =
+        item.target === undefined ? svg('g') : svg('a', { href: item.target, tabindex: 0, 'aria-label': item.title });
+      graphic.setAttribute('class', 'graph-node');
+      if (item.target !== undefined)
+        graphic.addEventListener('keydown', (event) => {
+          if (event.key === ' ') {
+            event.preventDefault();
+            location.hash = item.target;
+          }
+        });
+      const characters = Array.from(item.title.split('/').at(-1));
+      const tooltip = svg('title');
+      tooltip.textContent = item.title;
+      const caption = svg('text', { x, y: y + 21, 'text-anchor': 'middle' });
+      caption.textContent = characters.length > 18 ? `${characters.slice(0, 17).join('')}…` : characters.join('');
+      const kind = svg('text', { x, y: y + 39, 'text-anchor': 'middle', class: 'node-group' });
+      kind.textContent = item.kind;
+      graphic.append(tooltip, svg('rect', { x: x - 98, y, width: 196, height: 49, rx: 8 }), caption, kind);
+      canvas.append(graphic);
+    }
+    node({ title, kind: C.structure }, width / 2, 17);
+    for (const [i, child] of children.entries()) node(child, endPoints[i].x, endPoints[i].y);
+    graphNavigation(canvas, controls, width, height);
+    frame.append(controls, canvas);
+    return frame;
+  }
+
+  function architecture(title, label, children, diagrams) {
+    const area = el('section', undefined, 'architecture');
+    area.append(el('h2', label));
+    const options = el('div', undefined, 'view-options');
+    const panel = el('div');
+    const select = (mode) => {
+      composition.setAttribute('aria-pressed', String(mode === 'structure'));
+      dependencies.setAttribute('aria-pressed', String(mode !== 'structure'));
+      panel.replaceChildren();
+      if (mode === 'structure') panel.append(structure(title, children));
+      else if (diagrams.length === 0) panel.append(el('p', C.noDependencies, 'muted'));
+      else for (const diagram of diagrams) panel.append(renderDiagram(diagram, false));
+    };
+    const composition = button(C.structure, () => select('structure'));
+    const dependencies = button(C.dependencies, () => select('dependencies'));
+    options.append(composition, dependencies);
+    area.append(options, panel);
+    select('structure');
+    return area;
+  }
+
+  function compositionCards(label, children) {
+    if (children.length === 0) return null;
     const area = el('section', undefined, 'architecture-cards');
     const grid = el('div', undefined, 'architecture-card-grid');
-    const cards = [
-      ...modules.map((module) => [sectionLink(module), module.summary]),
-      ...files.map((file) => [link(file.relPath, hash('file', file.id)), file.responsibility]),
-    ];
-    for (const [card, description] of cards) {
-      card.className = 'architecture-card';
-      if (description) card.append(el('span', description, 'muted'));
+    for (const child of children) {
+      const card = link('', child.target, 'architecture-card');
+      card.append(el('span', child.kind, 'eyebrow'), el('strong', child.title));
+      if (child.summary) card.append(el('span', child.summary, 'muted'));
       grid.append(card);
     }
-    area.append(el('h2', C.architectureCards), grid);
+    area.append(el('h2', label), grid);
     return area;
+  }
+
+  function renderHome() {
+    const home = el('article');
+    const overview = model.sections.find(({ kind }) => kind === 'overview');
+    const candidates = model.sections.filter(({ kind }) => kind !== 'overview');
+    const modules = candidates.filter(({ kind }) => kind === 'module');
+    const structureSections = modules.length > 0 ? modules : candidates;
+    const introduction = overview?.summary || structureSections.find(({ summary }) => summary.trim() !== '')?.summary;
+    home.append(
+      el('span', C.projectOverview, 'eyebrow'),
+      el('h1', model.title),
+      el(
+        'p',
+        introduction || copy('reportCoverage', { sections: model.sections.length, files: model.files.length }),
+        'summary',
+      ),
+    );
+    if (model.sourceSnapshot?.techStack.length > 0) {
+      const tech = el('ul', undefined, 'tech-stack');
+      for (const item of model.sourceSnapshot.techStack) tech.append(el('li', item));
+      home.append(tech);
+    }
+    const children = structureSections.map(sectionItem);
+    const cards = compositionCards(C.projectOutline, model.sections.map(sectionItem));
+    if (cards !== null) home.append(cards);
+    home.append(
+      architecture(
+        model.title,
+        C.architecture,
+        children,
+        model.diagrams.filter(({ kind }) => kind === 'architecture'),
+      ),
+    );
+    if (overview)
+      for (const block of overview.blocks.filter(({ type }) => type !== 'diagram_ref' && type !== 'submodule')) {
+        const body = renderBlock(block);
+        if (body !== null) home.append(body);
+      }
+    return home;
+  }
+
+  function renderSubmodule(section, submodule) {
+    const article = el('article');
+    article.append(
+      el('span', C.submodule, 'eyebrow'),
+      el('h1', submodule.title),
+      el('p', submodule.summary, 'summary'),
+    );
+    const children = submodule.files
+      .map((path) => fileByPath.get(path))
+      .filter(Boolean)
+      .map(fileItem);
+    const sectionDiagrams = model.diagrams.filter(
+      ({ sectionId, nodes }) =>
+        sectionId === section.id && nodes.some((node) => submodule.files.includes(node.relPath ?? node.targetId)),
+    );
+    article.append(architecture(submodule.title, C.internalArchitecture, children, sectionDiagrams));
+    if (submodule.behaviors.length > 0) {
+      const explanations = el('section');
+      explanations.append(el('h2', C.behaviors));
+      for (const behavior of submodule.behaviors) explanations.append(renderBlock({ ...behavior, type: 'markdown' }));
+      article.append(explanations);
+    }
+    const cards = compositionCards(C.composition, children);
+    if (cards !== null) article.append(cards);
+    return article;
   }
 
   function renderSection(section) {
     const content = el('article');
-    content.append(el('h1', section.title));
+    content.append(el('span', sectionItem(section).kind, 'eyebrow'), el('h1', section.title));
     const graphs = model.diagrams.filter(({ sectionId }) => sectionId === section.id);
-    const files = model.files.filter(({ sectionId }) => sectionId === section.id);
-    const architecture = model.layoutStyle === 'arch';
+    const parts = partsOf(section);
+    const allocated = new Set(parts.flatMap(({ files }) => files));
+    const files = filesOf(section).filter(({ relPath }) => !allocated.has(relPath));
+    const children = [...parts.map((item) => submoduleItem(section, item)), ...files.map(fileItem)];
+    const graphsFirst = model.layoutStyle === 'arch';
     const rendered = new Set();
-    if (architecture) {
+    if (section.summary) content.append(el('p', section.summary, 'summary'));
+    if (graphsFirst && children.length > 0) {
+      content.append(architecture(section.title, C.internalArchitecture, children, graphs));
+      for (const graph of graphs) rendered.add(graph.id);
+    } else if (graphsFirst) {
       for (const graph of graphs) {
         content.append(renderDiagram(graph, false));
         rendered.add(graph.id);
       }
-      const cards = architectureCards(section, files);
-      if (cards !== null) content.append(cards);
+    } else if (children.length > 0) {
+      const area = el('section');
+      area.append(el('h2', C.internalArchitecture), structure(section.title, children));
+      content.append(area);
     }
-    if (section.summary) content.append(el('p', section.summary, 'summary'));
+    const behaviors = graphsFirst
+      ? section.blocks.filter((block) => block.type === 'markdown' && block.title && block.evidence?.length > 0)
+      : [];
+    if (behaviors.length > 0) {
+      const explanations = el('section');
+      explanations.append(el('h2', C.behaviors));
+      for (const behavior of behaviors) explanations.append(renderBlock(behavior));
+      content.append(explanations);
+    }
+    const cards = compositionCards(C.composition, children);
+    if (graphsFirst && cards !== null) content.append(cards);
     for (const block of section.blocks) {
+      if (block.type === 'submodule' || behaviors.includes(block)) continue;
       if (block.type === 'diagram_ref') {
         if (rendered.has(block.diagramId)) continue;
         rendered.add(block.diagramId);
@@ -306,21 +543,30 @@
     }
     const extraGraphs = graphs.filter(({ id }) => !rendered.has(id));
     if (extraGraphs.length > 0) content.append(linkList(C.relatedDiagrams, extraGraphs.map(graphLink)));
-    if (!architecture && files.length > 0)
-      content.append(
-        linkList(
-          C.relatedFiles,
-          files.map((file) => link(file.relPath, hash('file', file.id))),
-        ),
-      );
+    if (!graphsFirst && cards !== null) content.append(cards);
     return content;
   }
 
-  function renderFile(file, currentSymbol) {
+  function renderFile(file, currentSymbol, range) {
     const content = el('article');
-    content.append(el('h1', file.relPath, 'file-title'));
+    content.append(el('span', C.file, 'eyebrow'), el('h1', file.relPath, 'file-title'));
     content.append(button(C.copyPath, () => copyPath(file.relPath)));
     if (file.responsibility) content.append(el('p', file.responsibility, 'summary'));
+    const focus = file.symbols.find(({ id }) => id === currentSymbol);
+    const selection = range ?? (focus === undefined ? undefined : { start: focus.lineStart, end: focus.lineEnd });
+    const children = file.symbols.map((symbol) => ({
+      title: symbol.qualifiedName,
+      summary: symbol.summary,
+      kind: symbol.kind,
+      target: hash('file', file.id, symbol.id),
+    }));
+    const related = model.diagrams.filter(({ nodes }) =>
+      nodes.some(
+        (node) => node.relPath === file.relPath || node.targetId === file.id || node.targetId === file.relPath,
+      ),
+    );
+    content.append(architecture(file.relPath, C.fileArchitecture, children, related));
+    content.append(sourceExcerpts(file, selection));
     if (file.symbols.length > 0) content.append(el('h2', C.fileSymbols));
     for (const symbol of file.symbols) {
       const section = el('section', undefined, 'symbol');
@@ -346,16 +592,24 @@
       }
       if (symbol.id === currentSymbol) {
         section.classList.add('highlight');
-        requestAnimationFrame(() => section.scrollIntoView({ block: 'center' }));
       }
       content.append(section);
     }
+    if (selection !== undefined)
+      requestAnimationFrame(() => {
+        const target = content.querySelector('.code-line[data-focus]') ?? content.querySelector('.symbol.highlight');
+        target?.scrollIntoView({ block: 'center' });
+      });
     return content;
   }
 
   function nodeTarget(node) {
     if (node.targetKind === 'section' || node.targetKind === 'module') {
       if (sectionById.has(node.targetId)) return hash('section', node.targetId);
+      for (const section of model.sections) {
+        const submodule = partsOf(section).find(({ id }) => id === node.targetId);
+        if (submodule !== undefined) return submoduleTarget(section, submodule);
+      }
     }
     const file = fileById.get(node.targetId) || fileByPath.get(node.relPath) || fileByPath.get(node.targetId);
     if (node.targetKind === 'symbol') {
@@ -390,18 +644,31 @@
       view.height = height;
       refresh();
     };
+    const reset = () => {
+      Object.assign(view, area);
+      refresh();
+    };
     controls.append(
       button('＋', () => zoom(0.8), C.zoomIn),
       button('−', () => zoom(1.25), C.zoomOut),
-      button(
-        C.fitShort,
-        () => {
-          Object.assign(view, area);
-          refresh();
-        },
-        C.fit,
-      ),
+      button(C.fitShort, reset, C.fit),
     );
+    element.setAttribute('tabindex', '0');
+    element.setAttribute('aria-description', C.graphControlsHelp);
+    const direction = { ArrowLeft: [-1, 0], ArrowUp: [0, -1], ArrowRight: [1, 0], ArrowDown: [0, 1] };
+    element.addEventListener('keydown', (event) => {
+      if (event.target !== element) return;
+      if (Object.hasOwn(direction, event.key)) {
+        const [x, y] = direction[event.key];
+        view.x += (x * view.width) / 10;
+        view.y += (y * view.height) / 10;
+        refresh();
+      } else if (event.key === '+' || event.key === '=') zoom(0.8);
+      else if (event.key === '-') zoom(1.25);
+      else if (event.key === 'Home') reset();
+      else return;
+      event.preventDefault();
+    });
     element.addEventListener(
       'wheel',
       (event) => {
@@ -578,11 +845,39 @@
     searchIndex.push({ target, label, text: [label, ...terms].join(' ').toLocaleLowerCase() });
   }
 
+  function navGroup(parent, parentLink, children) {
+    if (children.childElementCount === 0) {
+      parent.append(parentLink);
+      return;
+    }
+    const branch = el('details', undefined, 'tree-branch');
+    const summary = el('summary');
+    summary.append(parentLink);
+    branch.append(summary, children);
+    parent.append(branch);
+  }
+
+  function fileNav(file) {
+    const listItem = el('li');
+    const target = hash('file', file.id);
+    indexItem(target, file.relPath, file.responsibility);
+    const symbols = el('ul');
+    for (const symbol of file.symbols) {
+      const address = hash('file', file.id, symbol.id);
+      const item = el('li');
+      item.append(link(symbol.name, address));
+      symbols.append(item);
+      indexItem(address, symbol.qualifiedName, symbol.name, file.relPath, symbol.summary);
+    }
+    navGroup(listItem, link(file.relPath, target), symbols);
+    return listItem;
+  }
+
   function populateNav(navigation) {
+    navigation.append(link(model.title, hash('home'), 'chapter-link'));
     for (const section of model.sections) {
       const heading = sectionLink(section);
       heading.className = 'chapter-link';
-      navigation.append(heading);
       indexItem(heading.getAttribute('href'), section.title, section.summary, JSON.stringify(section.blocks));
       const children = el('ul');
       for (const diagram of model.diagrams.filter(({ sectionId }) => sectionId === section.id)) {
@@ -597,24 +892,31 @@
           ...diagram.nodes.map(({ label }) => label),
         );
       }
-      for (const file of model.files.filter(({ sectionId }) => sectionId === section.id)) {
+      const allocated = new Set();
+      for (const submodule of partsOf(section)) {
         const item = el('li');
-        const a = link(file.relPath, hash('file', file.id));
-        item.append(a);
-        children.append(item);
-        indexItem(a.getAttribute('href'), file.relPath, file.responsibility);
-        for (const symbol of file.symbols) {
-          indexItem(hash('file', file.id, symbol.id), symbol.qualifiedName, symbol.name, file.relPath, symbol.summary);
+        const target = submoduleTarget(section, submodule);
+        const files = el('ul');
+        indexItem(target, submodule.title, submodule.summary, JSON.stringify(submodule.behaviors));
+        for (const path of submodule.files) {
+          const file = fileByPath.get(path);
+          if (file?.sectionId === section.id) {
+            allocated.add(path);
+            files.append(fileNav(file));
+          }
         }
+        navGroup(item, link(submodule.title, target), files);
+        children.append(item);
       }
-      if (children.childElementCount > 0) navigation.append(children);
+      const direct = filesOf(section).filter(({ relPath }) => !allocated.has(relPath));
+      for (const file of direct) children.append(fileNav(file));
+      navGroup(navigation, heading, children);
     }
   }
 
-  function renderSearch(query, navigation, results) {
+  function renderSearch(query, results) {
     const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     results.hidden = terms.length === 0;
-    navigation.hidden = !results.hidden;
     results.replaceChildren();
     if (results.hidden) return;
     const found = searchIndex.filter(({ text }) => terms.every((term) => text.includes(term)));
@@ -630,63 +932,128 @@
   }
 
   function setActiveLinks() {
-    for (const a of site.querySelectorAll('aside a')) {
-      if (a.getAttribute('href') === activeHash) a.setAttribute('aria-current', 'page');
-      else a.removeAttribute('aria-current');
+    for (const a of site.querySelectorAll('aside a, .search-results a')) {
+      if (a.getAttribute('href') === activeHash) {
+        a.setAttribute('aria-current', 'page');
+        for (let branch = a.closest('details'); branch !== null; branch = branch.parentElement.closest('details'))
+          branch.open = true;
+      } else a.removeAttribute('aria-current');
     }
   }
 
   function mount() {
     const sidebar = el('aside');
-    const title = el('p', model.title, 'site-title');
-    const label = el('label', C.searchLabel, 'search-label');
-    const input = el('input');
-    input.type = 'search';
-    input.placeholder = C.searchPlaceholder;
-    label.append(input);
     const navigation = el('nav');
     navigation.setAttribute('aria-label', C.outline);
     populateNav(navigation);
+    sidebar.append(el('p', C.outline, 'site-title'), navigation);
+    const header = el('header', undefined, 'site-header');
+    const toggle = button(
+      '☰',
+      () => {
+        const open = sidebar.classList.toggle('outline-open');
+        toggle.setAttribute('aria-expanded', String(open));
+      },
+      C.toggleOutline,
+    );
+    toggle.className = 'outline-toggle';
+    toggle.setAttribute('aria-label', C.toggleOutline);
+    toggle.setAttribute('aria-expanded', 'false');
+    const search = el('div', undefined, 'site-search');
+    const input = el('input');
+    input.type = 'search';
+    input.setAttribute('aria-label', C.searchLabel);
+    input.placeholder = C.searchPlaceholder;
     const results = el('div', undefined, 'search-results');
     results.hidden = true;
-    input.addEventListener('input', () => renderSearch(input.value, navigation, results));
-    sidebar.append(title, label, navigation, results);
+    input.addEventListener('input', () => renderSearch(input.value, results));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        input.value = '';
+        renderSearch('', results);
+      }
+    });
+    results.addEventListener('click', (event) => {
+      const target = event.target.closest('a');
+      if (target !== null) {
+        event.preventDefault();
+        location.hash = target.getAttribute('href');
+        input.value = '';
+        renderSearch('', results);
+      }
+    });
+    search.append(input, results);
+    header.append(toggle, link(C.pageTitle, hash('home'), 'site-brand'), search);
 
     const main = el('main');
     const breadcrumb = el('nav', undefined, 'breadcrumbs');
     breadcrumb.setAttribute('aria-label', C.breadcrumbs);
     const reader = el('div');
-    main.append(breadcrumb, reader);
-    site.append(sidebar, main);
+    const footer = el('footer', undefined, 'site-note');
+    const snapshot = model.sourceSnapshot;
+    const date = snapshot?.scannedAt === undefined ? '' : new Date(snapshot.scannedAt).toLocaleDateString();
+    const baseline = snapshot?.commitSha
+      ? [snapshot.branch, snapshot.commitSha.slice(0, 8)].filter(Boolean).join(' · ')
+      : date;
+    if (baseline !== '') footer.append(el('span', `${snapshot?.commitSha ? C.version : C.snapshot} · ${baseline}`));
+    footer.append(el('span', C.excerptNotice));
+    main.append(breadcrumb, reader, footer);
+    site.append(header, sidebar, main);
 
     function show() {
-      const [kind, id, symbolId] = route();
+      const [kind, id, symbolId, first, last] = route();
       const file = kind === 'file' ? fileById.get(id) : undefined;
       const diagram = kind === 'diagram' ? diagramById.get(id) : undefined;
-      const section = sectionById.get(file?.sectionId || diagram?.sectionId || id) || model.sections[0];
-      const current = file
-        ? hash('file', file.id, ...(symbolId === undefined ? [] : [symbolId]))
+      const section = sectionById.get(file?.sectionId || diagram?.sectionId || id);
+      const submodule =
+        section === undefined
+          ? undefined
+          : kind === 'submodule'
+            ? partsOf(section).find((item) => item.id === symbolId)
+            : file === undefined
+              ? undefined
+              : partsOf(section).find((item) => item.files.includes(file.relPath));
+      const symbol = file?.symbols.find((item) => item.id === symbolId);
+      const range =
+        Number(first) > 0 && Number(last) >= Number(first) ? { start: Number(first), end: Number(last) } : undefined;
+      activeHash = file
+        ? hash('file', file.id, ...(symbol ? [symbol.id] : []))
         : diagram
           ? hash('diagram', diagram.id)
-          : hash('section', section.id);
-      activeHash = current;
+          : kind === 'submodule' && section && submodule
+            ? submoduleTarget(section, submodule)
+            : section
+              ? hash('section', section.id)
+              : hash('home');
       setActiveLinks();
-      const home = link(model.title, hash('section', model.sections[0].id));
-      breadcrumb.replaceChildren(
-        home,
-        el('span', '›'),
-        file || diagram ? sectionLink(section) : el('span', section.title),
-      );
-      if (file || diagram) breadcrumb.append(el('span', '›'), el('span', file?.relPath || diagram.title));
-      const body = file ? renderFile(file, symbolId) : diagram ? renderDiagram(diagram, true) : renderSection(section);
+      sidebar.classList.remove('outline-open');
+      toggle.setAttribute('aria-expanded', 'false');
+      breadcrumb.replaceChildren(link(model.title, hash('home')));
+      const step = (item) => breadcrumb.append(el('span', '›'), item);
+      if (section) step(file || diagram || submodule ? sectionLink(section) : el('span', section.title));
+      if (section && submodule)
+        step(file ? link(submodule.title, submoduleTarget(section, submodule)) : el('span', submodule.title));
+      if (file) step(symbol ? link(file.relPath, hash('file', file.id)) : el('span', file.relPath));
+      if (symbol) step(el('span', symbol.name));
+      if (diagram) step(el('span', diagram.title));
+      const body = file
+        ? renderFile(file, symbol?.id, range)
+        : diagram
+          ? renderDiagram(diagram, true)
+          : section && submodule
+            ? renderSubmodule(section, submodule)
+            : section
+              ? renderSection(section)
+              : renderHome();
       reader.replaceChildren(body);
-      document.title = `${file?.relPath || diagram?.title || section.title} · ${model.title}`;
+      document.title = [file?.relPath || diagram?.title || submodule?.title || section?.title, model.title]
+        .filter(Boolean)
+        .join(' · ');
       window.scrollTo(0, 0);
     }
     window.addEventListener('hashchange', show);
     show();
   }
 
-  document.documentElement.dataset.theme = model.theme;
   mount();
 })();

@@ -7,6 +7,8 @@ import {
   type KnowledgeConversationDTO,
   knowledgeCitationOp,
   listKnowledgeOp,
+  type PermissionMode,
+  setKnowledgePermissionModeOp,
   stopKnowledgeOp,
 } from '@aw/shared';
 import {
@@ -61,6 +63,10 @@ export const useAskKnowledge = () =>
 export const useFollowUp = () =>
   useConversationMutation((input: { id: string; question: string; model: string | null }) =>
     callOperation(followUpKnowledgeOp, input),
+  );
+export const useSetKnowledgePermissionMode = () =>
+  useConversationMutation((input: { id: string; permissionMode: PermissionMode }) =>
+    callOperation(setKnowledgePermissionModeOp, input),
   );
 export const useStopKnowledge = () => useConversationMutation((id: string) => callOperation(stopKnowledgeOp, { id }));
 

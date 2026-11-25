@@ -28,7 +28,12 @@ import {
   OpencodeEventType,
   ToolCallStatus,
 } from '../opencode/index.ts';
-import { grantKey, type PermissionReviewer, type TaskPermissionPolicy } from '../permissions/index.ts';
+import {
+  grantKey,
+  type KnowledgePermissionPolicy,
+  type PermissionReviewer,
+  type TaskPermissionPolicy,
+} from '../permissions/index.ts';
 import type { Attempt } from './attempts.repo.ts';
 import { type AttemptState, errorOf, type LiveSession, systemEntry } from './attempts.state.ts';
 
@@ -49,6 +54,7 @@ export function watchSessions(
   deps: {
     settings: { get(key: 'ai.contextEngine'): boolean };
     taskPolicy(id: string): TaskPermissionPolicy;
+    knowledgePolicy(id: string): KnowledgePermissionPolicy | undefined;
     permissionReviewer: PermissionReviewer;
     opencode: OpencodeClient;
     prompts: Prompts;
@@ -187,13 +193,17 @@ export function watchSessions(
   function routePermission(attempt: Attempt, session: LiveSession, event: PermissionEvent) {
     if (session.seenPermissions.has(event.permissionId)) return;
     session.seenPermissions.add(event.permissionId);
-    if (attempt.taskId === null) {
-      onPermission(attempt, event);
-      return;
-    }
-    const taskId = attempt.taskId,
-      policy = deps.taskPolicy(taskId);
-    if (policy.mode === PermissionMode.Ask && attempt.permissionBaseline === null && event.permission !== 'bash') {
+    const taskId = attempt.taskId;
+    const taskPolicy = taskId === null ? undefined : deps.taskPolicy(taskId);
+    const isResearch = taskId === null && attempt.kind === AttemptKind.Research;
+    const researchPolicy = isResearch ? deps.knowledgePolicy(attempt.id) : undefined;
+    const currentPolicy = () => (taskId === null ? deps.knowledgePolicy(attempt.id) : deps.taskPolicy(taskId));
+    const policy = taskPolicy ?? researchPolicy;
+    if (
+      !policy ||
+      (taskId === null && (event.permission !== 'bash' || policy.mode === PermissionMode.Ask)) ||
+      (policy.mode === PermissionMode.Ask && attempt.permissionBaseline === null && event.permission !== 'bash')
+    ) {
       onPermission(attempt, event);
       return;
     }
@@ -202,23 +212,32 @@ export function watchSessions(
     outstanding.set(event.permissionId, ticket);
     const signal = AbortSignal.any([ticket.signal, session.permissionStop.signal]);
     const decide = async () => {
-      const result = await deps.permissionReviewer.native({
-        owner: { taskId, projectId: attempt.projectId },
-        sessionAllowed: session.grants.has(grantKey(event)),
+      const input = {
         event,
         call:
-          policy.mode === PermissionMode.Assisted || (event.permission === 'bash' && policy.mode === PermissionMode.Ask)
+          taskId === null ||
+          policy.mode === PermissionMode.Assisted ||
+          (event.permission === 'bash' && policy.mode === PermissionMode.Ask)
             ? await session.view.permissionCall(event.callId, deps.clock, signal)
             : undefined,
         directory: session.directory,
         intent: policy.intent,
-        checkCommand: policy.checkCommand,
         mode: policy.mode,
-        mutable: attempt.permissionBaseline !== null,
         parentSignal: session.permissionStop.signal,
-        baselineRules: attempt.permissionBaseline ?? [],
         signal,
-      });
+      };
+      const result = researchPolicy
+        ? await deps.permissionReviewer.researchNative({ ...input, sources: researchPolicy.sources })
+        : taskId === null
+          ? {}
+          : await deps.permissionReviewer.native({
+              ...input,
+              owner: { taskId, projectId: attempt.projectId },
+              sessionAllowed: session.grants.has(grantKey(event)),
+              checkCommand: taskPolicy?.checkCommand ?? null,
+              mutable: attempt.permissionBaseline !== null,
+              baselineRules: attempt.permissionBaseline ?? [],
+            });
       if (signal.aborted) return;
       if (result.reason)
         record(attempt, [
@@ -226,12 +245,12 @@ export function watchSessions(
             TranscriptSystemEvent.PermissionReview,
             [
               event.permission,
-              result.reply && deps.taskPolicy(taskId).mode === policy.mode ? '批准本次' : '询问你',
+              result.reply && currentPolicy()?.mode === policy.mode ? '批准本次' : '询问你',
               result.reason,
             ].join(' · '),
           ),
         ]);
-      if (result.reply === undefined || deps.taskPolicy(taskId).mode !== policy.mode) {
+      if (result.reply === undefined || currentPolicy()?.mode !== policy.mode) {
         onPermission(attempt, event, result.reason, result.bashGrant);
         return;
       }
@@ -265,8 +284,11 @@ export function watchSessions(
         directory: event.directory,
         permission: event.permission,
         patterns: event.patterns,
-        ...(event.permission === 'bash' && attempt.taskId !== null
-          ? { bashGrant: bashGrant ?? null, projectGrantAvailable: attempt.projectId !== null }
+        ...(event.permission === 'bash' && (attempt.taskId !== null || attempt.kind === AttemptKind.Research)
+          ? {
+              bashGrant: bashGrant ?? null,
+              projectGrantAvailable: attempt.taskId !== null && attempt.projectId !== null,
+            }
           : {}),
         ...(reason ? { reason } : {}),
       },
