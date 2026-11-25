@@ -8,6 +8,7 @@ import {
   LIST_PAGE_MAX,
 } from '../../constants/limits.ts';
 import { CitationType, knowledgeTurnStatusSchema } from '../../enums/knowledge.ts';
+import { PermissionMode, permissionModeSchema } from '../../enums/system.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { dbQueryOutputSchema } from '../mcp/db-tools.ts';
 import { attemptSummarySchema } from './attempts.ts';
@@ -82,6 +83,7 @@ export const knowledgeConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
   sources: knowledgeSourcesSchema,
+  permissionMode: permissionModeSchema.default(PermissionMode.Ask),
   /** `repoPath` is where the researcher works: its file paths are shown relative to it. */
   project: projectRef.extend({ repoPath: z.string(), databaseCount: z.number() }),
   turns: z.array(knowledgeTurnSchema),
@@ -94,6 +96,7 @@ export const knowledgeConversationSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
   project: projectRef,
+  permissionMode: permissionModeSchema.default(PermissionMode.Ask),
   turnCount: z.number(),
   latest: z.object({
     status: knowledgeTurnStatusSchema,
@@ -123,6 +126,7 @@ export const askKnowledgeRequestSchema = z.object({
   projectId: z.string(),
   question,
   sources: knowledgeSourcesSchema,
+  permissionMode: permissionModeSchema.optional(),
   model,
 });
 export type AskKnowledgeRequest = z.infer<typeof askKnowledgeRequestSchema>;

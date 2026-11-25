@@ -26,8 +26,8 @@ export function createDesignsModule(deps: {
   assetsDir: string;
   copyFile: string;
 }) {
-  const queries = createDesignQueries(deps);
   const runs = createDesignRuns(deps);
+  const queries = createDesignQueries({ ...deps, runs });
   const service = createDesignsService({ ...deps, queries, runs });
   return { service, operations: designsOperations(service) };
 }

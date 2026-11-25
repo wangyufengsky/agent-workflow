@@ -11,8 +11,13 @@
   padding: 4px 6px;
   white-space: nowrap;
 }
-.trigger:hover,
-.panel button:hover,
+.trigger:disabled,
+.panel button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.trigger:not(:disabled):hover,
+.panel button:not(:disabled):hover,
 .panel button:focus-visible {
   background: var(--fill-2);
 }

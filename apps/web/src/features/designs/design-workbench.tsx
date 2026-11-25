@@ -52,6 +52,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
   const review = useReviewDesign();
   const stop = useStopDesign();
   const active = design.runs.find(({ id }) => id === design.activeRunId);
+  const busy = active !== undefined || design.handoffPending;
   const latest = design.runs.at(-1);
   const selected = design.sections.filter(({ selected }) => selected);
   const followed = followedSection(design.runs, selected);
@@ -61,7 +62,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
       (run.kind === DesignRunKind.Generate || run.kind === DesignRunKind.Revise ? run.doneSectionIds.length : 0),
     0,
   );
-  const [initialSubmissions] = useState(() => (active !== undefined && submissions > 0 ? -1 : submissions));
+  const [initialSubmissions] = useState(() => (busy && submissions > 0 ? -1 : submissions));
   const [followFromCurrent, setFollowFromCurrent] = useState(false);
   const [reading, setReading] = useState<Reading | null>(null);
   const [panel, setPanel] = useState<OpenPanel>();
@@ -74,7 +75,6 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
     | { kind: 'delete' }
     | null
   >(null);
-  const busy = active !== undefined;
   const failures = failedSections(design.runs);
   const pending = generate.isPending || review.isPending || stop.isPending;
   const runtimeLabel =
@@ -82,7 +82,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
       ? undefined
       : RUNTIME_STATUS_LABEL[runtime.data.status];
   // 运行时面板只展示托管进程状态；执行服务以当前尝试引擎的就绪状态决定是否能启动。
-  const canGenerate = design.projectId !== null && !pending;
+  const canGenerate = design.projectId !== null && !busy && !pending;
   const automatic = followFromCurrent || submissions > initialSubmissions ? followed : undefined;
   const requested: ReadingTarget =
     reading?.target ?? (automatic === undefined ? { kind: 'overview' } : { kind: 'section', sectionId: automatic });

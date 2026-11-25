@@ -151,7 +151,10 @@ export function DesignToolbar({
         </div>
         <div className={styles.headline}>
           <DesignTitle design={design} disabled={busy} />
-          <StatusBadge tone={statusTone(design.status)} label={DESIGN_STATUS_LABEL[design.status]} />
+          <StatusBadge
+            tone={design.handoffPending ? StatusTone.Run : statusTone(design.status)}
+            label={design.handoffPending ? C.handoffPending : DESIGN_STATUS_LABEL[design.status]}
+          />
         </div>
         <div className={styles.meta}>
           <span className="mono" title={design.sourceSnapshot.dirty ? C.dirty : undefined}>

@@ -8,10 +8,12 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   AttemptKind,
   AttemptStatus,
+  askKnowledgeOp,
   BashPolicy,
   cancelTaskOp,
   ErrorCode,
   getAttemptContextOp,
+  getKnowledgeOp,
   getNodeOp,
   InboxKind,
   listInboxOp,
@@ -21,6 +23,7 @@ import {
   OPENCODE_AGENT_NAME,
   type PermissionAction,
   PermissionDecision,
+  PermissionMode,
   RoleBaseAgent,
   resolveInboxOp,
   ServerEventType,
@@ -59,6 +62,8 @@ let providerRequests = 0;
 const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
 const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
+const RESEARCH_PERMISSION_PROBE = 'VERIFY_RESEARCH_PERMISSION';
+const RESEARCH_CHECKSUM = 'cksum README.md';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
 const PROBE_SESSION_COMMAND = 'VERIFY_SESSION_COMMAND_BOUNDARIES';
@@ -141,7 +146,13 @@ function scriptedModel(): Server {
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
       providerRequests++;
       let replyText = 'done';
-      if (messages.some((m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'))) {
+      if (prompt.startsWith('{"userRequest":"VERIFY_RESEARCH_PERMISSION')) {
+        replyText = JSON.stringify({ decision: 'once', reason: 'Verified repository checksum' });
+      } else if (hasProbe(RESEARCH_PERMISSION_PROBE)) {
+        calls = messages.some((m) => m.role === 'tool')
+          ? [operation(McpToolName.SubmitAnswer, { answer: 'Repository checked.', citations: [] })]
+          : [{ name: 'bash', args: { command: RESEARCH_CHECKSUM, description: 'Read the repository checksum' } }];
+      } else if (messages.some((m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'))) {
         workerTools.push(names);
         workerStarted.resolve();
         await newReadProduced.promise;
@@ -375,6 +386,47 @@ async function decide(command: string): Promise<PermissionAction> {
     await reply;
   }
 }
+
+it('知识研究的真实 Bash 询问按 Ask、Assisted、Full 独立审批', async () => {
+  const { project } = await addProject(t, { files: { 'README.md': 'checksum fixture' } });
+  await t.call(updateSettingsOp, { 'ai.defaultModel': `${PROVIDER}/${MODEL}`, 'scheduler.maxConcurrentAttempts': 3 });
+  const nativeRequests: string[] = [];
+  const unsubscribe = t.app.services.opencode.subscribe((event) => {
+    if (event.type === OpencodeEventType.PermissionAsked && event.permission === 'bash')
+      nativeRequests.push(event.permissionId);
+  });
+  try {
+    for (const permissionMode of [PermissionMode.Ask, PermissionMode.Assisted, PermissionMode.Full]) {
+      const finished = waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        ({ attempt }) => attempt.kind === AttemptKind.Research && attempt.status === AttemptStatus.Succeeded,
+      );
+      const manual = permissionMode === PermissionMode.Ask ? inboxOpens(t, InboxKind.Permission) : undefined;
+      const { body } = await t.call(askKnowledgeOp, {
+        projectId: project.id,
+        question: RESEARCH_PERMISSION_PROBE,
+        sources: { code: true, docs: true, web: false, database: false },
+        permissionMode,
+      });
+      if (manual) {
+        const { item } = await manual;
+        expect(item.title).toContain('cksum');
+        await t.call(resolveInboxOp, { id: item.id, response: { decision: PermissionDecision.Once } });
+      }
+      const { attempt } = await finished;
+      const current = (await t.call(getKnowledgeOp, { id: body.id })).body;
+      expect(current).toMatchObject({ permissionMode, turns: [{ answer: 'Repository checked.' }] });
+      const transcript = t.app.services.attempts.transcript(attempt.id, 0);
+      const review = JSON.stringify(transcript);
+      if (permissionMode === PermissionMode.Assisted) expect(review).toContain('Verified repository checksum');
+      else expect(review).not.toContain('Verified repository checksum');
+    }
+    expect(nativeRequests).toHaveLength(3);
+  } finally {
+    unsubscribe();
+  }
+});
 
 it('自定义档位进入真实模型请求，下一轮模型默认及无效档位均省略强度', async () => {
   const oc = t.app.services.opencode;

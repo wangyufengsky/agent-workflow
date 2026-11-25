@@ -405,16 +405,18 @@ it('在已提交章节释放模型槽之前可以停止切章', async () => {
     await endCommandStarted.promise;
     const during = await get(id);
     expect(during.doneSections).toBe(1);
-    expect(during.activeRunId).toBeNull();
+    expect(during).toMatchObject({ activeRunId: null, handoffPending: true });
     expect(during.runs.at(-1)?.attempt.status).toBe(AttemptStatus.Succeeded);
     expect((await t.call(generateDesignOp, { id })).status).toBe(409);
-    expect((await t.call(stopDesignOp, { id })).status).toBe(200);
+    const stopped = await t.call(stopDesignOp, { id });
+    expect(stopped.status).toBe(200);
+    expect(stopped.body).toMatchObject({ activeRunId: null, handoffPending: false });
   } finally {
     releaseEndCommand.resolve();
   }
   await t.fake.settled();
   const stopped = await get(id);
-  expect(stopped).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 1 });
+  expect(stopped).toMatchObject({ status: DesignStatus.Incomplete, doneSections: 1, handoffPending: false });
   expect(stopped.runs.at(-1)?.targetSectionIds).toEqual([overview.id]);
   expect(stopped.sections.find(({ id }) => id === endpoint.id)?.blocks).toBeNull();
   expect(t.fake.prompts).toHaveLength(2);

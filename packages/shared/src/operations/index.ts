@@ -179,6 +179,7 @@ import {
   getKnowledgeOp,
   knowledgeCitationOp,
   listKnowledgeOp,
+  setKnowledgePermissionModeOp,
   snapshotKnowledgeTaskMaterialOp,
   stopKnowledgeOp,
 } from './knowledge.ts';
@@ -617,6 +618,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getKnowledgeOp,
   askKnowledgeOp,
   followUpKnowledgeOp,
+  setKnowledgePermissionModeOp,
   stopKnowledgeOp,
   deleteKnowledgeOp,
   knowledgeCitationOp,

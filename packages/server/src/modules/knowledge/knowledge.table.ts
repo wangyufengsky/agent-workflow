@@ -1,3 +1,4 @@
+import { PermissionMode } from '@aw/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { attemptsTable } from '../attempts/attempts.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
@@ -13,6 +14,7 @@ export const knowledgeConversationsTable = sqliteTable(
     title: text('title').notNull(),
     /** JSON `KnowledgeSources`. */
     sources: text('sources').notNull(),
+    permissionMode: text('permission_mode').$type<PermissionMode>().notNull().default(PermissionMode.Ask),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

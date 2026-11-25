@@ -26,11 +26,12 @@
 - 项目选择（只有一个项目时直接显示其名称）。
 - 输入框：`Enter` 发送、`Shift+Enter` 换行。
 - 输入框下方一行资料范围：「将从 代码 · 文档 · 数据库（2）中查找依据 · 网络检索关闭」，点击打开**资料来源**弹层：代码、文档、数据库三个勾选（项目没有关联数据库时「数据库」不可选并说明原因），另有独立的「网络检索」开关，说明「打开后研究员可以访问公开网页，问题内容会发给搜索服务」（离线环境下为「只能读内网网页（按完整地址打开），不能网络搜索」，D168）。三项都不勾时不能发送。
+- 提问框可选择本次新建对话的「权限」。默认「始终询问」，也可选「帮我批准」或「完全访问」。
 - 三个示例问题（固定文案，点击填入输入框）。
 
 **对话中**
 
-- 顶栏：项目名（锁定图标，悬停说明「对话开始后项目与资料范围不可更换，新建对话后可以切换」）、「对话记录」、「新建对话」。
+- 顶栏：项目名（锁定图标，悬停说明「对话开始后项目与资料范围不可更换，新建对话后可以切换」）、「对话记录」、「新建对话」。提问框显示当前对话的权限档位，一轮结束后可单独调整，后续追问继续使用该对话保存的档位。换模型与权限档位独立。
 - 每一轮：用户的问题气泡 → 研究过程卡 → 回答。
 - **研究过程卡**：就是这一轮尝试的会话流盒子（25 §3，高 300px，内部滚动）：研究中展开，标题行显示四个阶段（当前阶段高亮，检索次数、「引用有误，正在修正」），盒子里是研究员的思考、检索与读取的动作；有了回答（或停止、失败）就收起为一行「研究过程 · 读取 N 份原文 · 用时 X 秒」，可再展开。阶段由会话流推导（前端纯函数 `researchSteps(entries)`，不需要模型额外报告）：
   | 阶段 | 依据（会话流中的工具调用） |
@@ -44,7 +45,7 @@
 - **模型（D67 ④）**：输入框角落有一个小的模型选择（简单与专业模式都显示），选项为 opencode 的 provider 列表（与角色页同源），默认 `ai.defaultModel`，未设置时为「默认模型」（opencode 自己的默认）。每一轮可以换模型，续问也可以；这一轮的模型显示在研究员一行与对话记录中。
 - **停止**：研究中输入框右侧的按钮变为「停止」，停止后这一轮显示「已停止」；已写出的草稿保留，标为「已停止，引用未核对」，可以「重新提问」（同一问题作为新一轮）。
 - **失败**（未提交、超时、会话出错、应用重启中断）：显示原因（按错误码的文案）与「重新提问」。
-- **等待你允许**：研究员要运行只读白名单以外的命令时，权限请求进入「需要你处理」（与任务相同，03 §2.5）；这一轮显示「等待你允许一条命令」与「去处理」链接。
+- **等待你允许**：需要人工处理的权限请求进入「需要你处理」（03 §2.5）；这一轮显示「等待你允许一条命令」与「去处理」链接。
 - 一个对话同时只有一轮在研究；研究中输入框可以输入但不能发送。
 
 **引用原文面板**
@@ -88,7 +89,8 @@
 | project_id | TEXT → projects，CASCADE | 对话开始后不可更换 |
 | title | TEXT | 第一次提问的首行（`KNOWLEDGE_TITLE_MAX_CHARS`） |
 | sources | TEXT(JSON) | `KnowledgeSources`：`{ code, docs, database, web }`，均为布尔；对话开始后固定（D67） |
-| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建与结束更新，列表按它倒序 |
+| permission_mode | TEXT NOT NULL DEFAULT `ask` | `PermissionMode`。新建和升级旧记录均默认 `ask`，助手发起的新对话在创建时写入继承的档位。 |
+| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建、结束及权限档位修改更新，列表按它倒序 |
 
 索引：`(project_id)`、`(updated_at)`。
 
@@ -109,20 +111,21 @@
 
 - **这一轮的状态不单独存**，由尝试状态推导（`knowledgeTurnStatusOf(attemptStatus)`，`shared/enums/knowledge.ts`）：`starting` / `running` → `researching`；`succeeded` → `answered`；`aborted` → `stopped`；`failed` / `interrupted` → `failed`（原因为尝试的 `error`）。尝试状态只经尝试状态机改变，这里只是投影，不另设状态机。
 - 会话流就是尝试的会话流：`<数据目录>/runs/knowledge/<attemptId>.jsonl`（10 §3；`task_id` 为空的尝试中 `research` 类放 `runs/knowledge/`，调试尝试仍在 `runs/debug/`）。
-- 研究尝试的 `task_id`、`node_id`、`role_id` 为空，`directory` 为项目仓库路径，`model` 为发起时的 `ai.defaultModel`。
+- 研究尝试的 `task_id`、`node_id`、`role_id` 为空，`directory` 为项目仓库路径；`model` 记录这一轮实际选用的模型。
 
 **删除**：删除对话 = 删除其轮次，再删除这些轮次的尝试（尝试模块同时删除会话流文件；权限请求条目随尝试级联删除）。研究中的对话不能删除（`KNOWLEDGE_CONVERSATION_BUSY`）。删除项目时（`tasks.deleteProject`）同样先检查项目没有研究中的对话，再在同一事务里删除项目的全部对话与其尝试。
 
 ## 4. API（操作清单）
 
-契约在 `shared/operations/knowledge.ts`、DTO 在 `shared/contracts/api/knowledge.ts`；全部 `mode: simple`、`palette: false`、`expose.assistant: true`（应用助手按 D65 照常生成工具，write 需确认，critical 每次确认）。
+契约在 `shared/operations/knowledge.ts`、DTO 在 `shared/contracts/api/knowledge.ts`；全部 `mode: simple`、`palette: false`。权限档位修改和回答资料快照只由界面调用；其他操作向助手开放，助手工具的普通写入按 D65 处理，critical 每次确认。
 
 | 操作 | HTTP | 风险 | 说明 |
 | --- | --- | --- | --- |
 | `knowledge.list` | `GET /knowledge/conversations?projectId&query&limit&cursor` | read | 对话列表（`KnowledgeConversationSummaryDTO`），按 `updated_at` 倒序，游标分页；`query` 匹配问题与回答 |
-| `knowledge.get` | `GET /knowledge/conversations/:id` | read | 对话详情：项目、范围、全部轮次（`KnowledgeTurnDTO`） |
-| `knowledge.ask` | `POST /knowledge/conversations` `{ projectId, question, sources, model? }` | read | 新建对话并开始第一轮，返回详情（201） |
+| `knowledge.get` | `GET /knowledge/conversations/:id` | read | 对话详情：项目、范围、权限档位、全部轮次（`KnowledgeTurnDTO`） |
+| `knowledge.ask` | `POST /knowledge/conversations` `{ projectId, question, sources, model?, permissionMode? }` | read | 新建对话并开始第一轮，返回详情（201）；界面省略权限时使用 `ask` |
 | `knowledge.followUp` | `POST /knowledge/conversations/:id/turns` `{ question, model? }` | read | 续问：同一会话的新一轮；上一轮还在研究 → `KNOWLEDGE_CONVERSATION_BUSY` |
+| `knowledge.setPermissionMode` | `PATCH /knowledge/conversations/:id/permission-mode` `{ permissionMode }` | critical | 修改该知识对话的权限档位并返回详情；仅界面调用，之后的新权限请求采用新设置，已挂起的权限卡继续等待用户 |
 | `knowledge.stop` | `POST /knowledge/conversations/:id/stop` | write | 中止研究中的一轮（尝试 `aborted`）；没有研究中的一轮 → `STATE_TRANSITION_INVALID` |
 | `knowledge.delete` | `DELETE /knowledge/conversations/:id` | critical | 删除对话（§3） |
 | `knowledge.citation` | `GET /knowledge/turns/:turnId/citations/:index` | read | 一处引用的原文（§6.3）；`index` 从 1 起 |
@@ -142,7 +145,7 @@ type KnowledgeTurnDTO = {
 };
 
 type KnowledgeConversationDTO = {
-  id: string; title: string; sources: KnowledgeSources;
+  id: string; title: string; sources: KnowledgeSources; permissionMode: PermissionMode;
   project: { id: string; name: string; repoPath: string; databaseCount: number };   // 研究过程中的文件路径相对 repoPath 显示
   turns: KnowledgeTurnDTO[];
   createdAt: number; updatedAt: number;
@@ -151,21 +154,22 @@ type KnowledgeConversationDTO = {
 type KnowledgeConversationSummaryDTO = {
   id: string; title: string; project: { id: string; name: string };
   turnCount: number;
+  permissionMode: PermissionMode;
   latest: { status: KnowledgeTurnStatus; model: string | null; answerExcerpt: string | null; citationCount: number; error: ErrorInfo | null };
   updatedAt: number;
 };
 ```
 
-- `model`：`provider/model`、`null`（opencode 默认）或省略（`ai.defaultModel`，应用助手的调用即如此）；格式不对 → `VALIDATION_FAILED`。
+- `model`：`provider/model`、`null`（opencode 默认）或省略（`ai.defaultModel`）；格式不对 → `VALIDATION_FAILED`。
 - 发起时 opencode 未就绪 → `OPENCODE_NOT_READY`（503），什么都不写。
 - 项目没有关联数据库却勾选了 `database` → `VALIDATION_FAILED`（`details.issues` 指向 `sources.database`）。
-- SSE：`knowledge.updated { conversationId }`（新一轮、提交答案、尝试结束、删除时发出），界面据此刷新对话与列表；研究过程的实时片段沿用 `attempt.transcript` 与 `attempt.updated`。
+- SSE：`knowledge.updated { conversationId }`（新一轮、提交答案、尝试结束、修改权限或删除时发出），界面据此刷新对话与列表；研究过程的实时片段沿用 `attempt.transcript` 与 `attempt.updated`。
 
 ### 4a. 应用助手调用知识问答
 
 用户要求助手能直接提问（D68）。`knowledge.ask` 与 `knowledge.followUp` 为 read：只读项目，不需要确认卡片；契约声明 `produces: knowledge_conversation`（D66）。研究可能要几分钟，助手的工具调用不阻塞，沿用确认流程「结果作为下一条消息」的模式（15 §4）：
 
-1. 助手调用 `knowledge_ask`（或 `knowledge_followUp`）。操作照常执行；工具不返回对话 DTO，而是立即返回 `{ status: 'researching', knowledge_conversation_id, instruction }`，`instruction` 让模型告诉用户正在查资料并结束本轮。助手模块记下「这一轮由哪个助手对话等待」（内存中；应用重启会中断研究本身，结果仍可在知识问答页看到）。
+1. 助手调用 `knowledge_ask`（或 `knowledge_followUp`）。助手发起的新知识对话由后端继承当前助手对话已保存的权限档位，模型工具参数不接受 `permissionMode`。助手追问现有知识对话时继续使用该知识对话的档位。操作照常执行；工具不返回对话 DTO，而是立即返回 `{ status: 'researching', knowledge_conversation_id, instruction }`，`instruction` 让模型告诉用户正在查资料并结束本轮。助手模块记下「这一轮由哪个助手对话等待」（内存中；应用重启会中断研究本身，结果仍可在知识问答页看到）。
    操作一返回，助手对话中就记录指向该知识对话的导航卡片（`entity_ref`，与其他 `produces` 操作相同），用户在研究进行中即可点进去看进度。
 2. 这一轮结束时（知识模块 `onTurnEnded`），后端把消息发回原助手会话（会话忙时等本轮结束，`deliver`）：
    - 回答（`assistant-knowledge-answered.md`）：问题、带 `[n]` 的回答、引用列表（`[n] 路径 第 a–b 行 — link: /knowledge/<id>?turn=<turnId>&cite=<n>`），以及对话页面链接 `/knowledge/<id>`（即 `open_page` 的 `knowledge_conversation` 页面）；要求模型把提到的引用写成 `[[n]](link)` 形式的 Markdown 链接，并在结尾附上对话页面链接。
@@ -186,10 +190,24 @@ type KnowledgeConversationSummaryDTO = {
 ```
 
 - `edit: deny`（opencode 的 write / patch 也归 edit 管）；原生 `question` deny（研究员不提问，见 §5.4）；`task` deny：子 agent 用自己的权限，可能可以写文件（「全程只读」）；助手 MCP 的工具 deny（D25）。
-- 会话级规则（`session.create`）：bash 用 `readonlyBashRules()`（不带检查命令：研究员不跑测试）；网络开关打开时追加 `webfetch *` 与 `websearch *` 的 allow（离线环境只追加 `webfetch *`，首条消息的资料说明写明只能读内网网页、没有网络搜索，D168）。opencode 把 agent 规则与会话规则合并后取最后匹配（被整体 deny 的工具从工具列表中去掉，1.19 实测见 12 §8），所以开关关闭时模型看不到这两个工具。
+- 会话级规则（`session.create`）：bash 用 `readonlyBashRules()`（研究员不跑检查命令，也不继承项目额外的 Bash 放行）；网络开关打开时追加 `webfetch *` 与 `websearch *` 的 allow（离线环境只追加 `webfetch *`，首条消息的资料说明写明只能读内网网页、没有网络搜索，D168）。opencode 把 agent 规则与会话规则合并后取最后匹配（被整体 deny 的工具从工具列表中去掉，1.19 实测见 12 §8），所以开关关闭时模型看不到这两个工具。
 - 会话 `directory` = 项目仓库路径（主工作区，只读）；`external_directory: deny` 挡住仓库外的读取。
 - 网络开关打开时，研究员还能用执行 MCP 的浏览器工具读需要登录或需要浏览器渲染的网页（v1.3，29 §2.8、12 §6.17）：只能打开网站（按设置的网站规则，默认只读），不能打开预览；开关关闭时这些工具返回 `MCP_TOOL_NOT_ALLOWED`。
 - 尝试模块的 `agent` 参数从 `RoleBaseAgent` 扩为 `SessionAgent`（`planner | executor | reviewer | researcher`，`OPENCODE_AGENT_NAME` 随之扩展）；角色的基础类型仍只有前三个。
+
+### 研究员权限范围
+
+权限档位只决定允许范围内的原生请求怎样进入审批。研究员的只读角色规则、资料来源和对话归属始终适用。档位不会开放编辑、项目外目录、子代理或助手工具。数据库须在本对话资料范围内并绑定到当前项目，数据库工具按只读方式使用；网页访问继续受网络开关、离线设置及网站规则约束。代码与文档的资料选择用于研究提示、自动 Bash 审批和引用校验。原生仓库读取继续使用 OpenCode 的项目目录限制。
+
+原有只读白名单仍直接放行。收到新的 Bash 权限请求时按该对话当前档位处理。
+
+| 档位 | 研究中的权限请求 |
+| --- | --- |
+| 始终询问 `ask` | 进入「需要你处理」，用户可批准本次或拒绝 |
+| 帮我批准 `assisted` | 后端核对真实工具调用身份、完整命令与仓库内的实际工作目录。确认属于支持的仓库内只读查询后才交审批员；审批员使用自己的角色模型，只能批准本次，无法核实则由用户处理 |
+| 完全访问 `full` | 自动批准本次已核实的仓库内只读查询；其他无法自动核实的请求交给用户 |
+
+自动审批处理已核实的 Git 仓库信息查询，以及读取项目普通文件、查看文件信息和计算校验值的命令。后端仅接受支持的命令及参数形式，并验证权限事件、实际工具调用、工作目录和文件的真实路径。对话至少选中代码或文档才能使用这条自动审批路径。文件参数必须是相对路径，原路径及符号链接解析后的真实路径都须位于项目内、避开 `.git` 并符合勾选的来源。无法核实的请求交给用户处理。知识问答的人工 Bash 确认可批准本次，无法保存会话、任务或项目授权。接口允许研究期间更新档位；新请求采用新值，已显示的人工审批保持待处理。
 
 ### 5.2 尝试类型 `research`
 
@@ -200,7 +218,7 @@ type KnowledgeConversationSummaryDTO = {
 
 ### 5.3 一轮的生命周期
 
-1. `ask` / `followUp`：校验 → 生成尝试 id → `attempts.start({ id, kind: research, agent: researcher, … })`（第一轮）或 `attempts.continueSession(previousAttemptId, { id, … })`（续问：沿用上一轮的 opencode 会话，模型记得之前读过的内容；上一轮没有会话时新开）。两者在第一个 `await` 之前写入尝试行，调用后同步写入轮次行，所以会话里最早的 MCP 调用也能找到这一轮。
+1. `ask` / `followUp`：校验 → 生成尝试 id → `attempts.start({ id, kind: research, agent: researcher, … })`（第一轮）或 `attempts.continueSession(previousAttemptId, { id, … })`（续问：沿用上一轮的 opencode 会话并重设研究员的只读及网络规则，模型保留此前上下文；上一轮没有会话时新开）。两者在第一个 `await` 之前写入尝试行，调用后同步写入轮次行，所以会话里最早的 MCP 调用也能找到这一轮。
 2. 模型用原生 read / grep / glob / 只读 bash、`db_*` 工具（数据库在范围内时）、网络工具（打开时）研究，最后调用 `submit_answer`。
 3. `submit_answer` 校验引用（§6.2）：不通过 → `KNOWLEDGE_CITATION_INVALID` + 每处问题的 hint，模型修正后重提；通过 → 在一个事务里写入 answer / citations 并 `attempts.markSubmitted`，发 `knowledge.updated`。
 4. 尝试结束（任何终态）时知识模块经 `attempts.onSignal('ended')` 更新对话的 `updated_at` 并发 `knowledge.updated`。
@@ -313,8 +331,9 @@ apps/web/src/features/knowledge/       页面、研究过程卡、回答与引�
 
 | 层 | 覆盖 |
 | --- | --- |
-| 单元 | `citationMarkers`（链接、代码块、行内代码不算）、`classifySource`、`knowledgeTurnStatusOf`、`researchSteps`（前端阶段推导）、配置快照（`aw-researcher` 权限）、会话规则（网络开关） |
+| 单元 | `citationMarkers`（链接、代码块、行内代码不算）、`classifySource`、`knowledgeTurnStatusOf`、`researchSteps`（前端阶段推导）、配置快照（`aw-researcher` 权限）、会话规则（网络开关、项目 Bash 放行与研究隔离） |
 | 集成 | `knowledge.int.test.ts`（FakeOpencode）：提问 → 会话的目录 / agent / 规则正确 → `submit_answer` 通过后轮次 `answered`、引用与 excerpt 正确；引用校验每个子码（不存在的文件、越界行号、`..` 与符号链接越界、`.git`、范围外来源、未知标注、未用引用、未知连接）且返回 hint，修正后重提成功；只读：研究会话的规则无 edit、bash 写命令 ask、`task` deny、网络默认 deny；续问沿用同一 opencode 会话且上一轮研究中时 `KNOWLEDGE_CONVERSATION_BUSY`；停止 → `stopped`；未提交 → 提醒 → `failed`；读取原文（窗口、`changed`、文件删除后 404、编号越界 404）；删除对话清理尝试与会话流；删除项目时研究中拒绝、结束后级联；`research` 尝试不能调用 `submit_result` / `ask_user`；数据库引用（Docker MySQL）：原文重新执行只读查询 |
+| 权限回归 | 默认和旧对话为 `ask`，详情与列表返回权限档；续问或换模型保留档位。自动审批只处理已核实的仓库内只读查询。助手新建问答从真实会话继承，追问保留知识对话自己的档位，持续校验只读工具和资料范围 |
 | `@opencode` | 注入后 `aw-researcher` 在 opencode 配置中可见 |
 | 集成（助手） | `assistant.knowledge.int.test.ts`：`knowledge_ask` 不需确认、立即返回 `researching`；研究完成后助手会话收到带引用与链接的回答消息、对话中有导航卡片；研究失败时收到错误码与原因 |
 | 集成（流式与模型） | `knowledge.int.test.ts`：草稿在提交前写进会话流、提交后回答为提交的正文；校验失败时仍在研究、没有回答、草稿保留；停止后草稿保留；四轮分别用请求的模型、换模型、`ai.defaultModel`、opencode 默认，记录在轮次上并随首条消息发送 |

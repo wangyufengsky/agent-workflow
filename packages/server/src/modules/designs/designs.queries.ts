@@ -15,6 +15,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { createDesignsRepo, DesignRun, ProjectDesign } from './designs.repo.ts';
+import type { DesignRuns } from './designs.runs.ts';
 
 type DesignRefs = Pick<DesignSummaryDTO, 'project' | 'totalSections' | 'doneSections' | 'analyzedCount'>;
 type SectionCounts = Pick<DesignRefs, 'totalSections' | 'doneSections'>;
@@ -23,6 +24,7 @@ type DesignQueryDeps = {
   projects: Pick<ProjectsService, 'list' | 'getRecord'>;
   attempts: Pick<AttemptsService, 'summaries'>;
   inbox: Pick<InboxService, 'listOpen'>;
+  runs: Pick<DesignRuns, 'hasPendingHandoff'>;
 };
 
 const runKinds: Partial<Record<AttemptKind, DesignRunKind>> = {
@@ -68,7 +70,7 @@ function summaryOf(
   };
 }
 
-export function createDesignQueries({ repo, projects, attempts, inbox }: DesignQueryDeps) {
+export function createDesignQueries({ repo, projects, attempts, inbox, runs: designRuns }: DesignQueryDeps) {
   return {
     list({ projectId, query, limit, cursor }: ListDesignsQuery): ListDesignsResponse {
       const separator = cursor?.indexOf('.') ?? -1;
@@ -152,6 +154,7 @@ export function createDesignQueries({ repo, projects, attempts, inbox }: DesignQ
         diagrams,
         runs,
         activeRunId,
+        handoffPending: designRuns.hasPendingHandoff(id),
       };
     },
   };

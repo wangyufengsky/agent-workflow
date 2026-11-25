@@ -327,7 +327,7 @@ payload / response：
 | kind | payload | response |
 | --- | --- | --- |
 | `question` | `{ question, options?: string[], blocking: boolean, defaultAssumption?: string }` | `{ answer: string }` 或 `{ assumed: true, value }`（未问用户、按假设继续时直接以 resolved 写入，作为记录） |
-| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`，任务 Bash 另有 `bashGrant`（可复用证据或 null）和 `projectGrantAvailable` | `{ decision: PermissionDecision, scope?: "task" 或 "project" }` |
+| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`，任务 Bash 另有 `bashGrant`（可复用证据或 null）和 `projectGrantAvailable`；知识问答的 Bash 请求为 `bashGrant: null`、`projectGrantAvailable: false`，仅允许本次处理 | `{ decision: PermissionDecision, scope?: "task" 或 "project" }` |
 | `acceptance` | `{}` | `{ accepted: boolean, feedback?: string }` |
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |
@@ -515,7 +515,7 @@ payload / response：
 
 ## 4a. 知识问答（v1.1）
 
-见 [18-knowledge.md §3](18-knowledge.md#3-数据模型)，迁移 `0009_knowledge`。
+见 [18-knowledge.md §3](18-knowledge.md#3-数据模型)，迁移 `0009_knowledge` 建表，`0059_knowledge_permission_mode` 增加对话权限档位。
 
 ### knowledge_conversations
 
@@ -525,7 +525,8 @@ payload / response：
 | project_id | TEXT → projects，CASCADE | |
 | title | TEXT | 第一次提问的首行（`KNOWLEDGE_TITLE_MAX_CHARS`） |
 | sources | TEXT(JSON) | `{ code, docs, database, web }`，对话开始后固定（D67） |
-| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建与结束更新 |
+| permission_mode | TEXT NOT NULL DEFAULT `ask` | 对话独立保存权限档位，升级后现有记录默认为 `ask`。模型选择仍保存在每轮对应的尝试。 |
+| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建、结束及权限档位修改更新 |
 
 索引：`(project_id)`、`(updated_at)`。
 
@@ -924,7 +925,7 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 
 ## 对话和任务的审批配置
 
-迁移 0053 为 `assistant_conversations` 和 `tasks` 增加 `permission_mode`，默认 `ask`。每个对象独立保存选择。普通执行尝试的 `attempts.permission_baseline` 保存创建时的规则，同一原生会话继续执行时沿用。既有 `ai.imageModel` 迁入图像处理员的空模型字段，已有角色选择优先。
+迁移 0053 为 `assistant_conversations` 和 `tasks` 增加 `permission_mode`，默认 `ask`。每个对象独立保存选择。迁移 0059 为 `knowledge_conversations` 增加独立的权限档位，默认也是 `ask`，见 §4a。普通执行尝试的 `attempts.permission_baseline` 保存创建时的规则，同一原生会话继续执行时沿用。既有 `ai.imageModel` 迁入图像处理员的空模型字段，已有角色选择优先。
 
 ### 模型思考强度
 

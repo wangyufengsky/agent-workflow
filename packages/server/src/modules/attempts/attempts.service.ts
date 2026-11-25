@@ -25,7 +25,7 @@ import {
   type RecallInput,
   type RecallOutput,
   RoleBaseAgent,
-  type SessionAgent,
+  SessionAgent,
   type SkillSnapshot,
   TaskEventEntity,
   type TranscriptPage,
@@ -60,11 +60,18 @@ import {
 
 const SESSION_COMMAND_CLEANUP_TIMEOUT_MS = 5_000;
 
-import { grantKey, type PermissionReviewer, scopedRules, type TaskPermissionPolicy } from '../permissions/index.ts';
+import {
+  grantKey,
+  type KnowledgePermissionPolicy,
+  type PermissionReviewer,
+  scopedRules,
+  type TaskPermissionPolicy,
+} from '../permissions/index.ts';
 export type AttemptsServiceDeps = AttemptStateDeps & {
   permissionReviewer: PermissionReviewer;
   effortsForRole(id: string | null): ModelEffort[];
   taskPolicy(id: string): TaskPermissionPolicy;
+  knowledgePolicy(id: string): KnowledgePermissionPolicy | undefined;
   taskSkills(taskId: string): SkillSnapshot[];
   settings: SettingsService;
   prompts: Prompts;
@@ -110,7 +117,13 @@ export type ResumeInput = {
   functionalTest?: boolean;
 };
 
-type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?: AttemptKind } & ResumeInput;
+type ContinueInput = {
+  id?: string;
+  prompt: string;
+  model?: string | null;
+  kind?: AttemptKind;
+  web?: boolean;
+} & ResumeInput;
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
@@ -400,7 +413,23 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     const attempt = mustFind(id);
     // Cancelled while waiting.
     if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
-    await restorePermissionRules(attempt, input);
+    if (input.agent === SessionAgent.Researcher) {
+      try {
+        await opencode.setPermissions({
+          sessionId,
+          directory: attempt.directory,
+          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
+            web: input.web,
+            offline: settings.get('network.offline'),
+          }),
+        });
+      } catch (error) {
+        const current = mustFind(id);
+        return toDto(
+          current.status === AttemptStatus.Starting ? move(current, AttemptEvent.StartFailed, errorOf(error)) : current,
+        );
+      }
+    } else await restorePermissionRules(attempt, input);
     if (mustFind(id).status !== AttemptStatus.Starting) return toDto(mustFind(id));
     const session = track(
       attempt,
@@ -755,6 +784,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       scope?: 'task' | 'project',
     ): Promise<void> {
       const attempt = mustFind(attemptId);
+      if (attempt.kind === AttemptKind.Research && reply === PermissionDecision.Always) reply = PermissionDecision.Once;
       const scoped = attempt.permissionBaseline !== null || payload.bashGrant !== undefined;
       if (
         scope &&

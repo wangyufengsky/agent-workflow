@@ -373,7 +373,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `assistant.export_deck` | `{ conversationId, deckId, format }` | 助手调用 `export_deck`：界面打开这份 PPT，由页头执行与「导出」按钮相同的导出（28 §4） |
-| `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
+| `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、权限档位修改、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
 | `browser.frame` | `BrowserFrame`（`{ attemptId, taskId, seq, tool, url, file }`） | AI 浏览器动作后的画面（v1.3 B2，29 §8.2）；任务页「预览」页签观看 AI 会话时跟随最新一张 |
 | `browser.tab_updated` | `UserTabState`（`{ tabId, taskId, url, viewport, consoleErrors, failedRequests }`） | 用户的预览标签页换了页面、尺寸，或当前页面的控制台错误（含未捕获异常）与失败请求（网络错误或 ≥ 400）数变了（v1.3 B2，29 §8.1）；计数随主框架的新文档重新开始 |
 | `preview.updated` | `Preview`（`{ taskId, state, url, logTail }`） | 页面预览（v1.3，29 §4.2）：每次状态变化后；任务页的预览页签直接用它更新 |
@@ -434,14 +434,15 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13a. 知识问答（v1.1）
 
-见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple` 且不进命令面板。资料快照由界面调用，其他操作开放给助手（D68）。
+见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple` 且不进命令面板。资料快照和权限档位管理由界面调用，其他操作开放给助手（D68）。助手新建知识对话由后端继承发起对话的权限；助手追问现有知识对话时沿用该知识对话已保存的档位。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | `/knowledge/conversations?projectId&query&limit&cursor` | `knowledge.list` | read | `{ items: KnowledgeConversationSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配问题与回答 |
-| GET | `/knowledge/conversations/:id` | `knowledge.get` | read | `KnowledgeConversationDTO`（全部轮次、状态、回答、引用、`awaitingInput`） |
-| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources, model? }`（`model`：`provider/model`；`null` 为 opencode 默认；省略为 `ai.defaultModel`，D67 ④） → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
+| GET | `/knowledge/conversations/:id` | `knowledge.get` | read | `KnowledgeConversationDTO`（`permissionMode`、全部轮次、状态、回答、引用、`awaitingInput`） |
+| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources, model?, permissionMode? }`（界面省略权限时为 `ask`；`model`：`provider/model`；`null` 为 opencode 默认；省略为 `ai.defaultModel`，D67 ④） → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
 | POST | `/knowledge/conversations/:id/turns` | `knowledge.followUp` | read | `{ question, model? }`（可换模型）；上一轮研究中 409 `KNOWLEDGE_CONVERSATION_BUSY` |
+| PATCH | `/knowledge/conversations/:id/permission-mode` | `knowledge.setPermissionMode` | critical | `{ permissionMode }` → 更新后的 `KnowledgeConversationDTO`；仅界面调用；可以在研究中修改，之后的新权限请求采用新档位，现有待审批项继续等待处理。研究员的只读限制与资料范围继续生效 |
 | POST | `/knowledge/conversations/:id/stop` | `knowledge.stop` | write | 中止研究中的一轮；已结束 409 `STATE_TRANSITION_INVALID` |
 | DELETE | `/knowledge/conversations/:id` | `knowledge.delete` | critical | 204；研究中 409 |
 | GET | `/knowledge/turns/:turnId/citations/:index` | `knowledge.citation` | read | `CitationSourceDTO`（18 §6.3）；404 `KNOWLEDGE_CITATION_NOT_FOUND` / `KNOWLEDGE_SOURCE_UNAVAILABLE` |
@@ -747,7 +748,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 
 ## 审批与角色模型
 
-创建对话和任务可带 `permissionMode`。通过 `PATCH /assistant/conversations/:id/permission-mode` 或 `PATCH /tasks/:id/permission-mode` 提交 `{"permissionMode":"assisted"}`。两个端点都返回更新后的对象。角色更新支持为内置角色单独提交 `model`，传 `null` 恢复跟随默认模型。图像处理员的显式模型须在运行时目录中声明支持图片输入。
+创建助手对话、任务或知识问答可带 `permissionMode`。通过 `PATCH /assistant/conversations/:id/permission-mode`、`PATCH /tasks/:id/permission-mode` 或 `PATCH /knowledge/conversations/:id/permission-mode` 提交 `{"permissionMode":"assisted"}`。各端点都返回更新后的对象。知识问答的原生审批范围见 [18](18-knowledge.md#研究员权限范围)。角色更新支持为内置角色单独提交 `model`，传 `null` 恢复跟随默认模型。图像处理员的显式模型须在运行时目录中声明支持图片输入。
 
 ### 模型思考强度
 
@@ -767,13 +768,13 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | 操作 | 路径 | 请求与返回 |
 | --- | --- | --- |
 | designs.source | GET /designs/:id/files/:fileId/source | 仅本机阅读器可用。验证文件归属与扫描哈希，匹配返回 available 和全文；变化返回 changed，解绑或不可读返回 unavailable。此操作不暴露给助手 |
-| designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试 |
+| designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试。`handoffPending` 表示正在等候衔接下一章或自动复审，其间 `activeRunId` 为空，仍可停止 |
 | designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |
 | designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
 | designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
 | designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；可选 AI 优化只在确认前进行 |
 | designs.generate | POST /designs/:id/generate | 首次省略 sectionId 确认大纲。未勾选任何章节返回 400 VALIDATION_FAILED。每个章节使用独立会话，依次释放模型槽再续下一章。确认后只补未生成的选中章，带 sectionId 仅重试其中一章。确认前指定章节、重试未选章或已生成章返回 409 STATE_TRANSITION_INVALID |
 | designs.reviseSection / restoreSection | POST /designs/:id/sections/:sectionId/revise 或 /restore | 重写前保存最近一版，恢复一次同时还原正文、文件和图 |
-| designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止保留已提交内容 |
+| designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止可中止活动尝试或取消待交接，保留已提交内容 |
 | designs.export | POST /designs/:id/export | 已完成至少一章且无活动运行时导出。离线 HTML 只打包引用片段。非托管目录须显式确认覆盖；助手发起覆盖时逐次确认 |
 | designs.delete | DELETE /designs/:id | critical，删除关联尝试、会话流及数据库内容，已导出的站点由用户保管 |

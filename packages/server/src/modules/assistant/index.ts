@@ -2,6 +2,7 @@ import type { Prompts } from '@aw/builtin';
 import {
   AppError,
   actAssistantBrowserOp,
+  askKnowledgeOp,
   assistantBrowserActionSchema,
   assistantBrowserConfirmationSchema,
   assistantToolName,
@@ -118,6 +119,11 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     if (impl.contract.id === createAssistantMemoryOp.id) return saveConfirmedMemory(memory, conversationId, input);
     if (analysisRelay.handles(impl)) return analysisRelay.run(conversationId, input);
     if (breakdownRelay.handles(impl)) return breakdownRelay.run(conversationId, impl, input);
+    if (impl.contract.id === askKnowledgeOp.id)
+      return taskRelay.run(conversationId, impl, {
+        ...askKnowledgeOp.input.parse(input),
+        permissionMode: conversations.permissionMode(conversationId),
+      });
     return taskRelay.run(conversationId, impl, input);
   };
   const confirmations = createConfirmations({

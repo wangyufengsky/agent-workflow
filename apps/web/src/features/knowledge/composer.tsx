@@ -23,7 +23,7 @@ export function Composer({
   pending: boolean;
   onSend(question: string, clear: () => void): void;
   onStop?: () => void;
-  /** In the box's bottom corner: the model picker. */
+  /** Controls beside the send button. */
   tools?: ReactNode;
   /** Shown under the box: the sources. */
   children?: ReactNode;

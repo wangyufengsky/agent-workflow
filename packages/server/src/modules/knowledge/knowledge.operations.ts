@@ -5,6 +5,7 @@ import {
   getKnowledgeOp,
   knowledgeCitationOp,
   listKnowledgeOp,
+  setKnowledgePermissionModeOp,
   snapshotKnowledgeTaskMaterialOp,
   stopKnowledgeOp,
 } from '@aw/shared';
@@ -17,6 +18,9 @@ export function knowledgeOperations(knowledge: KnowledgeService) {
     implement(getKnowledgeOp, ({ id }) => knowledge.get(id)),
     implement(askKnowledgeOp, (input) => knowledge.ask(input)),
     implement(followUpKnowledgeOp, ({ id, question, model }) => knowledge.followUp(id, question, model)),
+    implement(setKnowledgePermissionModeOp, ({ id, permissionMode }) =>
+      knowledge.setPermissionMode(id, permissionMode),
+    ),
     implement(stopKnowledgeOp, ({ id }) => knowledge.stop(id)),
     implement(deleteKnowledgeOp, ({ id }) => knowledge.delete(id)),
     implement(knowledgeCitationOp, ({ turnId, index }) => knowledge.citation(turnId, index)),

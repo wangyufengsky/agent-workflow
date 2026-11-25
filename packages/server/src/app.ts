@@ -78,7 +78,11 @@ import { createImageAnalysis } from './modules/image-analysis/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createInitiativesModule, type InitiativesService } from './modules/initiatives/index.ts';
 import { createInsightsModule } from './modules/insights/index.ts';
-import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
+import {
+  createKnowledgeModule,
+  type KnowledgeService,
+  readKnowledgePermissionPolicy,
+} from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
 import { createModelSlotsModule } from './modules/model-slots/index.ts';
 import { createNetworkModule, validateNetworkSettings } from './modules/network/index.ts';
@@ -438,6 +442,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     permissionReviewer,
     effortsForRole: (id) => modelEfforts(settings.service.getAll(), id ? roles.service.get(id) : undefined),
     taskPolicy: (id) => readTaskPermissionPolicy(database.db, id),
+    knowledgePolicy: (id) => readKnowledgePermissionPolicy(database.db, id),
     sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,

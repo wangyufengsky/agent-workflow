@@ -914,6 +914,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       };
     },
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
+    permissionMode: (id: string): PermissionMode => get(id).permissionMode,
     /** The MCP servers the user added to opencode themself (28 §4); the app's own two are not theirs to manage. */
     async externalMcp(): Promise<ExternalMcpServerDTO[]> {
       const servers = await opencode.mcpStatus(directory);

@@ -255,6 +255,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.knowledge.get': '查看知识问答对话',
   'op.knowledge.ask': '向项目提问',
   'op.knowledge.followUp': '继续追问',
+  'op.knowledge.setPermissionMode': '修改问答权限',
   'op.knowledge.stop': '停止研究',
   'op.knowledge.delete': '删除知识问答对话',
   'op.knowledge.citation': '查看引用原文',

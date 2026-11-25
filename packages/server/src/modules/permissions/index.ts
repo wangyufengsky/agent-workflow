@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
-import { lstat, readFile, realpath } from 'node:fs/promises';
+import { lstat, readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   APPROVER_ROLE_KEY,
   AppError,
   type BashGrant,
+  classifySource,
   ErrorCode,
+  type KnowledgeSources,
   modelEfforts,
   OPENCODE_APPROVER_AGENT,
   type PermissionAction,
@@ -30,6 +32,7 @@ import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 
 export type TaskPermissionPolicy = { mode: PermissionMode; intent: string; checkCommand: string | null };
+export type KnowledgePermissionPolicy = { mode: PermissionMode; intent: string; sources: KnowledgeSources };
 
 type Asked = Extract<OpencodeEvent, { type: typeof OpencodeEventType.PermissionAsked }>;
 type Call = Extract<OpencodeEvent, { type: typeof OpencodeEventType.Tool }>;
@@ -108,8 +111,7 @@ async function testEvidence(root: string, command: string, configured: string | 
 
 const simpleQuery = /^(?:pwd|ls(?: -[alh]{1,3})?|node --version|git (?:status(?: --short)?|rev-parse HEAD))$/u;
 
-/** 授权卡记录请求出现时的证据。再次调用时重新读取入口，用户点击期间改过文件也不会放宽下一次授权。 */
-async function bashGrantFor(event: Asked, call: Call | undefined, root: string): Promise<BashGrant | null> {
+async function localBashCall(event: Asked, call: Call | undefined, root: string) {
   if (
     event.permission !== 'bash' ||
     !event.patterns.length ||
@@ -129,6 +131,71 @@ async function bashGrantFor(event: Asked, call: Call | undefined, root: string):
   const directory = await realpath(resolve(root, workdir ?? '.'));
   const sub = relative(base, directory);
   if (isAbsolute(sub) || sub.split(sep).includes('..')) return null;
+  return { directory, relativeDirectory: sub || '.', command, timeout: call.input.timeout };
+}
+
+const researchFileReaders = new Set(['cat', 'head', 'tail', 'wc', 'stat', 'file', 'cksum', 'shasum', 'sha256sum']);
+const relativeFileWord = /^[\p{L}\p{N}_.][\p{L}\p{N}\p{M}_./-]*$/u;
+const researchPathErrors = new Set(['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM', 'ELOOP']);
+
+// An exact grammar keeps shell expansion and program-specific options outside automated approval.
+function researchFiles(command: string): string[] | undefined {
+  const [program, ...args] = command.split(' ');
+  const reader = program?.replace(/^(?:\/usr\/bin\/|\/bin\/)/u, '');
+  if (!reader || !researchFileReaders.has(reader)) return undefined;
+  if ((reader === 'head' || reader === 'tail') && args[0] === '-n' && /^[1-9][0-9]{0,3}$/u.test(args[1] ?? '')) {
+    args.splice(0, 2);
+  }
+  if (reader === 'wc' && /^-[lwc]$/u.test(args[0] ?? '')) args.shift();
+  if (reader === 'shasum' && args[0] === '-a' && args[1] === '256') args.splice(0, 2);
+  if (args.length > 0 && args.every((word) => relativeFileWord.test(word))) return args;
+}
+
+async function researchQuery(event: Asked, call: Call | undefined, root: string, sources: KnowledgeSources) {
+  if (!sources.code && !sources.docs) return null;
+  try {
+    const local = await localBashCall(event, call, root);
+    if (!local) return null;
+    const repository = await realpath(root);
+    if ((await realpath(event.directory)) !== repository) return null;
+    const { command, directory } = local;
+    if (/^git --no-optional-locks rev-parse (?:HEAD|--show-toplevel|--is-inside-work-tree)$/u.test(command))
+      return local;
+    const files = researchFiles(command);
+    if (!files) return null;
+    for (const file of files) {
+      const requested = resolve(directory, file);
+      const target = await realpath(requested);
+      for (const path of [requested, target]) {
+        const sub = relative(repository, path);
+        const segments = sub.split(sep);
+        if (
+          isAbsolute(sub) ||
+          segments.some((part) => part === '..' || part.toLowerCase() === '.git') ||
+          !sources[classifySource(segments.join('/'))]
+        )
+          return null;
+      }
+      if (!(await stat(target)).isFile()) return null;
+    }
+    return local;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      typeof error.code === 'string' &&
+      researchPathErrors.has(error.code)
+    )
+      return null;
+    throw error;
+  }
+}
+
+/** 授权卡记录请求出现时的证据。再次调用时重新读取入口，用户点击期间改过文件也不会放宽下一次授权。 */
+async function bashGrantFor(event: Asked, call: Call | undefined, root: string): Promise<BashGrant | null> {
+  const local = await localBashCall(event, call, root);
+  if (!local) return null;
+  const { directory, relativeDirectory, command, timeout } = local;
   let entry = command;
   let manifest: string | undefined;
   const [program, ...args] = command.split(' ');
@@ -155,9 +222,9 @@ async function bashGrantFor(event: Asked, call: Call | undefined, root: string):
     if (contents === undefined) return null;
   }
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify([manifest, entry, contents, event.patterns, call.input.timeout ?? null]))
+    .update(JSON.stringify([manifest, entry, contents, event.patterns, timeout ?? null]))
     .digest('hex');
-  return { directory, relativeDirectory: sub || '.', command, fingerprint };
+  return { directory, relativeDirectory, command, fingerprint };
 }
 
 async function reviewable(
@@ -253,6 +320,38 @@ export function createPermissionReviewer(deps: {
   return {
     review,
     remember: grants.remember,
+    async researchNative(input: {
+      event: Asked;
+      call: Call | undefined;
+      directory: string;
+      intent: string;
+      mode: PermissionMode;
+      signal: AbortSignal;
+      parentSignal: AbortSignal;
+      sources: KnowledgeSources;
+    }): Promise<{ reply?: PermissionDecision; reason?: string; bashGrant?: BashGrant | null }> {
+      const { event, call, directory, mode, intent, signal, parentSignal } = input;
+      signal.throwIfAborted();
+      const local = await researchQuery(event, call, directory, input.sources);
+      if (!local) return {};
+      if (mode === PermissionMode.Full) return { reply: PermissionDecision.Once };
+      if (mode !== PermissionMode.Assisted) return {};
+      const result = await review(
+        intent,
+        {
+          directory: local.directory,
+          permission: event.permission,
+          patterns: event.patterns,
+          tool: call?.tool,
+          arguments: call?.input,
+        },
+        parentSignal,
+        signal,
+      );
+      return result.decision === 'once'
+        ? { reply: PermissionDecision.Once, reason: result.reason }
+        : { reason: result.reason };
+    },
     async native(input: {
       event: Asked;
       call: Call | undefined;

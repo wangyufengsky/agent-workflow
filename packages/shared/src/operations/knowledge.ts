@@ -10,7 +10,7 @@ import {
   listKnowledgeQuerySchema,
 } from '../contracts/api/knowledge.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
-import { OperationRisk } from '../enums/system.ts';
+import { OperationRisk, permissionModeSchema } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
@@ -46,6 +46,7 @@ export const askKnowledgeOp = defineOperationContract({
   title: 'op.knowledge.ask',
   description: 'Ask a question about a project; a read-only researcher answers with citations',
   input: askKnowledgeRequestSchema,
+  assistantOmit: ['permissionMode'],
   output: knowledgeConversationSchema,
   // Only reads the project; the assistant runs it without a confirmation and gets the answer later (D68, 18 §4a).
   risk: OperationRisk.Read,
@@ -63,6 +64,18 @@ export const followUpKnowledgeOp = defineOperationContract({
   risk: OperationRisk.Read,
   produces: { kind: EntityKind.KnowledgeConversation, ref: (c) => ({ id: c.id, title: c.title }) },
   http: { method: 'POST', path: '/knowledge/conversations/:id/turns' },
+});
+
+export const setKnowledgePermissionModeOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'knowledge.setPermissionMode',
+  title: 'op.knowledge.setPermissionMode',
+  description: 'Set the permission mode of a knowledge conversation',
+  input: byId.extend({ permissionMode: permissionModeSchema }),
+  output: knowledgeConversationSchema,
+  risk: OperationRisk.Critical,
+  http: { method: 'PATCH', path: '/knowledge/conversations/:id/permission-mode' },
 });
 
 export const stopKnowledgeOp = defineOperationContract({

@@ -290,6 +290,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
 
   return {
     assertIdle,
+    hasPendingHandoff: (id: string) => handoffs.has(id),
     async reviseOutline(id: string, input: ReviseOutlineInput) {
       const design = mustFindDesign(id);
       assertIdle(id);

@@ -3,6 +3,12 @@ export const PERMISSIONS_COPY = {
   conversation: '对话权限',
   task: '任务权限',
   question: '如何批准操作？',
+  knowledge: {
+    label: '问答权限',
+    [PermissionMode.Ask]: '超出只读命令白名单的操作由你审批。',
+    [PermissionMode.Assisted]: '审批员核对操作，符合只读规则时放行，拿不准时询问你。',
+    [PermissionMode.Full]: '自动允许符合规则的只读命令，其他命令仍会询问。资料范围和网络检索设置继续生效。',
+  },
   [PermissionMode.Ask]: { name: '始终询问', description: '沿用当前权限规则，需要批准的操作交给你。' },
   [PermissionMode.Assisted]: {
     name: '帮我批准',

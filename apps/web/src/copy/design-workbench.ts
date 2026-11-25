@@ -48,6 +48,7 @@ export const DESIGN_WORKBENCH_COPY = {
   free: '自由阅读',
   mode: '阅读模式',
   stop: '停止',
+  handoffPending: '等待下一轮分析',
   review: '独立复审',
   reviewEnabled: '生成后自动复审',
   continue: '继续生成',

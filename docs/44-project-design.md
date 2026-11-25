@@ -288,7 +288,7 @@
 | 全量/继续生成 | `designs.generate` | `design_generate` | 首次调用锁定 `outline_confirmed_at`；按章节顺序对所有未完成章节（`blocks IS NULL`）逐章分析，每章提交即落库并推送 `design.updated`；每章一个独立会话，释放模型槽后再串行启动下一章。每轮带精简大纲和当前章授权清单。失败/停止保留提交结果，续作只处理尚未生成的勾选章 |
 | 局部重写 | `designs.reviseSection` | `design_revise` | 目标为单个章节（可带聚焦的文件路径/符号名/图 ID 与一句用户要求）；覆盖前把该章当前内容快照进 `previous` |
 | 独立复审（可选） | `designs.review`（或生成完成后自动衔接） | `design_review` | 独立新会话，对照源码抽查关键结论、无依据断言与跨模块遗漏，经 `submit_design_review` 写回各章 `review_state` 与 `review_notes` |
-| 停止与续作 | `designs.stop` / 再次 `designs.generate` | — | 停止只中止当前尝试，已提交章节完整保留；应用重启时未完成尝试标为 `interrupted`，用户点「继续生成」只补跑剩余未完成章节 |
+| 停止与续作 | `designs.stop` / 再次 `designs.generate` | — | 停止中止当前尝试或取消等待中的交接，已提交章节完整保留；应用重启时未完成尝试标为 `interrupted`，用户点「继续生成」只补跑剩余未完成章节 |
 
 **程序化校验（在 `submit_design_section` 边界强制执行）**：
 - 所有引用的 `relPath` 必须位于本次项目已授权的非排除文件清单内（防编造路径、防越界）。
@@ -459,10 +459,11 @@
 | `designs.reviseSection` | `POST /designs/:id/sections/:sectionId/revise` `{ instruction, focusPath?, focusSymbol?, focusDiagramId?, model? }` | write | 局部重写指定章节/文件/图（保存上一版到 `previous`） |
 | `designs.restoreSection` | `POST /designs/:id/sections/:sectionId/restore` | write | 恢复该章节上一版；无 `previous` 返回 `STATE_TRANSITION_INVALID` |
 | `designs.review` | `POST /designs/:id/review` `{ model? }` | write | 手动触发一次独立 AI 复审（须全部章节已生成） |
-| `designs.stop` | `POST /designs/:id/stop` | write | 中止当前运行中的 AI 尝试 |
+| `designs.stop` | `POST /designs/:id/stop` | write | 中止当前运行中的 AI 尝试或取消等待中的下一章、自动复审交接 |
 | `designs.export` | `POST /designs/:id/export` `{ targetDir, overwrite?: boolean }` | write | 生成并写出自包含离线 HTML 站点；目标目录含非本工具文件且 `overwrite !== true` 时返回 `DESIGN_EXPORT_DIR_NOT_EMPTY` |
 | `designs.delete` | `DELETE /designs/:id` | critical | 删除设计、尝试与会话流（运行中返回 `DESIGN_BUSY`） |
 
+- 详情中 `activeRunId` 只指向正在执行的真实尝试。等待释放模型槽并衔接下一章或自动复审时，`handoffPending` 为真，工作台继续显示「停止」，已提交章数按实际内容显示。
 - SSE 事件：新增 `ServerEventType.DesignUpdated`（`{ designId }`），工作台据此失效刷新 React Query；实时执行流沿用既有的 `attempt.updated` 与 `attempt.transcript`。
 
 ---
