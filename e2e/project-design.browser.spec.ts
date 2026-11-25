@@ -530,12 +530,17 @@ test('草稿可以取消删除，所属项目删除后仍能确认删除', async
   expect(projectDeletion.status(), await projectDeletion.text()).toBe(204);
   await page.goto('/designs');
   await expect(page).toHaveURL(/\/designs$/);
-  await expect(page.getByRole('link', { name: /退款服务 项目设计/ })).toBeVisible();
-  await page.goto(`/designs/${id}`);
+  const retained = page.locator(`a[href="/designs/${id}"]`);
+  await expect(retained).toHaveAccessibleName(/退款服务 项目设计.*项目已删除/);
+  await retained.click();
   await expect(page.getByText('项目已删除', { exact: true })).toBeVisible();
   await expect(remove).toBeEnabled();
   await remove.click();
+  const removalResponse = page.waitForResponse(
+    (response) => response.request().method() === 'DELETE' && response.url() === `${API_BASE}/designs/${id}`,
+  );
   await confirmation.getByRole('button', { name: '删除设计', exact: true }).click();
+  expect((await removalResponse).status()).toBe(204);
   const deleted = await request.get(`${API_BASE}/designs/${id}`, { headers: AUTH });
   expect(deleted.status()).toBe(404);
   const [projects, designs] = await Promise.all([
