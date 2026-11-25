@@ -598,7 +598,7 @@ IDEA 联调组可由应用助手通过 `projects_modules` 读取，`tasks_create
 | --- | --- | --- |
 | submit_design_outline | design_outline | 校验范围并替换待确认大纲，返回 `{ accepted: true }` |
 | submit_design_section | design_generate、design_revise | 一个事务提交章节、文件详情和图，返回 `{ remainingSectionIds }` |
-| submit_design_review | design_review | 按章节写入结论与意见，返回 `{ accepted: true }` |
+| submit_design_review | design_review | 至少提交一个已抽查章节，逐章写入结论与意见。本轮目标里未抽查的章节回到未复审，返回 `{ accepted: true }` |
 
 模型提交的字段见 [44 §7.2](44-project-design.md#72-执行-mcp-工具)。
 范围只能引用本次扫描得到的文件和目录。静态关系需提供文件及有效行号，推断关系需提供理由。

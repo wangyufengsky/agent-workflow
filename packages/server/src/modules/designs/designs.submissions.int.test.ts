@@ -210,6 +210,18 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
       DesignReviewState.NeedsAttention,
     ]);
     expect(t.app.services.attempts.get(review.id).status).toBe(AttemptStatus.Succeeded);
+
+    const spotCheck = await work(AttemptKind.DesignReview, [overview.id, entry.id]);
+    expect((await spotCheck.submit(McpToolName.SubmitDesignReview, { findings: [] })).isError).toBe(true);
+    expect(
+      await spotCheck.submit(McpToolName.SubmitDesignReview, {
+        findings: [{ sectionId: overview.id, reviewState: DesignReviewState.Passed, notes: [] }],
+      }),
+    ).toEqual({ isError: false, body: { accepted: true } });
+    expect(repo.listSections(designId).map(({ reviewState, reviewNotes }) => [reviewState, reviewNotes])).toEqual([
+      [DesignReviewState.Passed, []],
+      [DesignReviewState.None, null],
+    ]);
   } finally {
     await mcp.close();
     db.close();
