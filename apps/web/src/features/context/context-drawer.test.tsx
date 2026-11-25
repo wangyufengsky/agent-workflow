@@ -8,7 +8,7 @@ it('原生助手显示账单与归档状态，受管模式显示摘要', () => {
     reconstructed: false,
     budget: null,
     historyEstimate: 12,
-    historyParts: { dialogue: 12, toolOutput: 0, summary: 0, media: 0 },
+    historyParts: { system: 41, tools: 59, dialogue: 12, toolOutput: 0, summary: 0, media: 0 },
     model: 'native',
     limit: 500,
     measuredInput: 100,
@@ -19,10 +19,26 @@ it('原生助手显示账单与归档状态，受管模式显示摘要', () => {
     stopped: false,
     summary: null,
     folded: [],
-    messages: [],
+    messages: [
+      {
+        id: 'm',
+        role: 'user',
+        title: 'hello',
+        status: 'protected',
+        sent: true,
+        tokens: 2,
+        projectedTokens: 2,
+        preview: 'hello',
+        length: 5,
+        truncated: false,
+      },
+    ],
   };
   const native = renderToStaticMarkup(<ContextContents data={detail} />);
   expect(native).toContain('20%');
+  expect(native).toContain('基础系统与工具定义估算');
+  expect(native).toContain('<dd>41</dd>');
+  expect(native).toContain('<dd>59</dd>');
   expect(native).toContain('原生压缩已完成 1 次');
   expect(native).not.toContain('后台语义摘要');
   const managed = renderToStaticMarkup(

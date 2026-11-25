@@ -90,6 +90,7 @@ export type OpencodeClient = {
   /** Returns the new session id. */
   createSession(input: CreateSessionInput): Promise<string>;
   readToolOutput(input: SessionRequest & { messageId: string; partId: string }): Promise<string | undefined>;
+  nativeToolBytes(directory: string, model: ModelRef): Promise<number>;
   sessionMessages(input: SessionRequest): Promise<import('@aw/shared/context').Messages>;
   summarizeSession(input: SessionRequest & { model: ModelRef }): Promise<void>;
   sessionRules(input: SessionRequest): Promise<PermissionRule[]>;
@@ -289,6 +290,12 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         }
         return undefined;
       });
+    },
+    async nativeToolBytes(directory, { providerId, modelId }) {
+      const result = await request('tool.list', () =>
+        runtime.sdk().tool.list({ directory, provider: providerId, model: modelId }, THROW),
+      );
+      return Buffer.byteLength(JSON.stringify(result.data));
     },
     async sessionMessages({ sessionId, directory, signal }) {
       return (

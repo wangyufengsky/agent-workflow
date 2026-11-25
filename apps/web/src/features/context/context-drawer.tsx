@@ -14,7 +14,13 @@ export function ContextContents({ data }: { data: ContextDetailDTO }) {
   const [filter, setFilter] = useState<Status | null>(null);
   const [onlySent, setOnlySent] = useState(false);
   const { budget: b } = data;
-  const used = b ? (b.blocked ? b.before : b.after) : (data.measuredInput ?? data.historyEstimate);
+  const used = b
+    ? b.blocked
+      ? b.before
+      : b.after
+    : data.reconstructed
+      ? data.historyEstimate
+      : (data.measuredInput ?? data.historyEstimate);
   const ratio = used !== null && data.limit !== null && data.limit > 0 ? used / data.limit : null;
   const parts = b
     ? [
@@ -26,8 +32,8 @@ export function ContextContents({ data }: { data: ContextDetailDTO }) {
         b.mediaTokens,
       ]
     : [
-        null,
-        null,
+        data.historyParts.system,
+        data.historyParts.tools,
         data.historyParts.dialogue,
         data.historyParts.toolOutput,
         data.historyParts.summary,
@@ -42,7 +48,7 @@ export function ContextContents({ data }: { data: ContextDetailDTO }) {
           {fmt(used)} <small>/ {fmt(data.limit)} tokens</small>
         </div>
         <div>
-          {b ? C.estimated : data.measuredInput === null ? C.historyEstimate : C.measured} ·{' '}
+          {b ? C.estimated : data.reconstructed || data.measuredInput === null ? C.historyEstimate : C.measured} ·{' '}
           {b ? C.limit : C.nativeLimit}
           {data.model && ` · ${data.model}`}
         </div>
@@ -87,7 +93,7 @@ export function ContextContents({ data }: { data: ContextDetailDTO }) {
           </>
         )}
         <dl>
-          {b && data.measuredInput !== null && (
+          {(b || data.reconstructed) && data.measuredInput !== null && (
             <div>
               <dt>{C.measured}</dt>
               <dd>{fmt(data.measuredInput)}</dd>

@@ -170,6 +170,13 @@ const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.Delegate]: PromptName.ProtocolDelegate,
 };
 
+export function contextBasePrompt(prompts: Prompts, agent: string | undefined, execution: boolean): string {
+  if (!execution)
+    return prompts[agent === OPENCODE_COMPANION_AGENT ? PromptName.ProtocolCompanion : PromptName.ProtocolAssistant];
+  const base = Object.values(SessionAgent).find((name) => OPENCODE_AGENT_NAME[name] === agent);
+  return prompts[base ? AGENT_PROMPT[base] : PromptName.ProtocolExecute];
+}
+
 /**
  * opencode's own hosted providers (Zen and Go) are listed even without a login and need the internet. A provider left
  * without models is dropped; `disabled_providers` is not used because this array would replace the user's own (D168).

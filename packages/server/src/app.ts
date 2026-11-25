@@ -796,10 +796,21 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     summaries.close();
   });
   const snapshots = createBudgetSnapshots();
+  const mcpSizes = new Map<string, number>();
+  function mcpToolBytes(execution: boolean): number {
+    const key = execution ? 'execution' : settings.service.get('ui.mode');
+    const cached = mcpSizes.get(key);
+    if (cached !== undefined) return cached;
+    const size = Buffer.byteLength(JSON.stringify((execution ? mcp : assistant).registry.list()));
+    mcpSizes.set(key, size);
+    return size;
+  }
   const inspectContext = createContextInspector(
     opencode,
     snapshots,
     summaries,
+    prompts,
+    mcpToolBytes,
     (directory, taskId) => contextEnabled() && worktrees.service.taskAt(directory) === taskId,
   );
   const stopWatchingContext = opencode.subscribe((event) => {
@@ -818,7 +829,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     taskAt: worktrees.service.taskAt,
     owner: attempts.service.contextOwner,
     block: attempts.service.blockContext,
-    toolBytes: () => Buffer.byteLength(JSON.stringify(mcp.registry.list())),
+    toolBytes: () => mcpToolBytes(true),
     log,
   });
   attempts.registerRoutes(server);

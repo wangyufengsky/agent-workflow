@@ -833,7 +833,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     },
     contextSource(id: string) {
       const c = get(id);
-      return { sessionId: c.opencodeSessionId, directory: filesDir(id) };
+      return { sessionId: c.opencodeSessionId, directory: filesDir(id), model: settings.get('ai.defaultModel') };
     },
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
     /** The MCP servers the user added to opencode themself (28 §4); the app's own two are not theirs to manage. */
