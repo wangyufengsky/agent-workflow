@@ -1,3 +1,4 @@
+import { isUtf8 } from 'node:buffer';
 import { DIFF_FILE_MAX_BYTES, type GitFileDTO, type GitTreeEntryDTO, GitTreeEntryType } from '@aw/shared';
 import { runGit } from './git.cli.ts';
 
@@ -38,11 +39,16 @@ export async function readTree(repo: string, ref: string, dir: string): Promise<
   return parseLsTree(stdout, dir);
 }
 
-/** A file at `ref`; binary content (a NUL byte) and files over DIFF_FILE_MAX_BYTES are not returned. */
+/** 读取指定版本的文本，跳过含 NUL、无效 UTF-8 或超出限制的文件。 */
 export async function readFile(repo: string, ref: string, path: string): Promise<GitFileDTO> {
   const object = `${ref}:${path}`;
   const size = Number((await runGit(['cat-file', '-s', '--end-of-options', object], { cwd: repo })).stdout.trim());
   if (size > DIFF_FILE_MAX_BYTES) return { path, tooLarge: true, size };
-  const { stdout } = await runGit(['cat-file', 'blob', '--end-of-options', object], { cwd: repo, verbatim: true });
-  return stdout.includes('\0') ? { path, binary: true } : { path, content: stdout };
+  const { stdout } = await runGit(['cat-file', 'blob', '--end-of-options', object], {
+    cwd: repo,
+    verbatim: true,
+    encoding: 'latin1',
+  });
+  const bytes = Buffer.from(stdout, 'latin1');
+  return bytes.includes(0) || !isUtf8(bytes) ? { path, binary: true } : { path, content: bytes.toString('utf8') };
 }

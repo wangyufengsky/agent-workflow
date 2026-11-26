@@ -148,7 +148,15 @@ import {
   listWorktreesOp,
   pruneWorktreesOp,
 } from './git.ts';
-import { getGitReviewOp, listGitReviewsOp, startGitReviewOp, stopGitReviewOp } from './git-reviews.ts';
+import {
+  exportGitReviewOp,
+  getGitReviewOp,
+  listGitReviewsOp,
+  readGitReviewEvidenceOp,
+  startGitReviewOp,
+  stopGitReviewOp,
+  updateGitFindingStatusOp,
+} from './git-reviews.ts';
 import { listHostingAccountsOp, removeHostingAccountOp, setHostingAccountOp } from './hosting.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
 import {
@@ -584,6 +592,9 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listGitReviewsOp,
   getGitReviewOp,
   stopGitReviewOp,
+  updateGitFindingStatusOp,
+  exportGitReviewOp,
+  readGitReviewEvidenceOp,
   listWorktreesOp,
   pruneWorktreesOp,
   listConversationsOp,

@@ -149,6 +149,7 @@ test('J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提�
   await expect(panel).toContainText('这条问题要先修。');
   await page.keyboard.press('ControlOrMeta+j');
   await expect(panel).toBeHidden();
+  await review.getByRole('tab', { name: /代码问题/ }).click();
   await review.getByRole('button', { name: 'bye.ts:2' }).click();
   await expect(page.locator('[data-focus]')).toContainText('export const b = 2;');
 

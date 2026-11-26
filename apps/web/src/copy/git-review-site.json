@@ -1,0 +1,54 @@
+{
+  "language": "zh-CN",
+  "title": "Git 审查报告",
+  "navigation": "报告导航",
+  "overview": "总览",
+  "findings": "代码问题",
+  "impacts": "业务影响",
+  "regression": "回归建议",
+  "noFindings": "本次审查未发现代码问题。",
+  "noImpacts": "本次审查未报告业务影响。",
+  "noChecks": "本次审查未提供回归建议。",
+  "truncated": "影响分析已截断，仍可能存在未列出的下游影响。",
+  "source": "源码证据",
+  "suggestion": "建议的改法",
+  "relatedImpacts": "关联影响",
+  "noFilteredFindings": "没有符合筛选条件的问题。",
+  "noFilteredImpacts": "没有符合筛选条件的影响。",
+  "uncoveredPaths": "设计未覆盖的变更路径",
+  "finishedAt": "审查完成于",
+  "localPath": "[本地路径]",
+  "worktreeVersion": "工作区",
+  "theme": { "label": "主题", "auto": "跟随系统", "light": "浅色", "dark": "深色" },
+  "filters": {
+    "all": "全部",
+    "severity": "严重级别",
+    "status": "处置状态",
+    "classification": "影响分类",
+    "evidence": "证据类型"
+  },
+  "counts": {
+    "importantFindings": "重要问题",
+    "minorFindings": "次要问题",
+    "directOrIndirectImpacts": "直接及间接影响",
+    "possibleImpacts": "潜在影响"
+  },
+  "severity": { "blocker": "阻断", "major": "严重", "minor": "一般" },
+  "category": {
+    "correctness": "正确性",
+    "security": "安全",
+    "performance": "性能",
+    "maintainability": "可维护性",
+    "tests": "测试"
+  },
+  "status": { "open": "待处理", "accepted": "已确认", "dismissed": "已忽略", "resolved": "已解决" },
+  "classification": { "direct": "直接影响", "indirect": "间接影响", "possible": "潜在待核实" },
+  "evidence": { "static": "静态确认", "inferred": "AI 推断" },
+  "kind": { "section": "章节", "submodule": "子模块", "file": "文件", "symbol": "符号", "transaction": "交易" },
+  "target": { "worktree": "工作区改动", "commit": "提交", "branch": "分支", "range": "区间" },
+  "match": {
+    "exact": "精确匹配快照",
+    "reference": "参考设计（非当前目标版本）",
+    "missing": "未建立项目设计，仅基于源码审查"
+  }
+}

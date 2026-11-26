@@ -8,7 +8,7 @@ import {
   ErrorCode,
   FINDING_PROBLEM_HINT,
   FindingProblemCode,
-  type GitFindingDTO,
+  type GitFindingInput,
   GitReviewTarget,
   type GitReviewTargetInput,
 } from '@aw/shared';
@@ -135,18 +135,21 @@ async function lineCount(repo: string, rev: string | null, path: string): Promis
 export async function validateFindings(
   repo: string,
   target: Pick<ResolvedTarget, 'from' | 'to' | 'files'>,
-  findings: readonly GitFindingDTO[],
+  findings: readonly GitFindingInput[],
 ): Promise<void> {
-  const paths = new Set(target.files.map((f) => f.path));
+  const paths = new Map(target.files.map((f) => [f.path, f]));
   const problems: Array<{ index: number; code: FindingProblemCode; hint: string; lineCount?: number }> = [];
   for (const [index, finding] of findings.entries()) {
-    if (!paths.has(finding.path)) {
+    const file =
+      paths.get(finding.path) ??
+      (finding.side === DiffSide.Old ? target.files.find((f) => f.oldPath === finding.path) : undefined);
+    if (!file) {
       problems.push({ index, code: FindingProblemCode.PathNotInDiff, hint: FINDING_PROBLEM_HINT.PATH_NOT_IN_DIFF });
       continue;
     }
     if (finding.line === undefined) continue;
     const rev = finding.side === DiffSide.Old ? target.from : target.to;
-    const lines = await lineCount(repo, rev, finding.path);
+    const lines = await lineCount(repo, rev, finding.side === DiffSide.Old ? (file.oldPath ?? file.path) : file.path);
     const end = finding.end_line ?? finding.line;
     if (lines === undefined || end < finding.line || end > lines) {
       problems.push({
@@ -160,7 +163,7 @@ export async function validateFindings(
   if (problems.length > 0) {
     throw new AppError(ErrorCode.GitReviewFindingsInvalid, 'Some findings do not match the reviewed diff', {
       problems,
-      files: [...paths],
+      files: [...paths.keys()],
     });
   }
 }

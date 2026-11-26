@@ -10,7 +10,7 @@ import {
   teamWorkTypeSchema,
 } from '../../enums/team.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
-import { gitFindingSchema } from './git.ts';
+import { codeFindingSchema } from './git.ts';
 
 const DAY_MS = 86_400_000;
 /** Days from `from` to `to`, both included (calendar dates, no time zone involved). */
@@ -309,7 +309,7 @@ export const submitMemberAnalysisInputSchema = z.object({
   strengths: z.array(citedText).max(5),
   concerns: z.array(citedText).max(5),
   findings: z
-    .array(gitFindingSchema.extend({ commit: z.string().min(7).describe('Full SHA of the sampled commit') }))
+    .array(codeFindingSchema.extend({ commit: z.string().min(7).describe('Full SHA of the sampled commit') }))
     .max(30),
 });
 export type SubmitMemberAnalysisInput = z.infer<typeof submitMemberAnalysisInputSchema>;

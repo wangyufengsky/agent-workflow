@@ -1,12 +1,5 @@
-import {
-  FindingCategory,
-  FindingSeverity,
-  GitMergeStrategy,
-  GitOperation,
-  GitReviewTarget,
-  type GitReviewTarget as GitReviewTargetType,
-  type HostingProvider,
-} from '@aw/shared';
+import { GitMergeStrategy, GitOperation, type HostingProvider } from '@aw/shared';
+import siteCopy from './git-review-site.json';
 import { PROJECTS_COPY } from './projects.ts';
 
 /** The Git workbench (27, pro mode). */
@@ -115,36 +108,21 @@ export const GIT_COPY = {
   verdictIssues: '建议合并前修复',
   verdictMinor: '有可以改进的地方',
   verdictClean: '没有发现需要处理的问题',
-  severity: {
-    [FindingSeverity.Blocker]: '阻断',
-    [FindingSeverity.Major]: '严重',
-    [FindingSeverity.Minor]: '一般',
-  } satisfies Record<FindingSeverity, string>,
-  category: {
-    [FindingCategory.Correctness]: '正确性',
-    [FindingCategory.Security]: '安全',
-    [FindingCategory.Performance]: '性能',
-    [FindingCategory.Maintainability]: '可维护性',
-    [FindingCategory.Tests]: '测试',
-  } satisfies Record<FindingCategory, string>,
+  severity: siteCopy.severity,
+  category: siteCopy.category,
   scope: (from: string, to: string | null) => `范围 ${from.slice(0, 7)} → ${to === null ? '工作区' : to.slice(0, 7)}`,
   scopeFiles: (n: number) => `${n} 个文件`,
   focusIs: (focus: string) => `关注点：${focus}`,
   findings: '问题',
   bySeverity: '按严重度',
   byFile: '按文件',
-  suggestion: '建议的改法',
+  suggestion: siteCopy.suggestion,
   selectedFindings: (n: number) => `已选 ${n} 个问题`,
   fixHint: '打开「修 Bug」并预填需求；AI 在独立分支中修改，完成后由你合并',
   fixFromReview: '据此修复',
   fixNeedsCommit: '工作区改动不在任何分支上：先提交，再审查提交后据此修复。',
   fixRequirement: (label: string, items: string) => `修复 AI 审查（${label}）发现的问题：\n\n${items}`,
-  targetLabel: {
-    [GitReviewTarget.Worktree]: '工作区改动',
-    [GitReviewTarget.Commit]: '提交',
-    [GitReviewTarget.Branch]: '分支',
-    [GitReviewTarget.Range]: '区间',
-  } satisfies Record<GitReviewTargetType, string>,
+  targetLabel: siteCopy.target,
   // 改动视图
   conflicted: '有冲突',
   conflictCode: 'UU',

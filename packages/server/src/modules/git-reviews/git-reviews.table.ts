@@ -1,6 +1,7 @@
-import type { GitReviewTarget } from '@aw/shared';
+import type { DesignKnowledgeMatch, GitReviewTarget } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { attemptsTable } from '../attempts/attempts.table.ts';
+import { projectDesignsTable } from '../designs/designs.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
 
 /** 10 §git_reviews: an AI review in the Git workbench (27 §7.2); its status is its attempt's. */
@@ -30,6 +31,12 @@ export const gitReviewsTable = sqliteTable(
     findings: text('findings'),
     createdAt: integer('created_at').notNull(),
     finishedAt: integer('finished_at'),
+    designId: text('design_id').references(() => projectDesignsTable.id, { onDelete: 'set null' }),
+    designSnapshotSha: text('design_snapshot_sha'),
+    designMatch: text('design_match').$type<Exclude<DesignKnowledgeMatch, 'missing'>>(),
+    impacts: text('impacts'),
+    impactTruncated: integer('impact_truncated', { mode: 'boolean' }),
+    regressionChecks: text('regression_checks'),
   },
   (t) => [
     index('git_reviews_project_idx').on(t.projectId, t.createdAt),

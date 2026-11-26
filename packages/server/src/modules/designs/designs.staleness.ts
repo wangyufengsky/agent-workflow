@@ -8,7 +8,7 @@ import { readDesignGitStatus, type ScannedDesignFile, scanDesignFiles } from './
 
 const CHANGED_PATHS_SAMPLE_LIMIT = 20;
 
-function changedPaths(baseline: readonly DesignFile[], current: readonly ScannedDesignFile[]) {
+function changedPaths(baseline: readonly ScannedDesignFile[], current: readonly ScannedDesignFile[]) {
   const remaining = new Map(baseline.map(({ relPath, contentHash }) => [relPath, contentHash]));
   const changed: string[] = [];
   for (const { relPath, contentHash } of current) {
@@ -41,6 +41,58 @@ function affectedSections(
     .map(({ id }) => id);
 }
 
+async function readWorktree(repoPath: string) {
+  try {
+    const root = await realpath(repoPath);
+    if (!(await stat(root)).isDirectory()) return undefined;
+    await access(root, constants.R_OK | constants.X_OK);
+    return { root, status: await readDesignGitStatus(root) };
+  } catch (error) {
+    if (directoryUnavailable(error)) return undefined;
+    throw error;
+  }
+}
+
+function directoryUnavailable(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    ['ENOENT', 'ENOTDIR', 'ELOOP', 'EACCES', 'EPERM'].some((code) => code === error.code)
+  );
+}
+
+function matchesCleanHead(design: ProjectDesign, status: Awaited<ReturnType<typeof readDesignGitStatus>>) {
+  const { commitSha, dirty } = design.sourceSnapshot;
+  return !dirty && status?.clean === true && commitSha === status.commit;
+}
+
+export async function findFreshDesign(
+  repo: Pick<ReturnType<typeof createDesignsRepo>, 'listFileHashes'>,
+  candidates: readonly ProjectDesign[],
+  repoPath: string,
+): Promise<ProjectDesign | undefined> {
+  const worktree = await readWorktree(repoPath);
+  if (worktree === undefined) return undefined;
+  // 同一批设计共用一次 Git 状态，相同排除规则共用一次文件扫描。
+  const scanned = new Map<string, readonly ScannedDesignFile[]>();
+  try {
+    for (const design of candidates) {
+      if (matchesCleanHead(design, worktree.status)) return design;
+      const key = JSON.stringify(design.excludePatterns);
+      let current = scanned.get(key);
+      if (current === undefined) {
+        current = (await scanDesignFiles(worktree.root, design.excludePatterns)).files;
+        scanned.set(key, current);
+      }
+      if (current.length !== design.sourceSnapshot.analyzableCount) continue;
+      if (changedPaths(repo.listFileHashes(design.id), current).length === 0) return design;
+    }
+  } catch (error) {
+    if (!directoryUnavailable(error)) throw error;
+  }
+  return undefined;
+}
+
 export async function readDesignStaleness(
   repo: ReturnType<typeof createDesignsRepo>,
   design: ProjectDesign,
@@ -51,17 +103,15 @@ export async function readDesignStaleness(
   const empty = { ...baselineSha, changedFilesCount: 0, affectedSectionIds: [], changedPathsSample: [] };
   if (repoPath === null) return { ...empty, state: DesignStalenessState.Unknown, reason: 'project_unbound' };
   const unavailable = { ...empty, state: DesignStalenessState.Unknown, reason: 'directory_unavailable' };
-  try {
-    const root = await realpath(repoPath);
-    if (!(await stat(root)).isDirectory()) return unavailable;
-    await access(root, constants.R_OK | constants.X_OK);
-    const status = await readDesignGitStatus(root);
-    const headSha = status?.commit ?? null;
-    const currentSha = headSha === null ? {} : { headSha };
-    const fresh = { ...empty, ...currentSha, state: DesignStalenessState.Fresh };
-    if (!design.sourceSnapshot.dirty && baseSha !== null && headSha === baseSha && status?.clean) return fresh;
+  const worktree = await readWorktree(repoPath);
+  if (worktree === undefined) return unavailable;
+  const headSha = worktree.status?.commit ?? null;
+  const currentSha = headSha === null ? {} : { headSha };
+  const fresh = { ...empty, ...currentSha, state: DesignStalenessState.Fresh };
+  if (matchesCleanHead(design, worktree.status)) return fresh;
 
-    const { files: current } = await scanDesignFiles(root, design.excludePatterns);
+  try {
+    const { files: current } = await scanDesignFiles(worktree.root, design.excludePatterns);
     const baseline = repo.listFiles(design.id);
     const changed = changedPaths(baseline, current);
     if (changed.length === 0) return fresh;
@@ -74,12 +124,7 @@ export async function readDesignStaleness(
       changedPathsSample: changed.slice(0, CHANGED_PATHS_SAMPLE_LIMIT),
     };
   } catch (error) {
-    if (
-      error instanceof Error &&
-      'code' in error &&
-      ['ENOENT', 'ENOTDIR', 'ELOOP', 'EACCES', 'EPERM'].some((code) => code === error.code)
-    )
-      return unavailable;
+    if (directoryUnavailable(error)) return unavailable;
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { GIT_REVIEW_FINDINGS_MAX } from '../../constants/limits.ts';
 import { WorkflowKind } from '../../enums/workflow.ts';
-import { gitFindingSchema, submitFindingsInputSchema } from './git.ts';
+import { codeFindingSchema } from './git.ts';
 
 export const CODE_REVIEW_WORKFLOW_KEY = 'code_review';
 export const VERSION_REVIEW_WORKFLOW_KEY = 'version_review';
@@ -23,14 +24,14 @@ export const taskCodeReviewScopeSchema = z.discriminatedUnion('kind', [
 
 export const taskCodeReviewInputSchema = z.object({
   scope: taskCodeReviewScopeSchema,
-  findings: submitFindingsInputSchema.shape.findings,
+  findings: z.array(codeFindingSchema).max(GIT_REVIEW_FINDINGS_MAX),
 });
 export type TaskCodeReviewInput = z.infer<typeof taskCodeReviewInputSchema>;
 
 export const taskCodeReviewReportSchema = z.object({
   scope: taskCodeReviewScopeSchema,
   findings: z.array(
-    gitFindingSchema.extend({
+    codeFindingSchema.extend({
       location: z.object({ commit: commitSha, path: z.string() }),
     }),
   ),

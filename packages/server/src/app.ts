@@ -68,6 +68,7 @@ import {
   createDesignSubmissions,
   createDesignsModule,
   createDesignsRepo,
+  createReviewKnowledgeReader,
   type DesignsService,
   syncBuiltinDesignTemplates,
 } from './modules/designs/index.ts';
@@ -601,6 +602,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     browser: browser.service,
   });
   const gitReviews = createGitReviewsModule({
+    designs: designsRepo,
+    readKnowledge: createReviewKnowledgeReader(designsRepo),
     db: database.db,
     unit,
     clock,

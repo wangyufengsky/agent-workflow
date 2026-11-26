@@ -1,6 +1,12 @@
 import { z } from 'zod';
-import { gitReviewFocusSchema, gitReviewSchema, gitReviewTargetInputSchema } from '../contracts/api/git.ts';
+import {
+  gitReviewEvidenceSchema,
+  gitReviewFocusSchema,
+  gitReviewSchema,
+  gitReviewTargetInputSchema,
+} from '../contracts/api/git.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
+import { diffSideSchema, gitFindingStatusSchema } from '../enums/git.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -55,4 +61,40 @@ export const stopGitReviewOp = defineOperationContract({
   output: gitReviewSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/git/reviews/:reviewId/stop' },
+});
+
+export const updateGitFindingStatusOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'gitReviews.updateFindingStatus',
+  title: 'op.gitReviews.updateFindingStatus',
+  description: 'Record the human disposition of a Git review finding',
+  input: z.object({ reviewId: z.string().min(1), findingId: z.string().min(1), status: gitFindingStatusSchema }),
+  output: gitReviewSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'PATCH', path: '/git/reviews/:reviewId/findings/:findingId' },
+});
+
+export const exportGitReviewOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'gitReviews.export',
+  title: 'op.gitReviews.export',
+  description: 'Export a Git review as a self-contained offline HTML report',
+  input: z.object({ reviewId: z.string().min(1), targetDir: z.string().min(1), overwrite: z.boolean().optional() }),
+  output: z.object({ path: z.string() }),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/git/reviews/:reviewId/export' },
+});
+
+export const readGitReviewEvidenceOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'gitReviews.readEvidence',
+  title: 'op.gitReviews.readEvidence',
+  description: 'Read source evidence and the diff on the recorded Git review baseline',
+  input: z.object({ reviewId: z.string().min(1), path: z.string().min(1), side: diffSideSchema }),
+  output: gitReviewEvidenceSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/git/reviews/:reviewId/evidence' },
 });

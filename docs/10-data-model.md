@@ -789,9 +789,15 @@ payload / response：
 | to_sha | TEXT NULL | 终点；空 = 主工作区的未提交改动 |
 | focus | TEXT NULL | 用户填的关注点 |
 | attempt_id | TEXT → attempts | `git_review` 尝试；审查的状态即它的状态，无状态列 |
-| files | TEXT(JSON) | 开始时的改动文件清单 `DiffFile[]`，校验与界面都用它 |
+| files | TEXT(JSON) | 开始时的改动文件清单。工作区审查为可读取的变更文本额外保存 `worktreeHash`（SHA-256），读取证据时核对；有设计时保留该文件未覆盖的旧/新路径。API 的 files 返回普通 `DiffFile[]` |
 | summary | TEXT NULL | `submit_findings` 的结论 |
-| findings | TEXT(JSON) NULL | `GitFindingDTO[]` |
+| findings | TEXT(JSON) NULL | `GitFindingDTO[]`。旧项按原顺序补稳定 ID 和处置状态 `open`；人工处置只更新本次报告 |
+| design_id | TEXT NULL → project_designs，SET NULL | 启动时关联的设计，删除设计后报告可继续读取 |
+| design_snapshot_sha | TEXT NULL | 启动时设计的扫描基线 |
+| design_match | TEXT NULL | `exact` 或 `reference`，没有设计时存 NULL |
+| impacts | TEXT(JSON) NULL | `GitImpactItemDTO[]`，审查完成时提交的业务影响 |
+| impact_truncated | INTEGER(bool) NULL | 初筛的传播或上下文字节预算触顶 |
+| regression_checks | TEXT(JSON) NULL | 模型提交的回归检查清单 |
 | created_at / finished_at | INTEGER | `finished_at` 在尝试结束（任何终态）时写入 |
 
 索引：`(project_id, created_at)`、`(attempt_id)`。AI 草拟提交信息不存库（27 §7.3），只留下它的 `commit_message` 尝试。

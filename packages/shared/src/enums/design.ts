@@ -18,6 +18,7 @@ export const DesignKnowledgeMatch = {
   Missing: 'missing',
 } as const;
 export type DesignKnowledgeMatch = (typeof DesignKnowledgeMatch)[keyof typeof DesignKnowledgeMatch];
+export const designKnowledgeMatchSchema = z.enum(DesignKnowledgeMatch);
 
 export const DesignStalenessState = {
   Fresh: 'fresh',

@@ -37,7 +37,12 @@ import {
 } from './design-workbench-dialogs.tsx';
 import { designStalenessQuery, useGenerateDesign, useReviewDesign, useStopDesign } from './designs.queries.ts';
 
-type Props = { design: DesignDTO; model: string | null; repoPath: string | null };
+type Props = {
+  design: DesignDTO;
+  model: string | null;
+  repoPath: string | null;
+  initialTarget?: ReadingTarget | undefined;
+};
 type EditableTarget = Exclude<ReadingTarget, { kind: 'overview' }>;
 type Reading = { target: ReadingTarget; highlighted: boolean; focus?: boolean };
 type OpenPanel = { runId: string | undefined; active: boolean; open: boolean };
@@ -55,7 +60,7 @@ function failedSections(runs: readonly DesignRunDTO[]): Set<string> {
   return new Set([...pending].flatMap(([id, failed]) => (failed ? [id] : [])));
 }
 
-export function DesignWorkbench({ design, model, repoPath }: Props) {
+export function DesignWorkbench({ design, model, repoPath, initialTarget }: Props) {
   const runtime = useQuery(runtimeQuery);
   const catalog = useTransactionCatalog(design);
   const generate = useGenerateDesign();
@@ -74,7 +79,9 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
   );
   const [initialSubmissions] = useState(() => (busy && submissions > 0 ? -1 : submissions));
   const [followFromCurrent, setFollowFromCurrent] = useState(false);
-  const [reading, setReading] = useState<Reading | null>(null);
+  const [reading, setReading] = useState<Reading | null>(() =>
+    initialTarget === undefined ? null : { target: initialTarget, highlighted: true, focus: true },
+  );
   const [panel, setPanel] = useState<OpenPanel>();
   const [navOpen, setNavOpen] = useState(true);
   const [navWidth, setNavWidth] = useState(DEFAULT_NAV);

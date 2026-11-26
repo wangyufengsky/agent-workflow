@@ -131,25 +131,61 @@ export async function diffChangeFile(cwd: string, path: string, staged: boolean)
 }
 
 async function isUntracked(cwd: string, path: string): Promise<boolean> {
-  const { stdout } = await runGit(['ls-files', '--others', '--exclude-standard', '--', path], { cwd });
+  const { stdout } = await runGit(['--literal-pathspecs', 'ls-files', '--others', '--exclude-standard', '--', path], {
+    cwd,
+  });
   return stdout.trim() !== '';
 }
 
 async function diffAgainstNothing(cwd: string, path: string): Promise<string> {
   // --no-index exits 1 when the files differ, which they always do against /dev/null.
-  return (await runGit(['diff', '--no-index', '--', '/dev/null', path], { cwd, okExitCodes: [1], verbatim: true }))
-    .stdout;
+  return (
+    await runGit(['diff', '--no-index', '--no-ext-diff', '--no-textconv', '--', '/dev/null', path], {
+      cwd,
+      okExitCodes: [1],
+      verbatim: true,
+    })
+  ).stdout;
 }
 
 /** Unified diff of one file of the worktree against a commit; an untracked file diffs against nothing. */
-export async function diffWorktreeFile(cwd: string, from: string, path: string): Promise<string> {
+export async function diffWorktreeFile(cwd: string, from: string, path: string, oldPath?: string): Promise<string> {
   if (await isUntracked(cwd, path)) return diffAgainstNothing(cwd, path);
-  return (await runGit(['diff', '-M', from, '--', path], { cwd, verbatim: true })).stdout;
+  const paths = oldPath === undefined ? [path] : [oldPath, path];
+  return (
+    await runGit(['--literal-pathspecs', 'diff', '--no-ext-diff', '--no-textconv', '-M', from, '--', ...paths], {
+      cwd,
+      verbatim: true,
+    })
+  ).stdout;
 }
 
 /** Unified diff of one file between two commits. */
-export async function diffCommitsFile(cwd: string, from: string, to: string, path: string): Promise<string> {
-  return (await runGit(['diff', '-M', '--end-of-options', from, to, '--', path], { cwd, verbatim: true })).stdout;
+export async function diffCommitsFile(
+  cwd: string,
+  from: string,
+  to: string,
+  path: string,
+  oldPath?: string,
+): Promise<string> {
+  const paths = oldPath === undefined ? [path] : [oldPath, path];
+  return (
+    await runGit(
+      [
+        '--literal-pathspecs',
+        'diff',
+        '--no-ext-diff',
+        '--no-textconv',
+        '-M',
+        '--end-of-options',
+        from,
+        to,
+        '--',
+        ...paths,
+      ],
+      { cwd, verbatim: true },
+    )
+  ).stdout;
 }
 
 /** A file's diff for the UI: over DIFF_FILE_MAX_BYTES only its size (11 §5). */

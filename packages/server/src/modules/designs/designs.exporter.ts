@@ -1,8 +1,14 @@
-import { cp, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { cp, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join } from 'node:path';
 import { AppError, ErrorCode } from '@aw/shared';
 import { z } from 'zod';
 import { SOURCE_DESIGN_SITE_ASSETS_DIR, SOURCE_DESIGN_SITE_COPY_FILE } from '../../core/config.ts';
+import {
+  canonicalExportTarget,
+  exportPathMetadata,
+  invalidExportTarget,
+  withExportTargetLock,
+} from '../../core/offline-export.ts';
 import {
   type DesignSiteContents,
   type DesignSiteModel,
@@ -15,7 +21,6 @@ import { designSiteStylesheet } from './designs.site-style.ts';
 const MARKER = '.aw-design-site.json';
 const EXPORT_FILES = ['index.html', 'design-data.js', 'design-model.json', MARKER] as const;
 const ASSETS = ['style.css', 'viewer.js'] as const;
-const targetQueues = new Map<string, Promise<void>>();
 const markerSchema = z.object({ schemaVersion: z.literal(1), designId: z.string().min(1), exportedAt: z.number() });
 const copySchema = z.object({ pageTitle: z.string(), noScript: z.string(), localPath: z.string() }).passthrough();
 function htmlText(text: string): string {
@@ -48,49 +53,6 @@ type ExportOptions = DesignSiteContents & {
   copyFile?: string | undefined;
 };
 
-const missing = (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === 'ENOENT';
-
-async function metadata(path: string) {
-  try {
-    return await lstat(path);
-  } catch (error) {
-    if (missing(error)) return undefined;
-    throw error;
-  }
-}
-
-function invalid(message: string): never {
-  throw new AppError(ErrorCode.ValidationFailed, message, { issues: [{ path: ['targetDir'], message }] });
-}
-
-function within(path: string, base: string): boolean {
-  const rel = relative(base, path);
-  return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`));
-}
-
-async function canonicalCandidate(path: string): Promise<string> {
-  if ((await metadata(path)) !== undefined) return realpath(path);
-  return join(await canonicalCandidate(dirname(path)), basename(path));
-}
-
-async function canonicalTarget(path: string, projectRoot: string | null): Promise<string> {
-  if (!isAbsolute(path)) invalid('The export directory must be absolute');
-  const selected = resolve(path);
-  const current = await metadata(selected);
-  if (current !== undefined && !current.isDirectory()) invalid('The export target must be a directory');
-  const target = await canonicalCandidate(selected);
-  if (target === dirname(target)) invalid('A filesystem root cannot be an export directory');
-  if (projectRoot !== null) {
-    const project = await canonicalCandidate(projectRoot);
-    const localPaths = [join(project, 'docs', 'design'), join(project, '.git')];
-    const protectedPaths = [...localPaths, ...(await Promise.all(localPaths.map(canonicalCandidate)))];
-    if (within(project, target) || protectedPaths.some((path) => within(target, path) || within(path, target))) {
-      invalid('The export directory overlaps a protected project location');
-    }
-  }
-  return target;
-}
-
 type ExistingSite = { exists: boolean; extraRoot: string[]; extraAssets: string[] };
 
 function overwriteRequired(): never {
@@ -99,7 +61,7 @@ function overwriteRequired(): never {
 
 async function readSiteMarker(target: string) {
   const path = join(target, MARKER);
-  if (!(await metadata(path))?.isFile()) return undefined;
+  if (!(await exportPathMetadata(path))?.isFile()) return undefined;
   const raw = await readFile(path, 'utf8');
   try {
     const result = markerSchema.safeParse(JSON.parse(raw));
@@ -111,9 +73,9 @@ async function readSiteMarker(target: string) {
 }
 
 async function existingSite(target: string, designId: string, overwrite: boolean): Promise<ExistingSite> {
-  const current = await metadata(target);
+  const current = await exportPathMetadata(target);
   if (current === undefined) return { exists: false, extraRoot: [], extraAssets: [] };
-  if (!current.isDirectory()) invalid('The export target must be a directory');
+  if (!current.isDirectory()) invalidExportTarget('The export target must be a directory');
 
   const entries = await readdir(target, { withFileTypes: true });
   if (entries.length === 0) return { exists: true, extraRoot: [], extraAssets: [] };
@@ -158,18 +120,11 @@ export async function exportDesignSite(options: ExportOptions): Promise<{ target
   if (model.sections.length === 0) {
     throw new AppError(ErrorCode.StateTransitionInvalid, 'The design has no completed sections to export');
   }
-  const targetDir = await canonicalTarget(options.targetDir, options.projectRoot);
-  const previous = targetQueues.get(targetDir);
-  const queue = Promise.withResolvers<void>();
-  targetQueues.set(targetDir, queue.promise);
-  try {
-    await previous;
+  const targetDir = await canonicalExportTarget(options.targetDir, options.projectRoot);
+  return withExportTargetLock(targetDir, async () => {
     await writeSite(targetDir, options, model);
     return { targetDir };
-  } finally {
-    queue.resolve();
-    if (targetQueues.get(targetDir) === queue.promise) targetQueues.delete(targetDir);
-  }
+  });
 }
 
 async function validateStage(stage: string, model: DesignSiteModel, json: string, entry: string): Promise<void> {
