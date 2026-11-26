@@ -367,6 +367,9 @@ summary {
 .graph-edge-target:focus-visible {
   outline: none;
 }
+.tx-offline-canvas .graph-edge {
+  stroke: var(--tx-edge);
+}
 .graph-edge-target:hover .graph-edge,
 .graph-edge-target:focus .graph-edge,
 .graph-edge-target[aria-pressed="true"] .graph-edge {
@@ -540,74 +543,114 @@ main {
   outline-offset: 2px;
 }
 
-.transaction-catalog input[type="search"] {
-  max-width: 100%;
-  width: 28em;
-  padding: 0.55em 0.8em;
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+#design-site.transaction-site {
+  grid-template-columns: minmax(13rem, 15rem) minmax(0, 1fr);
 }
-
-.transaction-catalog {
-  container-type: inline-size;
-  margin-block: 1.5rem;
+.transaction-site .site-header {
+  background: var(--design-code-bg);
+  border-color: var(--design-code-line);
 }
-.transaction-grid {
-  display: grid;
-  gap: 1rem;
-  align-items: start;
+.transaction-site .site-brand {
+  color: var(--design-code-muted);
+  font-size: 0.82rem;
 }
-.transaction-grid h2 {
-  margin-block: 0 0.65rem;
+.transaction-site .site-brand strong {
+  color: var(--design-code-ink);
+  font-size: 1rem;
+  white-space: nowrap;
 }
-.transaction-canvas {
-  min-width: 0;
+.transaction-site main {
+  padding-inline: clamp(0.9rem, 2.8vw, 3rem);
 }
-.transaction-list {
-  list-style: none;
-  padding: 0;
-  margin: 0.75rem 0;
-  max-height: 24rem;
-  overflow: auto;
+.transaction-site article:has(.tx-board) {
+  max-width: none;
 }
-.transaction-list button {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.25rem;
+.transaction-site .breadcrumbs {
+  margin-bottom: 1rem;
+}
+.tx-offline-canvas.graph-canvas {
+  position: absolute;
+  inset: 0;
+  height: 100%;
   width: 100%;
-  text-align: start;
-  padding: 0.65rem;
-  border: 0;
-  border-inline-start: 3px solid transparent;
-  border-radius: 0;
   background: transparent;
-  color: var(--ink);
-  cursor: pointer;
+  border: none;
+  border-radius: 0;
+  touch-action: none;
 }
-.transaction-list button[aria-pressed="true"] {
-  border-inline-start-color: var(--accent);
-  background: var(--surface);
+.tx-offline-canvas .arrow {
+  fill: var(--tx-edge);
 }
-.transaction-list code,
-.transaction-list small {
-  color: var(--muted);
+.tx-offline-canvas .graph-edge-target[data-kind="exception"] .graph-edge {
+  stroke: var(--tx-exception);
+  stroke-dasharray: 6 4;
 }
-.transaction-list small {
-  grid-column: 1 / -1;
+.tx-exception-arrow {
+  fill: var(--tx-exception);
 }
-@container (min-width: 40rem) {
-  .transaction-grid {
-    grid-template-columns: minmax(10rem, 26%) minmax(0, 1fr);
-  }
+.tx-offline-canvas .graph-edge-target:is(:focus-visible, :hover, [aria-pressed="true"]) .graph-edge {
+  stroke: var(--tx-accent);
+  stroke-width: 3;
+}
+.tx-edge-caption {
+  pointer-events: none;
+  text-align: center;
+}
+.tx-edge-caption span {
+  display: inline-block;
+  padding: 0 3px;
+  max-width: 100%;
+  background: var(--tx-canvas);
+  color: var(--tx-muted);
+  font: 11px / 17px var(--sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tx-graphic-node:focus-visible {
+  outline: none;
+}
+.tx-graphic-node:focus-visible .tx-node {
+  box-shadow: inset 0 0 0 3px var(--tx-accent);
+}
+.tx-toolbar .graph-controls {
+  margin: 0;
+}
+.tx-source-dialog {
+  width: min(54rem, 92vw);
+  max-height: 82dvh;
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--tx-line);
+  border-radius: 10px;
+  color: var(--tx-ink);
+  background: var(--tx-paper);
+}
+.tx-source-dialog::backdrop {
+  background: color-mix(in srgb, var(--design-code-bg) 64%, transparent);
+}
+.tx-source-dialog .source-excerpts {
+  padding: 0 1rem 1rem;
+}
+.tx-source-dialog .tx-toolbar {
+  align-items: start;
+  flex-wrap: nowrap;
+}
+.tx-source-dialog .tx-toolbar h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.transaction-canvas .graph-canvas {
-  height: clamp(16rem, 38vh, 28rem);
-}
-div.transaction-canvas > a {
-  display: block;
-  text-align: end;
+.transaction-site .tx-site-outline {
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+  margin-top: 1.2rem;
   font-size: 0.85rem;
+}
+.transaction-site .tx-site-outline > summary {
+  color: var(--muted);
+  font-weight: 620;
+}
+.transaction-site .breadcrumbs[hidden] {
+  display: none;
 }

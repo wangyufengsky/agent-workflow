@@ -84,6 +84,7 @@ export * from './contracts/mcp/submit-slide.ts';
 export * from './deck/status.ts';
 export * from './design/layout.ts';
 export * from './design/status.ts';
+export * from './design/transaction-diagram.ts';
 export * from './enums/assistant.ts';
 export * from './enums/attachment.ts';
 export * from './enums/batch.ts';

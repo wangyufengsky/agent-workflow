@@ -63,7 +63,26 @@
     "chapter": "阅读所属章节",
     "steps": "处理步骤",
     "fields": "字段流转",
-    "boundaries": "事务范围",
-    "source": "查看对应源码或章节"
+    "boundaries": "事务边界",
+    "source": "查看对应源码或章节",
+    "flow": "处理链路",
+    "sources": "源码索引",
+    "relatedFields": "关联字段",
+    "outgoing": "从这里可以到达",
+    "noFields": "本次分析未记录字段流转。",
+    "noBoundaries": "本次分析未记录可证实的事务范围。",
+    "noSources": "本笔交易尚无源码引用。",
+    "relations": "处理关系",
+    "exceptions": "异常分支",
+    "external": "外部调用",
+    "graph": "交易流程图",
+    "inferred": "推断关系",
+    "nodeDetails": "节点详情",
+    "sourceLocation": "源码位置",
+    "brand": "Agent Workflow",
+    "referencedFiles": "引用文件",
+    "closeSource": "关闭源码",
+    "noExcerpt": "此位置暂无引用片段。",
+    "graphSize": "{nodes} 个节点 · {edges} 条关系"
   }
 }

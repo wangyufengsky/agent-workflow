@@ -2,10 +2,14 @@ import '@xyflow/react/dist/base.css';
 import {
   type DesignDiagramDTO,
   type DesignDiagramEdge,
+  type DesignDiagramLayout,
   type DesignDiagramNode,
   DesignEvidenceClass,
+  type DesignFileDTO,
   type DesignTransaction,
   layoutDesignDiagram,
+  presentTransactionDiagram,
+  type TransactionNodeRole,
 } from '@aw/shared';
 import {
   BaseEdge,
@@ -18,15 +22,16 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
 } from '@xyflow/react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/button.tsx';
+import { Icon } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import siteCopy from '../../copy/design-site.json';
 import { DESIGN_WORKBENCH_COPY as C, DESIGN_DIAGRAM_LABEL } from '../../copy/design-workbench.ts';
 import type { ReadingTarget } from './design-reading.ts';
-import { TransactionTraces } from './design-transaction-traces.tsx';
 import styles from './design-workbench.module.css';
 
 type FigureNode = Node<
@@ -34,12 +39,20 @@ type FigureNode = Node<
     label: string;
     group?: string;
     summary?: string;
+    role?: TransactionNodeRole;
+    detail?: string;
     action?: () => void;
     pressed?: boolean;
   },
   'designFigure'
 >;
-type FigureEdge = Edge<{ path: string }, 'designFigure'>;
+type FigureEdge = Edge<
+  {
+    path: string;
+    label?: { text: string; x: number; y: number; width: number };
+  },
+  'designFigure'
+>;
 
 function FigureNodeBody({ data }: NodeProps<FigureNode>) {
   const label = (
@@ -49,7 +62,7 @@ function FigureNodeBody({ data }: NodeProps<FigureNode>) {
     </>
   );
   return (
-    <div className={styles.shape}>
+    <div className={data.role ? styles.txShape : styles.shape}>
       <Handle type="target" position={Position.Left} isConnectable={false} className={styles.handle} />
       {data.action === undefined ? (
         <span className={styles.figureLabel} title={data.summary}>
@@ -58,12 +71,22 @@ function FigureNodeBody({ data }: NodeProps<FigureNode>) {
       ) : (
         <button
           type="button"
-          className={`${styles.figureLabel} nodrag nopan`}
+          className={`${data.role ? 'tx-node' : styles.figureLabel} nodrag nopan`}
+          data-kind={data.role}
+          aria-label={data.role ? data.label : undefined}
           title={data.summary}
           aria-pressed={data.pressed}
           onClick={data.action}
         >
-          {label}
+          {data.role ? (
+            <>
+              <Icon name={data.role === 'exception' ? 'alert' : data.role === 'external' ? 'external' : 'flow'} />
+              <strong>{data.label}</strong>
+              {data.detail && <code>{data.detail}</code>}
+            </>
+          ) : (
+            label
+          )}
         </button>
       )}
       <Handle type="source" position={Position.Right} isConnectable={false} className={styles.handle} />
@@ -74,23 +97,44 @@ function FigureNodeBody({ data }: NodeProps<FigureNode>) {
 function FigureEdgeBody({ id, data, markerEnd, style }: EdgeProps<FigureEdge>) {
   if (data === undefined) return null;
   return (
-    <BaseEdge
-      id={id}
-      path={data.path}
-      {...(markerEnd === undefined ? {} : { markerEnd })}
-      {...(style === undefined ? {} : { style })}
-    />
+    <>
+      <BaseEdge
+        id={id}
+        path={data.path}
+        {...(markerEnd === undefined ? {} : { markerEnd })}
+        {...(style === undefined ? {} : { style })}
+      />
+      {data.label && (
+        <foreignObject
+          x={data.label.x - data.label.width / 2}
+          y={data.label.y - 8}
+          width={data.label.width}
+          height={16}
+          pointerEvents="none"
+        >
+          <span className={styles.txEdgeLabel}>{data.label.text}</span>
+        </foreignObject>
+      )}
+    </>
   );
 }
 const nodeTypes = { designFigure: FigureNodeBody };
 const edgeTypes = { designFigure: FigureEdgeBody };
 
-type GraphProps = {
+export type GraphProps = {
   diagram: DesignDiagramDTO;
-  transaction?: DesignTransaction | undefined;
   targetOf: (node: DesignDiagramNode) => ReadingTarget | undefined;
   onNavigate: (target: ReadingTarget) => void;
   source: (path: string, line?: number, end?: number) => ReactNode;
+};
+
+type TransactionProjection = ReturnType<typeof presentTransactionDiagram>;
+type TransactionPlot = {
+  profile: DesignTransaction;
+  files: DesignFileDTO[];
+  projection: TransactionProjection;
+  selected: string | undefined;
+  select: (id: string) => void;
 };
 
 function coordinates(
@@ -98,7 +142,8 @@ function coordinates(
   collapsed: ReadonlySet<string>,
   controlsFor: (node: DesignDiagramNode) => Pick<FigureNode['data'], 'action' | 'pressed'>,
   toggle: (group: string) => void,
-): { nodes: FigureNode[]; edges: FigureEdge[] } {
+  transaction: TransactionPlot | undefined,
+): { nodes: FigureNode[]; edges: FigureEdge[]; layout: DesignDiagramLayout } {
   const visible = new Map<string, FigureNode['data']>();
   const projected = new Map<string, string>();
   const identifiers = new Set(diagram.nodes.map(({ id }) => id));
@@ -130,14 +175,22 @@ function coordinates(
     if (from === undefined || to === undefined || (from === to && from !== edge.from)) return [];
     return [{ ...edge, from, to }];
   });
-  const layout = layoutDesignDiagram(
-    Array.from(visible.keys(), (id) => ({ id })),
-    projectedEdges,
-  );
-  const routes = new Map(layout.routes.map(({ id, path }) => [id, path]));
+  const original = new Map(diagram.nodes.map((node) => [node.id, node]));
+  const shown = Array.from(visible, ([id, data]) => original.get(id) ?? { id, label: data.label });
+  const projection =
+    transaction &&
+    (collapsed.size
+      ? presentTransactionDiagram(shown, projectedEdges, transaction.files, transaction.profile)
+      : transaction.projection);
+  const layout = projection?.layout ?? layoutDesignDiagram(shown, projectedEdges);
+  const routes = new Map(layout.routes.map((route) => [route.id, route]));
+  const labels = new Map(projection?.nodes.map((node) => [node.id, node]));
+  const roles = new Map(projection?.edges.map((edge) => [edge.id, edge.role]));
   return {
+    layout,
     nodes: layout.placed.flatMap(({ id, box }) => {
       const data = visible.get(id);
+      const label = labels.get(id);
       return data === undefined
         ? []
         : [
@@ -149,14 +202,16 @@ function coordinates(
               type: 'designFigure' as const,
               // React Flow disables pointer events on non-draggable, non-selectable wrappers.
               ...(data.action === undefined ? {} : { style: { pointerEvents: 'auto' as const } }),
-              data,
+              data: label ? { ...data, label: label.title, detail: label.detail, role: label.role } : data,
             },
           ];
     }),
     edges: projectedEdges.flatMap((edge) => {
-      const path = routes.get(edge.id);
+      const route = routes.get(edge.id);
+      const exception = roles.get(edge.id) === 'exception';
+      const stroke = projection ? (exception ? 'var(--tx-exception)' : 'var(--tx-edge)') : 'var(--muted)';
       const inference = edge.evidenceClass === DesignEvidenceClass.Inferred;
-      return path === undefined
+      return route === undefined
         ? []
         : [
             {
@@ -164,9 +219,25 @@ function coordinates(
               source: edge.from,
               target: edge.to,
               type: 'designFigure' as const,
-              data: { path },
-              markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--muted)' },
-              style: { stroke: 'var(--muted)', strokeWidth: 1.5, ...(inference ? { strokeDasharray: '5 4' } : {}) },
+              data: {
+                path: route.path,
+                ...(projection
+                  ? {
+                      label: {
+                        x: route.labelX,
+                        y: route.labelY,
+                        width: route.labelWidth,
+                        text: edge.label ?? edge.kind,
+                      },
+                    }
+                  : {}),
+              },
+              markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
+              style: {
+                stroke,
+                strokeWidth: 1.5,
+                ...(exception || inference ? { strokeDasharray: exception ? '6 4' : '2 4' } : {}),
+              },
             },
           ];
     }),
@@ -177,60 +248,133 @@ function evidenceLabel(edge: DesignDiagramEdge): string {
   return edge.evidenceClass === DesignEvidenceClass.Static ? C.static : C.inferred;
 }
 
-function Board({ diagram, targetOf, onNavigate, source, transaction }: GraphProps) {
-  const { zoomIn, zoomOut, fitView } = useReactFlow<FigureNode, FigureEdge>();
+export function DiagramBoard({
+  diagram,
+  targetOf,
+  onNavigate,
+  source,
+  transaction,
+}: GraphProps & { transaction?: TransactionPlot }) {
+  const nodesInitialized = useNodesInitialized();
+  const { zoomIn, zoomOut, fitView, fitBounds, getViewport, setCenter, viewportInitialized } = useReactFlow<
+    FigureNode,
+    FigureEdge
+  >();
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [hovered, setHovered] = useState<string>();
   const [pinned, setPinned] = useState<string>();
   const described = diagram.edges.find(({ id }) => id === (pinned ?? hovered));
   const groups = [...new Set(diagram.nodes.flatMap(({ group }) => (group === undefined ? [] : [group])))];
-  const toggle = (group: string) =>
+  const toggle = useCallback(
+    (group: string) =>
+      setCollapsed((previous) => {
+        const next = new Set(previous);
+        if (next.has(group)) next.delete(group);
+        else next.add(group);
+        return next;
+      }),
+    [],
+  );
+  const { nodes, edges, layout } = useMemo(
+    () =>
+      coordinates(
+        diagram,
+        collapsed,
+        (node) => {
+          if (transaction)
+            return { pressed: node.id === transaction.selected, action: () => transaction.select(node.id) };
+          const target = targetOf(node);
+          return target === undefined ? {} : { action: () => onNavigate(target) };
+        },
+        toggle,
+        transaction,
+      ),
+    [diagram, collapsed, transaction, targetOf, onNavigate, toggle],
+  );
+  const plot = useRef<HTMLElement>(null);
+  const selectedNode = transaction && diagram.nodes.find((node) => node.id === transaction.selected);
+  useEffect(() => {
+    const group = selectedNode?.group;
+    if (group === undefined) return;
     setCollapsed((previous) => {
+      if (!previous.has(group)) return previous;
       const next = new Set(previous);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
+      next.delete(group);
       return next;
     });
-  const [stepId, selectStep] = useState<string>();
-  const step = diagram.nodes.find((node) => node.id === stepId && !collapsed.has(node.group ?? ''));
-  const stepTarget = step === undefined ? undefined : targetOf(step);
-  const { nodes, edges } = coordinates(
-    diagram,
-    collapsed,
-    (node) => {
-      if (transaction)
-        return { pressed: node.id === step?.id, action: () => selectStep(node.id === stepId ? undefined : node.id) };
-      const target = targetOf(node);
-      return target === undefined ? {} : { action: () => onNavigate(target) };
-    },
-    toggle,
+  }, [selectedNode]);
+  const stepBox = selectedNode && layout.placed.find(({ id }) => id === selectedNode.id)?.box;
+  useEffect(() => {
+    if (!stepBox || !plot.current || !nodesInitialized || !viewportInitialized) return;
+    const { x, y, zoom } = getViewport();
+    const left = stepBox.x * zoom + x;
+    const top = stepBox.y * zoom + y;
+    if (
+      left < 0 ||
+      top < 0 ||
+      left + stepBox.width * zoom > plot.current.clientWidth ||
+      top + stepBox.height * zoom > plot.current.clientHeight
+    )
+      void setCenter(stepBox.x + stepBox.width / 2, stepBox.y + stepBox.height / 2, { zoom });
+  }, [stepBox, getViewport, setCenter, nodesInitialized, viewportInitialized]);
+  const groupControls = groups.length > 0 && (
+    <fieldset className={`row wrap ${styles.graphGroups}`} aria-label={C.groups}>
+      {groups.map((group) => (
+        <Button
+          key={group}
+          size="sm"
+          variant="ghost"
+          aria-pressed={!collapsed.has(group)}
+          onClick={() => toggle(group)}
+        >
+          <IconGroup collapsed={collapsed.has(group)} />
+          {group}
+        </Button>
+      ))}
+    </fieldset>
   );
   return (
     <>
-      <div className={styles.graphToolbar}>
-        <span className="hint">{DESIGN_DIAGRAM_LABEL[diagram.kind]}</span>
-        {groups.length > 0 && (
-          <fieldset className={`row wrap ${styles.graphGroups}`} aria-label={C.groups}>
-            {groups.map((group) => (
-              <Button
-                key={group}
-                size="sm"
-                variant="ghost"
-                aria-pressed={!collapsed.has(group)}
-                onClick={() => toggle(group)}
-              >
-                <IconGroup collapsed={collapsed.has(group)} />
-                {group}
-              </Button>
-            ))}
-          </fieldset>
+      <div className={transaction ? 'tx-toolbar' : styles.graphToolbar}>
+        {transaction ? (
+          <div>
+            <h3>{diagram.title}</h3>
+            <small>
+              {siteCopy.transactions.graphSize
+                .replace('{nodes}', String(diagram.nodes.length))
+                .replace('{edges}', String(diagram.edges.length))}
+            </small>
+          </div>
+        ) : (
+          <span className="hint">{DESIGN_DIAGRAM_LABEL[diagram.kind]}</span>
+        )}
+        {transaction && groups.length > 0 ? (
+          <details className={styles.txGroups}>
+            <summary className={styles.txGroupSummary}>{C.groups}</summary>
+            {groupControls}
+          </details>
+        ) : (
+          groupControls
         )}
         <span className="grow" />
         <Button size="sm" aria-label={C.zoomOut} icon="minus" onClick={() => void zoomOut()} />
         <Button size="sm" aria-label={C.zoomIn} icon="plus" onClick={() => void zoomIn()} />
-        <Button size="sm" aria-label={C.fit} icon="expand" onClick={() => void fitView({ padding: 0.2 })} />
+        <Button
+          size="sm"
+          aria-label={C.fit}
+          icon="expand"
+          onClick={() => {
+            if (transaction)
+              void fitBounds({ x: 0, y: 0, width: layout.width, height: layout.height }, { padding: 0.12 });
+            else void fitView({ padding: 0.2 });
+          }}
+        />
       </div>
-      <section className={styles.graph} aria-label={diagram.title}>
+      <section
+        ref={plot}
+        className={transaction ? `tx-plot ${styles.txPlot}` : styles.graph}
+        aria-label={diagram.title}
+      >
         <ReactFlow<FigureNode, FigureEdge>
           nodes={nodes}
           edges={edges}
@@ -249,7 +393,8 @@ function Board({ diagram, targetOf, onNavigate, source, transaction }: GraphProp
           panOnDrag
           preventScrolling={false}
           fitView
-          fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+          {...(transaction ? { minZoom: 0.02 } : {})}
+          fitViewOptions={{ padding: 0.2, maxZoom: 1, ...(transaction ? { minZoom: 0.65 } : {}) }}
           deleteKeyCode={null}
           proOptions={{ hideAttribution: true }}
         />
@@ -278,20 +423,6 @@ function Board({ diagram, targetOf, onNavigate, source, transaction }: GraphProp
           </aside>
         )}
       </section>
-      {step !== undefined && (
-        <aside className={styles.proseBlock} aria-label={siteCopy.transactions.steps}>
-          <strong>{step.label}</strong>
-          {step.group && <span className={styles.sourceTag}>{step.group}</span>}
-          {step.summary && <p>{step.summary}</p>}
-          {stepTarget !== undefined ? (
-            <button type="button" className={styles.textButton} onClick={() => onNavigate(stepTarget)}>
-              {siteCopy.transactions.source}
-            </button>
-          ) : (
-            step.relPath && source(step.relPath)
-          )}
-        </aside>
-      )}
     </>
   );
 }
@@ -300,7 +431,7 @@ function IconGroup({ collapsed }: { collapsed: boolean }) {
   return <span aria-hidden="true">{collapsed ? '+' : '−'}</span>;
 }
 
-export function DesignDiagram({ diagram, targetOf, onNavigate, source, transaction }: GraphProps) {
+export function EdgeList({ diagram, targetOf, onNavigate, source }: GraphProps) {
   const nodes = new Map(diagram.nodes.map((node) => [node.id, node]));
   const endpoint = (id: string) => {
     const node = nodes.get(id);
@@ -315,41 +446,40 @@ export function DesignDiagram({ diagram, targetOf, onNavigate, source, transacti
     );
   };
   return (
+    <details className={styles.edgeList}>
+      <summary>{C.textEdges}</summary>
+      {diagram.edges.length === 0 ? (
+        <p className="hint">{C.noEdges}</p>
+      ) : (
+        <ul>
+          {diagram.edges.map((edge) => (
+            <li key={edge.id}>
+              <div className="row wrap">
+                {endpoint(edge.from)} <span aria-hidden="true">→</span> {edge.label ?? edge.kind}
+                <span aria-hidden="true">→</span> {endpoint(edge.to)}
+                <span className={styles.sourceTag}>{evidenceLabel(edge)}</span>
+                {edge.evidencePath !== undefined && source(edge.evidencePath, edge.lineStart, edge.lineEnd)}
+              </div>
+              {edge.rationale !== undefined && <p className="hint">{edge.rationale}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
+  );
+}
+
+export function DesignDiagram(props: GraphProps) {
+  return (
     <div className={styles.figure}>
-      {diagram.nodes.length === 0 ? (
+      {props.diagram.nodes.length === 0 ? (
         <p className="hint">{C.noNodes}</p>
       ) : (
         <ReactFlowProvider>
-          <Board
-            transaction={transaction}
-            diagram={diagram}
-            targetOf={targetOf}
-            onNavigate={onNavigate}
-            source={source}
-          />
+          <DiagramBoard {...props} />
         </ReactFlowProvider>
       )}
-      {transaction && <TransactionTraces transaction={transaction} diagram={diagram} source={source} />}
-      <details className={styles.edgeList}>
-        <summary>{C.textEdges}</summary>
-        {diagram.edges.length === 0 ? (
-          <p className="hint">{C.noEdges}</p>
-        ) : (
-          <ul>
-            {diagram.edges.map((edge) => (
-              <li key={edge.id}>
-                <div className="row wrap">
-                  {endpoint(edge.from)} <span aria-hidden="true">→</span> {edge.label ?? edge.kind}
-                  <span aria-hidden="true">→</span> {endpoint(edge.to)}
-                  <span className={styles.sourceTag}>{evidenceLabel(edge)}</span>
-                  {edge.evidencePath !== undefined && source(edge.evidencePath, edge.lineStart, edge.lineEnd)}
-                </div>
-                {edge.rationale !== undefined && <p className="hint">{edge.rationale}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </details>
+      <EdgeList {...props} />
     </div>
   );
 }

@@ -45,7 +45,7 @@ export async function startBackend(
         : join(app.getAppPath(), '../../packages/builtin/prompts'),
       AW_DESIGN_SITE_ASSETS_DIR: app.isPackaged
         ? join(process.resourcesPath, 'design-site-assets')
-        : join(app.getAppPath(), '../../packages/server/src/modules/designs/site-assets'),
+        : join(app.getAppPath(), '../web/src/features/designs/site-assets'),
       AW_DESIGN_SITE_COPY_FILE: app.isPackaged
         ? join(process.resourcesPath, 'design-site-assets', 'design-site.json')
         : join(app.getAppPath(), '../web/src/copy/design-site.json'),

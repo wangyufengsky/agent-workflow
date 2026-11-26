@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -696,8 +696,12 @@ test('交易模板按渠道和版本筛选同码交易，在工作台和离线�
       "import { submitRefund } from './refunds';",
       'export const refundRoutes = [',
       "  { code: 'RF01', channel: '柜面', version: 'v1', handle: submitRefund },",
-      "  { code: 'RF01', channel: '移动端', version: 'v2', handle: submitRefund },",
+      "  { code: 'RF01', channel: '移动端', version: 'v2', handle: mobileRefund },",
       '];',
+      'function mobileRefund(order: string) {',
+      "  if (!order.trim()) throw new Error('Missing order');",
+      '  return submitRefund(order);',
+      '}',
     ].join('\n'),
   );
   git(project.repoPath, 'add', routes);
@@ -720,10 +724,25 @@ test('交易模板按渠道和版本筛选同码交易，在工作台和离线�
     { channel: '柜面', version: 'v1' },
     { channel: '移动端', version: 'v2' },
   ];
-  const graphs = versions.map(({ channel, version }) => ({
-    ...pendingGraph(DesignDiagramKind.BusinessFlow, `${channel}退款处理`),
-    id: version,
-  }));
+  const graphs = versions.map(({ channel, version }) => {
+    const graph = pendingGraph(DesignDiagramKind.BusinessFlow, `${channel}退款处理`);
+    if (version === 'v1') return { ...graph, id: version };
+    const routeEdge = { from: 'validate', evidenceClass: DesignEvidenceClass.Static, evidencePath: routes };
+    return {
+      ...graph,
+      id: version,
+      nodes: [
+        { id: 'validate', label: '检查移动端订单号', targetKind: 'file', relPath: routes },
+        ...graph.nodes,
+        { id: 'missing', label: '拒绝空订单号', group: '异常出口', summary: '空白订单号不能提交退款。' },
+      ],
+      edges: [
+        ...graph.edges,
+        { ...routeEdge, id: 'route', to: 'entry', kind: 'calls', label: '有效订单', lineStart: 8, lineEnd: 8 },
+        { ...routeEdge, id: 'reject', to: 'missing', kind: 'reject', label: '订单号为空', lineStart: 7, lineEnd: 7 },
+      ],
+    };
+  });
   const base = chapter(
     section.id,
     '根据退款入口追踪请求校验和退款单构建。',
@@ -738,23 +757,33 @@ test('交易模板按渠道和版本筛选同码交易，在工作台和离线�
       args: {
         ...base.args,
         diagrams: graphs,
-        blocks: versions.map(({ channel, version }, index) => ({
-          type: 'transaction',
-          title: '订单退款',
-          code: 'RF01',
-          channel,
-          version,
-          diagramId: version,
-          fields: [
-            {
-              name: 'order',
-              steps: ['entry', 'builder'],
-              description: '订单号传递给退款单构建函数。',
-              evidence: [{ evidenceClass: 'static', relPath: IMPLEMENTATION, lineStart: 4, lineEnd: 5 }],
-            },
-          ],
-          evidence: [{ evidenceClass: 'static', relPath: routes, lineStart: 3 + index, lineEnd: 3 + index }],
-        })),
+        blocks: [
+          {
+            type: 'code',
+            language: 'typescript',
+            relPath: IMPLEMENTATION,
+            lineStart: 1,
+            lineEnd: 3,
+            code: readFileSync(join(project.repoPath, IMPLEMENTATION), 'utf8').split('\n').slice(0, 3).join('\n'),
+          },
+          ...versions.map(({ channel, version }, index) => ({
+            type: 'transaction',
+            title: '订单退款',
+            code: 'RF01',
+            channel,
+            version,
+            diagramId: version,
+            fields: [
+              {
+                name: 'order',
+                steps: ['entry', 'builder'],
+                description: '订单号传递给退款单构建函数。',
+                evidence: [{ evidenceClass: 'static', relPath: IMPLEMENTATION, lineStart: 4, lineEnd: 5 }],
+              },
+            ],
+            evidence: [{ evidenceClass: 'static', relPath: routes, lineStart: 3 + index, lineEnd: 3 + index }],
+          })),
+        ],
       },
     },
   ]);
@@ -769,36 +798,65 @@ test('交易模板按渠道和版本筛选同码交易，在工作台和离线�
   });
   expect(exported.ok(), await exported.text()).toBe(true);
   const offline = await browser.newPage({ offline: true });
+  const remoteRequests: string[] = [];
+  offline.on('request', (request) => {
+    if (/^https?:/u.test(request.url())) remoteRequests.push(request.url());
+  });
   try {
     await offline.goto(pathToFileURL(join(exportDir, 'index.html')).href);
     for (const reader of [page, offline]) {
       const catalog = reader.getByRole('region', { name: '交易目录' });
+      const flow = reader.getByRole('region', { name: '处理链路', exact: true });
       const search = catalog.getByRole('searchbox');
       await expect(catalog.getByRole('button', { name: /RF01/ })).toHaveCount(2);
+      await expect(flow.getByRole('button', { name: '拒绝空订单号', exact: true })).toHaveCount(0);
       await search.fill('RF01 移动端 v2');
       await expect(catalog.getByRole('button', { name: /RF01/ })).toHaveCount(1);
-      await expect(catalog.getByRole('heading', { name: '移动端退款处理' })).toBeVisible();
-      await catalog.getByText('字段流转', { exact: true }).click();
-      await expect(catalog.getByText('订单号传递给退款单构建函数。')).toBeVisible();
+      await expect(flow.getByRole('heading', { name: '移动端退款处理' })).toBeVisible();
+      const inspector = flow.getByLabel('处理步骤', { exact: true });
+      await inspector.getByRole('button', { name: /拒绝空订单号/ }).click();
+      await expect(inspector.getByRole('heading', { name: '拒绝空订单号' })).toBeVisible();
+      await flow.getByRole('button', { name: '事务边界', exact: true }).click();
+      await expect(flow.getByText('本次分析未记录可证实的事务范围。')).toBeVisible();
+      await flow.getByRole('button', { name: '源码索引', exact: true }).click();
+      await flow.getByRole('button', { name: IMPLEMENTATION, exact: true }).click();
+      const dialog = reader.getByRole('dialog', { name: IMPLEMENTATION });
+      await expect(dialog).toContainText('export function buildRefund');
+      await expect(dialog).not.toContainText('export function submitRefund');
+      await dialog.getByRole('button', { name: '关闭源码' }).click();
+      await expect(dialog).toHaveCount(0);
+      await flow.getByText('字段流转', { exact: true }).click();
+      await expect(flow.getByText('订单号传递给退款单构建函数。')).toBeVisible();
+      await flow.getByRole('button', { name: '构建退款单', exact: true }).click();
+      await expect(inspector.getByRole('heading', { name: '构建退款单' })).toBeVisible();
+      await expect(inspector).toContainText('buildRefund');
+      await inspector.getByRole('button', { name: 'order', exact: true }).click();
+      await expect(flow.getByText('订单号传递给退款单构建函数。')).toBeVisible();
       await search.fill('未知渠道');
       await expect(catalog.getByText('没有匹配的交易。')).toBeVisible();
       await search.fill('');
       await catalog.getByRole('button', { name: /订单退款.*移动端/ }).click();
-      await catalog.getByRole('button', { name: '构建退款单', exact: true }).press('Enter');
-      await expect(catalog.getByRole('button', { name: '构建退款单', exact: true })).toHaveAttribute(
+      await flow.getByRole('button', { name: '构建退款单', exact: true }).press('Enter');
+      await expect(flow.getByRole('button', { name: '构建退款单', exact: true })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
-      const step = catalog.getByLabel('处理步骤', { exact: true });
+      const step = flow.getByLabel('处理步骤', { exact: true });
       await expect(step).toContainText('构建退款单');
       await step.getByText('查看对应源码或章节').click();
       await expect(reader.getByRole('heading', { name: FILE_NAME, exact: false }).first()).toBeVisible();
     }
+    expect(remoteRequests).toEqual([]);
     const shots = process.env.AW_TRANSACTION_SCREENSHOTS;
     if (shots) {
       mkdirSync(shots, { recursive: true });
       await offline.setViewportSize({ width: 1320, height: 960 });
       await offline.goto(pathToFileURL(join(exportDir, 'index.html')).href);
+      await offline.getByRole('button', { name: /订单退款.*移动端/ }).click();
+      await page.setViewportSize({ width: 1560, height: 1040 });
+      await page.goto(`/designs/${id}`);
+      await page.getByRole('button', { name: /订单退款.*移动端/ }).click();
+      await page.screenshot({ path: join(shots, 'transaction-workbench.png'), animations: 'disabled' });
       for (const colorScheme of ['light', 'dark'] as const) {
         await offline.emulateMedia({ colorScheme });
         await offline.screenshot({ path: join(shots, `transaction-${colorScheme}.png`) });

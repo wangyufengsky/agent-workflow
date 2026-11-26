@@ -19,6 +19,7 @@ import {
 } from './design-reading.ts';
 import { DesignRunPanel } from './design-run-panel.tsx';
 import { DesignToolbar } from './design-toolbar.tsx';
+import { TransactionCatalog, TransactionReport, useTransactionCatalog } from './design-transactions.tsx';
 import styles from './design-workbench.module.css';
 import {
   DeleteDesignDialog,
@@ -48,6 +49,7 @@ function failedSections(runs: readonly DesignRunDTO[]): Set<string> {
 
 export function DesignWorkbench({ design, model, repoPath }: Props) {
   const runtime = useQuery(runtimeQuery);
+  const catalog = useTransactionCatalog(design);
   const generate = useGenerateDesign();
   const review = useReviewDesign();
   const stop = useStopDesign();
@@ -166,6 +168,11 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
           <DesignOutlineNav
             design={design}
             hidden={!navOpen}
+            catalog={
+              catalog.enabled ? (
+                <TransactionCatalog catalog={catalog} design={design} onNavigate={navigate} />
+              ) : undefined
+            }
             target={currentTarget}
             active={active}
             failedIds={failures}
@@ -180,7 +187,21 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
             <Button size="sm" icon="list" variant="ghost" aria-label={C.showNav} onClick={() => setNavOpen(true)} />
           </div>
         )}
-        {
+        {catalog.enabled && (
+          <section
+            className={styles.reader}
+            aria-label={C.reader}
+            hidden={currentTarget.kind !== 'overview'}
+            aria-hidden={currentTarget.kind !== 'overview'}
+            inert={currentTarget.kind !== 'overview'}
+            onWheel={keepReading}
+            onTouchMove={keepReading}
+            onKeyDown={keepReading}
+          >
+            <TransactionReport catalog={catalog} design={design} onNavigate={navigate} />
+          </section>
+        )}
+        {(!catalog.enabled || currentTarget.kind !== 'overview') && (
           <section
             className={styles.reader}
             aria-label={C.reader}
@@ -220,7 +241,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
               />
             )}
           </section>
-        }
+        )}
         {panelOpen && (
           <DesignRunPanel
             design={design}

@@ -5,9 +5,10 @@ import {
   type DesignRunDTO,
   type DesignSectionDTO,
 } from '@aw/shared';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { Icon } from '../../components/icon.tsx';
+import siteCopy from '../../copy/design-site.json';
 import { DESIGN_WORKBENCH_COPY as C, DESIGN_REVIEW_LABEL } from '../../copy/design-workbench.ts';
 import {
   basename,
@@ -37,6 +38,7 @@ function sectionStatus(section: DesignSectionDTO, workingId: string | undefined,
 type NavProps = {
   design: DesignDTO;
   hidden: boolean;
+  catalog?: ReactNode;
   target: ReadingTarget;
   active: DesignRunDTO | undefined;
   failedIds: ReadonlySet<string>;
@@ -96,7 +98,16 @@ function FileTreeItem({
   );
 }
 
-export function DesignOutlineNav({ design, hidden, target, active, failedIds, onNavigate, onCollapse }: NavProps) {
+export function DesignOutlineNav({
+  design,
+  hidden,
+  catalog,
+  target,
+  active,
+  failedIds,
+  onNavigate,
+  onCollapse,
+}: NavProps) {
   const [search, setSearch] = useState('');
   const items = useMemo(() => readingIndex(design), [design]);
   const matches = matchingReadingItems(items, search);
@@ -124,12 +135,8 @@ export function DesignOutlineNav({ design, hidden, target, active, failedIds, on
     }
   }, [current, search]);
 
-  return (
-    <aside className={styles.navigator} aria-label={C.outline} hidden={hidden}>
-      <div className={styles.paneTitle}>
-        <strong>{C.outline}</strong>
-        <Button size="sm" variant="ghost" icon="chevLeft" aria-label={C.hideNav} onClick={onCollapse} />
-      </div>
+  const chapterTree = (
+    <>
       <div className={styles.searchRow}>
         <Icon name="search" size="sm" />
         <input
@@ -271,6 +278,29 @@ export function DesignOutlineNav({ design, hidden, target, active, failedIds, on
               );
             })}
         </nav>
+      )}
+    </>
+  );
+  return (
+    <aside
+      className={styles.navigator}
+      aria-label={catalog ? siteCopy.transactions.catalog : C.outline}
+      hidden={hidden}
+    >
+      <div className={styles.paneTitle}>
+        <h3 className={styles.navHeading}>{catalog ? siteCopy.transactions.catalog : C.outline}</h3>
+        <Button size="sm" variant="ghost" icon="chevLeft" aria-label={C.hideNav} onClick={onCollapse} />
+      </div>
+      {catalog ? (
+        <>
+          {catalog}
+          <details className={styles.chapterCatalog}>
+            <summary className={styles.chapterCatalogTitle}>{C.outline}</summary>
+            {chapterTree}
+          </details>
+        </>
+      ) : (
+        chapterTree
       )}
     </aside>
   );

@@ -1,4 +1,9 @@
-import { type DesignSourceSnapshot, layoutDesignDiagram, TRANSACTION_EXPLORER_KEY } from '@aw/shared';
+import {
+  type DesignSourceSnapshot,
+  layoutDesignDiagram,
+  presentTransactionDiagram,
+  TRANSACTION_EXPLORER_KEY,
+} from '@aw/shared';
 import type { DesignDiagramRecord, DesignFile, DesignSection, ProjectDesign } from './designs.records.ts';
 
 export type DesignSiteContents = {
@@ -21,24 +26,36 @@ export function designSiteModel({ design, sections, files, diagrams, exportedAt 
       if (block.type === 'code' && !excerptChapters.has(block.relPath)) excerptChapters.set(block.relPath, section.id);
     }
   }
+  const siteFiles = files.flatMap<Pick<DesignFile, 'id' | 'sectionId' | 'relPath' | 'responsibility' | 'symbols'>>(
+    ({ id, sectionId, relPath, responsibility, symbols }) => {
+      if (sectionId !== null && chapterIds.has(sectionId) && responsibility !== null) {
+        return [{ id, sectionId, relPath, responsibility, symbols }];
+      }
+      const excerptSectionId = excerptChapters.get(relPath);
+      return excerptSectionId === undefined
+        ? []
+        : [{ id, sectionId: excerptSectionId, relPath, responsibility: null, symbols: [] }];
+    },
+  );
+  const transactions = new Map(
+    completed.flatMap(({ blocks }) =>
+      blocks.flatMap((block) => (block.type === 'transaction' ? [[block.diagramId, block] as const] : [])),
+    ),
+  );
   const graphs = diagrams
     .filter(({ sectionId }) => chapterIds.has(sectionId))
-    .map(({ id, sectionId, kind, title, nodes, edges }) => ({
-      id,
-      sectionId,
-      kind,
-      title,
-      nodes,
-      edges,
-      layout: layoutDesignDiagram(nodes, edges),
-    }));
+    .map(({ id, sectionId, kind, title, nodes, edges }) => {
+      const diagram = { id, sectionId, kind, title, nodes, edges };
+      const transaction = transactions.get(id);
+      if (!transaction) return { ...diagram, layout: layoutDesignDiagram(nodes, edges) };
+      const { layout, ...presentation } = presentTransactionDiagram(nodes, edges, files, transaction);
+      return { ...diagram, layout, presentation };
+    });
   return {
     schemaVersion: 1,
     designId: design.id,
     title: design.title,
-    transactionExplorer:
-      design.templateSnapshot.key === TRANSACTION_EXPLORER_KEY ||
-      completed.some(({ blocks }) => blocks.some((block) => block.type === 'transaction')),
+    transactionExplorer: design.templateSnapshot.key === TRANSACTION_EXPLORER_KEY || transactions.size > 0,
     theme: design.theme,
     layoutStyle: design.layoutStyle,
     depth: design.depth,
@@ -52,17 +69,7 @@ export function designSiteModel({ design, sections, files, diagrams, exportedAt 
       summary,
       blocks,
     })),
-    files: files.flatMap<Pick<DesignFile, 'id' | 'sectionId' | 'relPath' | 'responsibility' | 'symbols'>>(
-      ({ id, sectionId, relPath, responsibility, symbols }) => {
-        if (sectionId !== null && chapterIds.has(sectionId) && responsibility !== null) {
-          return [{ id, sectionId, relPath, responsibility, symbols }];
-        }
-        const excerptSectionId = excerptChapters.get(relPath);
-        return excerptSectionId === undefined
-          ? []
-          : [{ id, sectionId: excerptSectionId, relPath, responsibility: null, symbols: [] }];
-      },
-    ),
+    files: siteFiles,
     diagrams: graphs,
   };
 }
