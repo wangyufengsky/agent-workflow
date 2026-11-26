@@ -300,6 +300,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.decks.delete': '删除 PPT',
   'op.designs.list': '项目设计列表',
   'op.designs.source': '阅读报告引用的本机源码',
+  'op.designs.lookupImpact': '按路径查询设计影响',
   'op.designs.staleness': '检查项目设计是否过期',
   'op.designs.get': '查看项目设计',
   'op.designs.create': '新建项目设计',

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   createDesignRequestSchema,
   createDesignTemplateRequestSchema,
+  designImpactLookupSchema,
   designSchema,
   designSectionRefSchema,
   designStalenessSchema,
@@ -13,6 +14,7 @@ import {
   listDesignsResponseSchema,
   listDesignTemplatesQuerySchema,
   listDesignTemplatesResponseSchema,
+  lookupDesignImpactRequestSchema,
   reviewDesignRequestSchema,
   reviseDesignOutlineRequestSchema,
   reviseDesignSectionRequestSchema,
@@ -63,6 +65,19 @@ export const getDesignStalenessOp = defineOperationContract({
   output: designStalenessSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/designs/:id/staleness' },
+  refs: designRef,
+});
+
+export const lookupDesignImpactOp = defineOperationContract({
+  ...common,
+  id: 'designs.lookupImpact',
+  title: 'op.designs.lookupImpact',
+  description:
+    'Look up static impact candidates for up to 50 project-relative file paths against a saved design snapshot',
+  input: lookupDesignImpactRequestSchema,
+  output: designImpactLookupSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/designs/:id/lookup-impact' },
   refs: designRef,
 });
 

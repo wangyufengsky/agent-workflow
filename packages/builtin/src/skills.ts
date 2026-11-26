@@ -6,6 +6,7 @@ import { FUNCTIONAL_TEST_WORKFLOW_KEY, SessionAgent } from '@aw/shared';
  */
 export const SkillName = {
   DesignAnalysis: 'aw-design-analysis',
+  DesignGitReview: 'aw-design-git-review',
   /** The assistant finds out why a task failed or is stuck and what to do next (41 §5.1). */
   TaskDiagnosis: 'aw-task-diagnosis',
   /** The assistant writes the requirement of a task, batch, scheduled task or initiative (41 §5.1). */
@@ -46,7 +47,7 @@ export const SKILL_MAX_BYTES = 8 * 1024;
 export const SKILL_DESCRIPTION_MAX = 400;
 /** Skills one agent may be given (D212). */
 export const AGENT_SKILLS_MAX = 9;
-export const ASSISTANT_SKILLS_MAX = 10;
+export const ASSISTANT_SKILLS_MAX = 11;
 
 /**
  * 内置 Skill 的分配表，同时用于原生 Skill 白名单和管理页。
@@ -105,6 +106,7 @@ export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.AssistantMemory,
   SkillName.DbReadonly,
   SkillName.TaskDelivery,
+  SkillName.DesignGitReview,
 ];
 
 /** 内置 Skill 约定用单行描述，值可包含冒号。 */

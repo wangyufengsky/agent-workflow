@@ -4,6 +4,8 @@ import {
   type CreateDesignRequest,
   DESIGN_TITLE_MAX_CHARS,
   DesignDepth,
+  type DesignImpactLookupDTO,
+  DesignKnowledgeMatch,
   DesignLayoutStyle,
   type DesignOutlineSection,
   DesignReviewState,
@@ -11,6 +13,7 @@ import {
   type ExportDesignRequest,
   type GenerateDesignRequest,
   type IncrementalUpdateDesignRequest,
+  type LookupDesignImpactRequest,
   type ReviewDesignRequest,
   type ReviseDesignOutlineRequest,
   type ReviseDesignSectionRequest,
@@ -27,7 +30,9 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { replaceSectionContent } from './designs.content.ts';
 import { exportDesignSite } from './designs.exporter.ts';
+import { screenDesignImpact } from './designs.impact.ts';
 import { restoreDesignUpdateSection } from './designs.incremental.ts';
+import { readProjectKnowledge } from './designs.knowledge.ts';
 import { initialDesignOutline } from './designs.outline.ts';
 import type { createDesignQueries } from './designs.queries.ts';
 import type { createDesignsRepo, DesignSection, ProjectDesign } from './designs.repo.ts';
@@ -118,6 +123,23 @@ export function createDesignsService({
       const design = designById(id);
       const repoPath = design.projectId === null ? null : projects.getRecord(design.projectId).repoPath;
       return readDesignStaleness(repo, design, repoPath);
+    },
+    lookupImpact({ id, paths }: LookupDesignImpactRequest): DesignImpactLookupDTO {
+      const design = designById(id);
+      const knowledge = readProjectKnowledge(repo, design);
+      const { candidates, uncoveredPathSet, truncated } = screenDesignImpact(
+        { knowledge, match: DesignKnowledgeMatch.Reference, worktreeFresh: false },
+        paths.map((path) => ({ path })),
+      );
+      return {
+        designId: id,
+        snapshotSha: knowledge.sourceSnapshot.commitSha,
+        dirty: knowledge.sourceSnapshot.dirty,
+        coverage: knowledge.coverage,
+        candidates,
+        uncoveredPaths: [...uncoveredPathSet],
+        truncated,
+      };
     },
     async source(id: string, fileId: string) {
       const design = designById(id);

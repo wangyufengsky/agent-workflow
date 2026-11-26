@@ -109,6 +109,7 @@ describe('opencode 配置生成', () => {
       [SkillName.AssistantMemory]: 'allow',
       [SkillName.DbReadonly]: 'allow',
       [SkillName.TaskDelivery]: 'allow',
+      [SkillName.DesignGitReview]: 'allow',
     });
   });
 

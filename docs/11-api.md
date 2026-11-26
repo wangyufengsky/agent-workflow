@@ -777,6 +777,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | 操作 | 路径 | 请求与返回 |
 | --- | --- | --- |
 | designs.source | GET /designs/:id/files/:fileId/source | 仅本机阅读器可用。验证文件归属与扫描哈希，匹配返回 available 和全文；变化返回 changed，解绑或不可读返回 unavailable。此操作不暴露给助手 |
+| designs.lookupImpact | POST /designs/:id/lookup-impact | read，助手可直接调用。请求体 `{ paths: string[] }` 接受最多 50 条项目相对路径。按保存的设计索引返回 `designId`、`snapshotSha`、`dirty`、`coverage`、直接与间接 `candidates`、`uncoveredPaths` 和 `truncated`。结果仅表示快照中的静态关联，全程零模型调用 |
 | designs.staleness | GET /designs/:id/staleness | read，只读比较设计与当前工作区。返回 `state`、变更文件总数 `changedFilesCount`、按目录顺序排列的受影响已勾选章节 `affectedSectionIds` 与最多 20 条相对路径样例 `changedPathsSample`。基线或当前提交可用时附 `baseSha`、`headSha`。设计不存在返回 404 DESIGN_NOT_FOUND |
 | designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试。`handoffPending` 表示正在等候衔接下一章或自动复审，其间 `activeRunId` 为空，仍可停止 |
 | designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |

@@ -11,23 +11,35 @@ import {
   confirmAssistantCallOp,
   createConversationOp,
   createDeckOp,
+  createDesignOp,
   createProjectOp,
   createTaskOp,
+  DesignSectionKind,
+  DesignStatus,
   ErrorCode,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
+  GitReviewTarget,
   generateDeckOp,
+  generateDesignOp,
   getProjectOp,
   getRequirementsOp,
   getSettingsOp,
+  incrementalUpdateDesignOp,
   listConfirmationsOp,
   MCP_SESSION_ARG,
+  McpToolName,
+  OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OperationRisk,
+  PermissionMode,
   RoleBaseAgent,
   ServerEventType,
   SlideLayout,
   sendAssistantMessageOp,
+  setConversationPermissionModeOp,
+  startGitReviewOp,
   type TranscriptPage,
+  updateDesignOutlineOp,
   updateSettingsOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -93,6 +105,74 @@ async function decide(confirmationId: string, decision: 'confirm' | 'cancel', al
 }
 
 describe('助手 MCP（/mcp/assistant，A-04）', () => {
+  it.each([PermissionMode.Full, PermissionMode.Ask])(
+    '%s：设计快查直接执行，Git 审查与设计增量更新逐次确认',
+    async (permissionMode) => {
+      const path = 'src/orders.ts';
+      const { project, repo } = await addProject(t, { files: { [path]: 'export const orders = 1;' } });
+      const design = await t.call(createDesignOp, { projectId: project.id, aiReviewEnabled: false });
+      expect(design.status).toBe(201);
+      const outline = await t.call(updateDesignOutlineOp, {
+        id: design.body.id,
+        sections: [{ kind: DesignSectionKind.Module, title: '订单', scopePaths: [path] }],
+      });
+      expect(outline.status).toBe(200);
+      const [section] = outline.body.sections;
+      if (section === undefined) throw new Error('Expected a design section');
+      t.fake.enqueue(
+        script().callTool(McpToolName.SubmitDesignSection, {
+          sectionId: section.id,
+          summary: '订单入口',
+          blocks: [{ type: 'markdown', markdown: '订单入口' }],
+          files: [{ relPath: path, responsibility: '订单入口', symbols: [] }],
+          diagrams: [],
+        }),
+        { agent: OPENCODE_AGENT_NAME.designer },
+      );
+      const ready = waitForEvent(
+        t.app.events,
+        ServerEventType.DesignUpdated,
+        ({ designId }) =>
+          designId === design.body.id && t.app.services.designs.get(designId).status === DesignStatus.Ready,
+      );
+      expect((await t.call(generateDesignOp, { id: design.body.id })).status).toBe(200);
+      await ready;
+
+      const from = await repo.git('rev-parse', 'HEAD');
+      writeFileSync(join(repo.path, path), 'export const orders = 2;');
+      await repo.git('commit', '-am', 'Change orders');
+      const to = await repo.git('rev-parse', 'HEAD');
+      expect(
+        (
+          await t.call(updateSettingsOp, {
+            'ui.mode': 'pro',
+            'assistant.alwaysAllow': [startGitReviewOp.id, incrementalUpdateDesignOp.id],
+          })
+        ).status,
+      ).toBe(200);
+      expect((await t.call(setConversationPermissionModeOp, { id: conversationId, permissionMode })).status).toBe(200);
+      const sessionsBefore = t.fake.sessions.length;
+      const staleness = await call('designs_staleness', { id: design.body.id });
+      const impact = await call('designs_lookupImpact', { id: design.body.id, paths: [path] });
+      expect(staleness.body).toMatchObject({ state: 'stale' });
+      expect(impact.body).toMatchObject({ designId: design.body.id });
+      expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(0);
+
+      const calls = [
+        await call('gitReviews_start', { id: project.id, target: { kind: GitReviewTarget.Compare, from, to } }),
+        await call('gitReviews_start', { id: project.id, target: { kind: GitReviewTarget.Commit, sha: to } }),
+        await call('designs_incrementalUpdate', { id: design.body.id, sectionIds: [section.id] }),
+      ];
+      expect(calls.map(({ body }) => body.status)).toEqual(Array(3).fill('needs_confirmation'));
+      expect(t.fake.sessions).toHaveLength(sessionsBefore);
+      const confirmations = await t.call(listConfirmationsOp, { id: conversationId });
+      expect(confirmations.body.items.map(({ risk }) => risk)).toEqual(Array(3).fill(OperationRisk.Critical));
+      const [update] = confirmations.body.items;
+      if (update === undefined) throw new Error('Expected a confirmation');
+      expect((await t.call(confirmAssistantCallOp, { id: update.id, alwaysAllow: true })).status).toBe(400);
+    },
+  );
+
   it('令牌与执行 MCP 分开：执行 MCP 的令牌被拒绝（401）', async () => {
     await expect(connectMcp(t.assistantMcpUrl, t.app.mcpToken)).rejects.toMatchObject({ code: 401 });
   });

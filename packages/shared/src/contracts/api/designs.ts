@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import {
+  DESIGN_IMPACT_LOOKUP_MAX_PATHS,
+  DESIGN_IMPACT_MAX_DEPTH,
+  DESIGN_IMPACT_MAX_ITEMS,
   DESIGN_INSTRUCTION_MAX_CHARS,
   DESIGN_MAX_SECTIONS,
   LIST_PAGE_DEFAULT,
@@ -15,6 +18,7 @@ import {
   designStalenessStateSchema,
   designStatusSchema,
 } from '../../enums/design.ts';
+import { GitImpactClassification, gitImpactTargetKindSchema } from '../../enums/git.ts';
 import { themeIdSchema } from '../../enums/ui.ts';
 import { designBlockSchema, designRelativePathSchema, designTitleSchema } from '../design/block.ts';
 import { designDiagramSchema } from '../design/diagram.ts';
@@ -44,6 +48,32 @@ export const designStalenessSchema = z.strictObject({
     .optional(),
 });
 export type DesignStalenessDTO = z.infer<typeof designStalenessSchema>;
+
+export const lookupDesignImpactRequestSchema = byId.extend({
+  paths: z.array(designRelativePathSchema).max(DESIGN_IMPACT_LOOKUP_MAX_PATHS),
+});
+export type LookupDesignImpactRequest = z.infer<typeof lookupDesignImpactRequestSchema>;
+
+const designImpactCandidateSchema = z.strictObject({
+  targetKind: gitImpactTargetKindSchema,
+  targetId: id,
+  title: id,
+  relPath: designRelativePathSchema.optional(),
+  classification: z.enum([GitImpactClassification.Direct, GitImpactClassification.Indirect]),
+  distance: count.max(DESIGN_IMPACT_MAX_DEPTH),
+  sourcePath: designRelativePathSchema,
+});
+
+export const designImpactLookupSchema = z.strictObject({
+  designId: id,
+  snapshotSha: id.nullable(),
+  dirty: z.boolean(),
+  coverage: z.strictObject({ doneSections: count, totalSections: count }),
+  candidates: z.array(designImpactCandidateSchema).max(DESIGN_IMPACT_MAX_ITEMS),
+  uncoveredPaths: z.array(designRelativePathSchema).max(DESIGN_IMPACT_LOOKUP_MAX_PATHS),
+  truncated: z.boolean(),
+});
+export type DesignImpactLookupDTO = z.infer<typeof designImpactLookupSchema>;
 
 export const designSummarySchema = byId.extend({
   title: designTitleSchema,

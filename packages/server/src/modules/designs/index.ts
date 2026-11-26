@@ -41,6 +41,7 @@ export function createDesignsModule(deps: {
 
 export { designExclusion } from './designs.exclusions.ts';
 export { exportDesignSite } from './designs.exporter.ts';
+export { screenDesignImpact } from './designs.impact.ts';
 export {
   buildProjectKnowledgeIndex,
   createProjectKnowledgeReader,

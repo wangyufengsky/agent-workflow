@@ -24,6 +24,7 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { createDesignsRepo, createReviewKnowledgeReader } from '../designs/index.ts';
+import { screenDesignImpact } from '../designs/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -36,7 +37,7 @@ import {
   worktreeChanged,
 } from './git-reviews.evidence.ts';
 import { exportGitReviewReport } from './git-reviews.exporter.ts';
-import { renderDesignImpact, screenDesignImpact } from './git-reviews.impact.ts';
+import { renderDesignImpact } from './git-reviews.impact.ts';
 import { createGitReviewsRepo, type Review } from './git-reviews.repo.ts';
 import { readCommands, resolveTarget, validateFindings } from './git-reviews.target.ts';
 

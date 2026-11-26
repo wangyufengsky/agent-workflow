@@ -2,7 +2,16 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { builtinSkillHeader, SKILL_DESCRIPTION_MAX, SKILL_FILE, SKILL_MAX_BYTES, SkillName } from './skills.ts';
+import { loadPrompts, PromptName } from './prompts.ts';
+import {
+  AGENT_SKILLS,
+  ASSISTANT_SKILLS,
+  builtinSkillHeader,
+  SKILL_DESCRIPTION_MAX,
+  SKILL_FILE,
+  SKILL_MAX_BYTES,
+  SkillName,
+} from './skills.ts';
 
 const SKILLS_DIR = fileURLToPath(new URL('../skills', import.meta.url));
 const dirs = readdirSync(SKILLS_DIR);
@@ -10,6 +19,13 @@ const dirs = readdirSync(SKILLS_DIR);
 describe('内置 skill（41 §6）', () => {
   it('SkillName 与 skills 目录一一对应', () => {
     expect(dirs.toSorted()).toEqual(Object.values(SkillName).toSorted());
+  });
+
+  it('设计与 Git 审查 Skill 由助手协议点名并仅分配给助手', () => {
+    const prompts = loadPrompts(fileURLToPath(new URL('../prompts', import.meta.url)));
+    expect(prompts[PromptName.ProtocolAssistant]).toContain(`load \`${SkillName.DesignGitReview}\``);
+    expect(ASSISTANT_SKILLS).toContain(SkillName.DesignGitReview);
+    expect(Object.values(AGENT_SKILLS).flat()).not.toContain(SkillName.DesignGitReview);
   });
 
   it.each(dirs)('%s：只有 SKILL.md，头部只有与目录同名的 name 和不超长的 description，正文不超过上限', (dir) => {
