@@ -11,20 +11,17 @@ import {
   DiffSide,
   designRelativePathSchema,
   ErrorCode,
+  type GitComparisonDTO,
   GitReviewEvidenceState,
+  GitReviewTarget,
   type SubmitFindingsInput,
 } from '@aw/shared';
 import { linesOf, locateRepoFile } from '../../core/repo-files.ts';
 import { designExclusion } from '../designs/index.ts';
-import {
-  diffCommitsFile,
-  diffWorktree,
-  diffWorktreeFile,
-  limitDiff,
-  readFile as readGitFile,
-  runGit,
-} from '../git/index.ts';
+import { diffCommitsFile, diffWorktree, diffWorktreeFile, limitDiff, runGit } from '../git/index.ts';
 import type { Review } from './git-reviews.repo.ts';
+
+type EndpointExclusions = Readonly<Record<DiffSide, readonly string[]>>;
 
 type EvidenceTarget = Pick<Review, 'fromSha' | 'toSha' | 'files'>;
 
@@ -95,11 +92,23 @@ async function committedText(repo: string, sha: string, path: string): Promise<s
   // Git 的符号链接本身也是 blob；只有普通文件可以作为源码证据。
   const match = /^100(?:644|755) blob [0-9a-f]+\s+(\d+)\t/.exec(entry.stdout);
   if (!match || Number(match[1]) > DESIGN_SCAN_MAX_FILE_BYTES) return null;
-  const file = await readGitFile(repo, sha, path);
-  return 'content' in file ? file.content : null;
+  const { stdout } = await runGit(
+    ['show', '--no-ext-diff', '--no-textconv', '--end-of-options', `${sha}:${path}`, '--'],
+    {
+      cwd: repo,
+      verbatim: true,
+      encoding: 'latin1',
+    },
+  );
+  const bytes = Buffer.from(stdout, 'latin1');
+  return bytes.includes(0) || !isUtf8(bytes) ? null : bytes.toString('utf8');
 }
 
-function changedFile(target: EvidenceTarget, path: string) {
+function changedFile(target: EvidenceTarget, path: string, side: DiffSide) {
+  if (side === DiffSide.Old) {
+    const old = target.files.find((f) => f.oldPath === path);
+    if (old) return old;
+  }
   return target.files.find((file) => file.path === path) ?? target.files.find((file) => file.oldPath === path);
 }
 
@@ -110,7 +119,7 @@ async function sourceAt(
   side: DiffSide,
   exclusions: readonly string[],
 ) {
-  const file = changedFile(target, path);
+  const file = changedFile(target, path, side);
   const sourcePath = side === DiffSide.Old ? (file?.oldPath ?? path) : (file?.path ?? path);
   const unavailable = { state: GitReviewEvidenceState.Unavailable, path: sourcePath, content: null };
   if (!allowed(sourcePath, exclusions)) return unavailable;
@@ -130,17 +139,27 @@ export async function readReviewEvidence(
   review: Review,
   path: string,
   side: DiffSide,
-  exclusions: readonly string[],
+  exclusions: EndpointExclusions,
 ) {
-  const reported = review.findings.some((f) => f.path === path) || review.impacts.some((i) => i.evidencePath === path);
+  const file = changedFile(review, path, side);
+  const comparison = review.comparison;
+  const endpointPath = side === DiffSide.Old ? 'fromPath' : 'toPath';
+  const compared =
+    review.target === GitReviewTarget.Compare &&
+    (file !== undefined ||
+      (comparison &&
+        [comparison.sections, comparison.transactions].some((items) =>
+          items.some((item) => item[endpointPath] === path),
+        )));
+  const reported =
+    compared || review.findings.some((f) => f.path === path) || review.impacts.some((i) => i.evidencePath === path);
   if (!reported) throw new AppError(ErrorCode.NotFound, 'Evidence is not part of this review', { path, side });
-  const source = await sourceAt(repo, review, path, side, exclusions);
-  const file = changedFile(review, path);
+  const source = await sourceAt(repo, review, path, side, exclusions[side]);
   if (
     source.content === null ||
     file === undefined ||
-    !allowed(file.path, exclusions) ||
-    (file.oldPath && !allowed(file.oldPath, exclusions))
+    !allowed(file.path, exclusions.new) ||
+    !allowed(file.oldPath ?? file.path, exclusions.old)
   ) {
     return { ...source, patch: null };
   }
@@ -148,18 +167,56 @@ export async function readReviewEvidence(
     // 旧侧只能展示不可变基线；新侧在读取补丁后再次核对，工作区可能已被编辑。
     if (side === DiffSide.Old) return { ...source, patch: null };
     const patch = await diffWorktreeFile(repo, review.fromSha, file.path, file.oldPath);
-    const checked = await sourceAt(repo, review, path, side, exclusions);
+    const checked = await sourceAt(repo, review, path, side, exclusions[side]);
     return { ...checked, patch: checked.content === null ? null : limitDiff(path, patch) };
   }
   const patch = await diffCommitsFile(repo, review.fromSha, review.toSha, file.path, file.oldPath);
   return { ...source, patch: limitDiff(path, patch) };
 }
 
+/** 设计节点由冻结的对齐结果授权。纯源码结论只能引用本次直接 diff 相应一侧的文件。 */
+export async function validateComparisonPaths(
+  repo: string,
+  from: string,
+  to: string,
+  files: readonly DiffFile[],
+  input: GitComparisonDTO,
+  exclusions: EndpointExclusions,
+) {
+  const oldPaths = new Set(files.filter((f) => f.status !== DiffFileStatus.Added).map((f) => f.oldPath ?? f.path));
+  const newPaths = new Set(files.filter((f) => f.status !== DiffFileStatus.Deleted).map((f) => f.path));
+  const checked = new Map<string, boolean>();
+  for (const group of ['sections', 'transactions'] as const) {
+    for (const [index, item] of input[group].entries()) {
+      for (const [key, sha, scope, id, patterns] of [
+        ['fromPath', from, oldPaths, item.fromId, exclusions.old],
+        ['toPath', to, newPaths, item.toId, exclusions.new],
+      ] as const) {
+        const path = item[key];
+        if (path === undefined) continue;
+        if (allowed(path, patterns) && (id !== undefined || scope.has(path))) {
+          const object = `${sha}:${path}`;
+          if (!checked.has(object)) checked.set(object, (await committedText(repo, sha, path)) !== null);
+          if (checked.get(object)) continue;
+        }
+        throw new AppError(ErrorCode.ValidationFailed, 'Invalid comparison source on the specified endpoint', {
+          issues: [
+            {
+              path: ['comparison', group, index, key],
+              message: 'Use a readable, non-excluded source file from this endpoint of the comparison',
+            },
+          ],
+        });
+      }
+    }
+  }
+}
+
 export async function validateReviewImpacts(
   repo: string,
   target: EvidenceTarget,
   input: SubmitFindingsInput,
-  exclusions: readonly string[],
+  exclusions: EndpointExclusions,
 ) {
   const issues: { path: (string | number)[]; message: string }[] = [];
   const ids = new Set<string>();
@@ -167,10 +224,12 @@ export async function validateReviewImpacts(
   for (const [index, impact] of (input.impacts ?? []).entries()) {
     if (ids.has(impact.id)) issues.push({ path: ['impacts', index, 'id'], message: 'Use a unique impact id' });
     ids.add(impact.id);
-    if (impact.relPath !== undefined && !allowed(impact.relPath, exclusions)) {
+    const side = impact.side ?? DiffSide.New;
+    const patterns = exclusions[side];
+    if (impact.relPath !== undefined && !allowed(impact.relPath, patterns)) {
       issues.push({ path: ['impacts', index, 'relPath'], message: 'Use a non-excluded repository-relative path' });
     }
-    if (impact.evidencePath !== undefined && !allowed(impact.evidencePath, exclusions)) {
+    if (impact.evidencePath !== undefined && !allowed(impact.evidencePath, patterns)) {
       issues.push({ path: ['impacts', index, 'evidencePath'], message: 'Use a non-excluded repository-relative path' });
       continue;
     }
@@ -180,11 +239,10 @@ export async function validateReviewImpacts(
       issues.push({ path: ['impacts', index], message: 'Static evidence needs a source path, start and end line' });
       continue;
     }
-    const side = impact.side ?? DiffSide.New;
     const key = `${side}:${evidencePath}`;
     let count = sources.get(key);
     if (count === undefined) {
-      const source = await sourceAt(repo, target, evidencePath, side, exclusions);
+      const source = await sourceAt(repo, target, evidencePath, side, patterns);
       count = source.content === null ? -1 : linesOf(source.content).length;
       sources.set(key, count);
     }
@@ -195,10 +253,16 @@ export async function validateReviewImpacts(
       });
   }
   const changedPaths = new Set(
-    target.files.flatMap((file) => (file.oldPath ? [file.path, file.oldPath] : [file.path])),
+    target.files.flatMap((file) => {
+      const oldPath = file.oldPath ?? file.path;
+      return [
+        ...(file.status !== DiffFileStatus.Added && allowed(oldPath, exclusions.old) ? [oldPath] : []),
+        ...(file.status !== DiffFileStatus.Deleted && allowed(file.path, exclusions.new) ? [file.path] : []),
+      ];
+    }),
   );
   for (const [index, impact] of (input.impacts ?? []).entries()) {
-    if (impact.sourcePaths?.some((path) => !changedPaths.has(path) || !allowed(path, exclusions))) {
+    if (impact.sourcePaths?.some((path) => !changedPaths.has(path))) {
       issues.push({
         path: ['impacts', index, 'sourcePaths'],
         message: 'Use non-excluded changed paths from this review',

@@ -90,7 +90,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ReviewCommentKind` | `thread`（未解决的审查讨论，通常在某个文件的某一行）· `general`（对话中的评论或审查总结）（21 §2.2） |
 | `GitOperation` | `merge` · `rebase` · `cherry_pick` · `revert`：主工作区里用户没做完的操作（27 §5） |
 | `GitMergeStrategy` | `merge`（合并提交）· `squash`（压缩为一个提交）：Git 工作台的合并方式（27 §3.5） |
-| `GitReviewTarget` | `worktree` · `commit` · `branch` · `range`：AI 审查的对象（27 §4.2） |
+| `GitReviewTarget` | `worktree` · `commit` · `branch` · `range` · `compare`。range 从共同祖先审查，compare 直连指定提交（45 §5） |
+| `GitComparisonStatus` | `added`（＋ 新增）、`removed`（－ 删除）、`modified`（～ 修改）、`unchanged`（＝ 未变）、`uncertain`（？ 待确认），适用于对比报告的章节与交易条目 |
 | `FindingSeverity` | `blocker` · `major` · `minor` |
 | `FindingCategory` | `correctness` · `security` · `performance` · `maintainability` · `tests` |
 | `DiffSide` | `new` · `old`：审查问题的行号属于改动后还是改动前的版本 |

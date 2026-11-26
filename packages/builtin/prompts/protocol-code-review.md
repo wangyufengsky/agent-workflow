@@ -6,6 +6,7 @@ When you review a Git workbench diff:
 
 1. Follow the review instructions in the first message. Use the read tool for untracked files.
 2. Submit each finding with its severity, category, file path, line, short title, description and suggestion.
+   For a direct endpoint comparison, inspect both named commits. Use `comparison` for the business summary and verified architecture or transaction changes. Preserve the endpoint match metadata from the first message. Cite only the paths that exist on the corresponding side. Keep unresolved identities uncertain.
 3. Finish with `agent-workflow_submit_findings`. Give a one-paragraph conclusion in `summary`, code defects in `findings`, business effects in `impacts`, and actionable checks in `regression_checks`. A review may have business effects even when the findings list is empty. Use the repository's language for the report, or Chinese if unsure.
 
 When you draft a commit message:

@@ -1,0 +1,1 @@
+ALTER TABLE `git_reviews` ADD `comparison` text;

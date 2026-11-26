@@ -37,6 +37,7 @@ export const gitReviewsTable = sqliteTable(
     impacts: text('impacts'),
     impactTruncated: integer('impact_truncated', { mode: 'boolean' }),
     regressionChecks: text('regression_checks'),
+    comparison: text('comparison'),
   },
   (t) => [
     index('git_reviews_project_idx').on(t.projectId, t.createdAt),

@@ -14,6 +14,8 @@ import {
   diffSideSchema,
   findingCategorySchema,
   findingSeveritySchema,
+  GitReviewTarget,
+  gitComparisonStatusSchema,
   gitFindingStatusSchema,
   gitImpactClassificationSchema,
   gitImpactTargetKindSchema,
@@ -24,6 +26,7 @@ import {
 } from '../../enums/git.ts';
 import { attemptStatusSchema, taskStatusSchema } from '../../enums/task.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
+import { designRelativePathSchema, designTitleSchema } from '../design/block.ts';
 import { diffFileSchema } from '../mcp/get-task-diff.ts';
 
 /** The task a branch or worktree belongs to (Git console, 11 §8). */
@@ -244,12 +247,35 @@ export type GitImpactItemDTO = z.infer<typeof gitImpactItemSchema>;
 export const gitReviewImpactsSchema = z.array(gitImpactItemSchema).max(GIT_REVIEW_IMPACTS_MAX);
 export const gitReviewRegressionChecksSchema = z.array(gitReviewCheckSchema).max(GIT_REVIEW_REGRESSION_CHECKS_MAX);
 
+export const gitComparisonItemSchema = z.strictObject({
+  status: gitComparisonStatusSchema,
+  title: designTitleSchema,
+  fromId: z.string().min(1).optional(),
+  toId: z.string().min(1).optional(),
+  fromPath: designRelativePathSchema.optional(),
+  toPath: designRelativePathSchema.optional(),
+  detail: gitReviewCheckSchema.optional(),
+});
+export type GitComparisonItemDTO = z.infer<typeof gitComparisonItemSchema>;
+
+export const gitComparisonSchema = z.strictObject({
+  fromDesignId: z.string().min(1).optional(),
+  toDesignId: z.string().min(1).optional(),
+  fromMatch: designKnowledgeMatchSchema,
+  toMatch: designKnowledgeMatchSchema,
+  sections: z.array(gitComparisonItemSchema),
+  transactions: z.array(gitComparisonItemSchema),
+  summary: z.string().trim().min(1).max(GIT_REVIEW_SUMMARY_MAX_CHARS),
+});
+export type GitComparisonDTO = z.infer<typeof gitComparisonSchema>;
+
 /** What `gitReviews.start` reviews (27 §4.2). */
 export const gitReviewTargetInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('worktree') }),
   z.object({ kind: z.literal('commit'), sha: z.string().min(1), parent: z.number().int().min(1).optional() }),
   z.object({ kind: z.literal('branch'), branch: z.string().min(1) }),
   z.object({ kind: z.literal('range'), from: z.string().min(1), to: z.string().min(1) }),
+  z.strictObject({ kind: z.literal(GitReviewTarget.Compare), from: z.string().min(1), to: z.string().min(1) }),
 ]);
 export type GitReviewTargetInput = z.infer<typeof gitReviewTargetInputSchema>;
 
@@ -283,6 +309,7 @@ export const gitReviewSchema = z.object({
   uncoveredPaths: z.array(z.string()),
   impacts: gitReviewImpactsSchema,
   regressionChecks: gitReviewRegressionChecksSchema,
+  comparison: gitComparisonSchema.optional(),
   createdAt: z.number(),
   finishedAt: z.number().nullable(),
 });
@@ -302,6 +329,7 @@ export const submitFindingsInputSchema = z.object({
   findings: z.array(gitFindingInputSchema).max(GIT_REVIEW_FINDINGS_MAX),
   impacts: gitReviewImpactsSchema.optional(),
   regression_checks: gitReviewRegressionChecksSchema.optional(),
+  comparison: gitComparisonSchema.optional(),
 });
 export type SubmitFindingsInput = z.infer<typeof submitFindingsInputSchema>;
 

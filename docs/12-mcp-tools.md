@@ -399,8 +399,9 @@ type HandoffOutput = {
 | --- | --- |
 | `impacts` | 最多 60 项，每项含唯一的 id、targetKind、title、classification、evidenceClass、reason、suggestedChecks，以及可选的 targetId、relPath、evidencePath、lineStart、lineEnd、side。static 必须给出审查对应版本内可读且未排除的文件与有效起止行；inferred 必须说明推断依据。side 默认 new。间接证据可位于未修改的文件。传播关系可选填 `sourcePaths`（本次变更文件，可用旧路径）与 `viaImpactIds`（同一报告的其他前序影响 ID），各最多 60 项。仅经核验的关联才画入传播图 |
 | `regression_checks` | 最多 30 项非空的测试或联调检查。即使 findings 为空也可以提交业务影响与检查清单 |
+| `comparison` | 仅供 compare。传 `{ fromDesignId?, toDesignId?, fromMatch, toMatch, sections, transactions, summary }`。两组条目均为 `{ status, title, fromId?, toId?, fromPath?, toPath?, detail? }`。匹配态、设计 ID 与节点引用须与审查启动时的基线一致。纯源码条目须引用本次 Diff 相应端点的可读、未排除文件。省略整个 comparison 时，报告保留初筛条目并以审查结论作为业务摘要。 |
 
-违规的影响证据或无效关联返回 `VALIDATION_FAILED` 和定位到字段的 `issues`，本次提交不落库，模型可在原会话修正并重提。
+越界对比引用、非法对比结构、违规影响证据或无效关联返回 `VALIDATION_FAILED` 和定位到字段的 `issues`，本次提交不落库，模型可在原会话修正并重提。
 
 输出：`{ accepted: true }`
 错误：`GIT_REVIEW_FINDINGS_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。

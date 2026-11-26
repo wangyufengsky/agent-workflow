@@ -2,6 +2,13 @@ import { DiffSide } from '@aw/shared';
 import siteCopy from './git-review-site.json';
 
 export const GIT_REVIEW_COPY = {
+  comparison: siteCopy.comparison,
+  comparisonItems: '对比项',
+  comparisonDiff: '查看双端点 Diff',
+  comparisonSource: '双版本源码对照',
+  comparisonReadOnly: '按所选提交只读查看源码',
+  comparisonNoSource: '当前对比没有可查看的源码。',
+  comparisonNoPath: '此版本无对应文件。',
   overview: siteCopy.overview,
   findings: siteCopy.findings,
   impacts: siteCopy.impacts,
@@ -40,6 +47,7 @@ export const GIT_REVIEW_COPY = {
   worktreeChanged: '工作区已变化，无法重现本次审查的源码证据。',
   worktreeDrift: '工作区已变化，当前文件与审查开始时不同。',
   export: '导出离线 HTML',
+  exportComparison: '导出离线对比 HTML',
   exportDir: '导出目录',
   exportChoose: '选择目录',
   exportSubmit: '导出',

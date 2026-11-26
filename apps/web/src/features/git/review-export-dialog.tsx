@@ -9,7 +9,7 @@ import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { GIT_REVIEW_COPY as C } from '../../copy/git-review.ts';
 
-export function ReviewExportDialog({ reviewId, close }: { reviewId: string; close: () => void }) {
+export function ReviewExportDialog({ reviewId, title, close }: { reviewId: string; title: string; close: () => void }) {
   const [targetDir, setTargetDir] = useState('');
   const mutation = useMutation({
     mutationFn: ({ overwrite }: { overwrite: boolean }) =>
@@ -31,7 +31,7 @@ export function ReviewExportDialog({ reviewId, close }: { reviewId: string; clos
   return (
     <Dialog
       open
-      title={C.export}
+      title={title}
       onOpenChange={(open) => {
         if (!open && !mutation.isPending) close();
       }}

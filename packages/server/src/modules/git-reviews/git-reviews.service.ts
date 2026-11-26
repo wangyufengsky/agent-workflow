@@ -6,6 +6,7 @@ import {
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
+  DESIGN_IMPACT_PROMPT_MAX_BYTES,
   type DiffFile,
   type DiffSide,
   ErrorCode,
@@ -26,9 +27,11 @@ import type { createDesignsRepo, createReviewKnowledgeReader } from '../designs/
 import type { ProjectsService } from '../projects/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { buildGitComparison, mergeGitComparison, renderGitComparison } from './git-reviews.comparison.ts';
 import {
   readReviewEvidence,
   recordWorktreeFiles,
+  validateComparisonPaths,
   validateReviewImpacts,
   worktreeChanged,
 } from './git-reviews.evidence.ts';
@@ -59,6 +62,8 @@ const SCOPE: Record<GitReviewTarget, (label: string) => string> = {
   [GitReviewTarget.Commit]: (label) => `Commit ${label}.`,
   [GitReviewTarget.Branch]: (label) => `Branch ${label}, from where it left the project's default branch.`,
   [GitReviewTarget.Range]: (label) => `The changes ${label}.`,
+  [GitReviewTarget.Compare]: (label) =>
+    `Compare the two frozen endpoints ${label} directly. Trace business changes against both versions.`,
 };
 
 const fileLine = (f: DiffFile) =>
@@ -77,6 +82,12 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
 
   function patterns(designId: string | null) {
     return designId === null ? [] : (deps.designs.findDesign(designId)?.excludePatterns ?? []);
+  }
+
+  function evidencePatterns(review: Review) {
+    const current = patterns(review.designId);
+    const fromId = review.comparison?.fromDesignId;
+    return { old: fromId && fromId !== review.designId ? patterns(fromId) : current, new: current };
   }
 
   function toDto(review: Review): GitReviewDTO {
@@ -99,6 +110,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       impactTruncated: review.impactTruncated,
       impacts: review.impacts,
       regressionChecks: review.regressionChecks,
+      comparison: review.comparison,
       status: attempt.status,
       model: attempt.model,
       error: attempt.error,
@@ -138,14 +150,26 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
   /** Resolves the diff, starts the review's attempt and records the review; the caller awaits the start. */
   async function begin(project: ProjectDTO, input: GitReviewTargetInput, focus: string | undefined) {
     const target = await resolveTarget(project.repoPath, project.defaultBranch, input);
-    if (target.files.length === 0) {
+    if (target.files.length === 0 && target.target !== GitReviewTarget.Compare) {
       throw new AppError(ErrorCode.ValidationFailed, 'There are no changes to review', {
         issues: [{ path: ['target'], message: 'no changes' }],
       });
     }
     const selection = await deps.readKnowledge(project.id, target.to, project.repoPath);
+    const comparison =
+      target.target === GitReviewTarget.Compare
+        ? buildGitComparison(
+            await deps.readKnowledge(project.id, target.from, project.repoPath),
+            selection,
+            target.files,
+          )
+        : undefined;
     const screened = screenDesignImpact(selection, target.files);
-    const { context, truncated } = renderDesignImpact(screened);
+    const alignment = comparison ? `${renderGitComparison(comparison, DESIGN_IMPACT_PROMPT_MAX_BYTES / 2)}\n\n` : '';
+    const { context, truncated } = renderDesignImpact(
+      screened,
+      DESIGN_IMPACT_PROMPT_MAX_BYTES - Buffer.byteLength(alignment),
+    );
     const snapshotId = selection.knowledge?.designId ?? null;
     const files =
       target.to === null
@@ -168,7 +192,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       model: reviewer.model ?? settings.get('ai.defaultModel'),
       prompt: renderTemplate(prompts[PromptName.StartGitReview], {
         projectName: project.name,
-        designImpact: context,
+        designImpact: alignment + context,
         scope: SCOPE[target.target](target.label),
         readCommands: readCommands(target),
         files: target.files.map(fileLine).join('\n'),
@@ -194,6 +218,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       designSnapshotSha: selection.knowledge?.sourceSnapshot.commitSha ?? null,
       designMatch: selection.match,
       impactTruncated: truncated,
+      comparison,
       createdAt: clock.now(),
     };
     unit.transact(() => {
@@ -257,9 +282,21 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       if (review === undefined) throw new Error(`Review attempt ${attempt.id} has no review`);
       const { repoPath } = projects.getRecord(review.projectId);
       await validateFindings(repoPath, { from: review.fromSha, to: review.toSha, files: review.files }, input.findings);
-      await validateReviewImpacts(repoPath, review, input, patterns(review.designId));
+      const exclusions = evidencePatterns(review);
+      await validateReviewImpacts(repoPath, review, input, exclusions);
+      const comparison = mergeGitComparison(review.comparison, input.comparison, input.summary);
+      if (input.comparison && review.toSha !== null) {
+        await validateComparisonPaths(
+          repoPath,
+          review.fromSha,
+          review.toSha,
+          review.files,
+          input.comparison,
+          exclusions,
+        );
+      }
       unit.transact(() => {
-        repo.setResult(review.id, input.summary, input.findings, input.impacts, input.regression_checks);
+        repo.setResult(review.id, input.summary, input.findings, input.impacts, input.regression_checks, comparison);
         attempts.markSubmitted(attempt.id);
         publish(review);
       });
@@ -282,7 +319,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
         review,
         path,
         side,
-        patterns(review.designId),
+        evidencePatterns(review),
       );
     },
 

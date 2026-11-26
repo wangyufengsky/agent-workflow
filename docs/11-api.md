@@ -314,7 +314,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/projects/:id/git/merge` | `{ source, target, strategy: merge \| squash, message }` → `{ merged: true, commit }` 或 `{ merged: false, conflictFiles }`（冲突时已中止，目标不变）；以用户身份；目标检出在主工作区时要求它干净（`WORKTREE_DIRTY`），检出在别处 `GIT_BRANCH_IN_USE`，任务分支 `GIT_BRANCH_OWNED_BY_TASK`，critical |
 | POST | `/projects/:id/git/merge-task` | `{ source, target }` → 201 任务（`system.merge_branch` 系统流程，27 §3.6），write，`produces: task` |
 | POST | `/projects/:id/git/pull-requests` | `{ branch, base, title, body }` → 201 `{ url, existed }`：该分支已有打开的 PR 时直接返回它；`HOSTING_NOT_CONFIGURED`，critical |
-| POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（含 `attemptId`，复用尝试详情、会话流 API 与 SSE）（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`）；没有改动 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
+| POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（含 `attemptId`，复用尝试详情、会话流 API 与 SSE）（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`、`{ kind: compare, from, to }`）；除 compare 外没有改动返回 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
 | GET | `/projects/:id/git/reviews?to` | 审查列表，新的在前；`to` 只列该提交的 |
 | GET | `/git/reviews/:reviewId` | 一次审查；`GIT_REVIEW_NOT_FOUND` |
 | PATCH | `/git/reviews/:reviewId/findings/:findingId` | write，传 `{ status }` 更新一条问题的人工处置并返回本次审查。重跑会创建独立审查；找不到问题时返回 404 |
@@ -325,6 +325,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/projects/:id/worktrees/prune` | 删除终态任务遗留的 worktree（保留分支）并 `git worktree prune`；上次退出时中断的移除可在重启后重新清理，返回新的列表 |
 
 `GitReviewDTO` 记录启动时的 `designId`、`designSnapshotSha`、`designMatch`，以及未覆盖的变更路径 `uncoveredPaths`、`impactTruncated`、`impacts`、`regressionChecks`。删除设计只解除设计链接，仍保留当时的匹配度。旧记录按 missing、空影响和空回归清单读取，问题按原顺序补 ID 与 open 状态。
+
+`range` 的起点为两端的 merge-base。`compare` 将两个 ref 各解析一次，使用这一对完整提交 SHA 计算直接 Diff、选择两端快照和读取源码。即使两棵 Git 文件树相同也能发起对比。compare 报告的 `comparison` 包含可选的 `fromDesignId/toDesignId`、`fromMatch/toMatch`、`sections`、`transactions` 和业务 `summary`。双端均为 exact 时计算设计差异，否则按源码核验。证据接口允许读取冻结 Diff 的文件及比较项相应端点引用的路径，重命名按 old/new 侧解析。导出的自包含 HTML 展示相同端点、匹配态与结构化差异。
 
 打开已完成的工作区审查详情时，`worktreeChanged` 表示当前 HEAD、变更清单或可读文本内容是否偏离审查启动时的记录。缺少足够基线或目录不可用时省略该字段。历史列表只读已保存的报告。
 

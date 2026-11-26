@@ -2,19 +2,26 @@ import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { DesignKnowledgeMatch, GitFindingStatus } from '@aw/shared';
+import {
+  DesignKnowledgeMatch,
+  type GitComparisonDTO,
+  GitComparisonStatus,
+  GitFindingStatus,
+  GitReviewTarget,
+} from '@aw/shared';
 import { expect, it } from 'vitest';
 import { openDatabase } from '../../core/db/database.ts';
 import { createGitReviewsRepo } from './git-reviews.repo.ts';
 
 const MIGRATIONS = join(import.meta.dirname, '../../../migrations');
 const DESIGN_GIT_MIGRATION = '0060_design_git_integration';
+const COMPARE_GIT_MIGRATION = '0061_git_review_compare';
 
-async function migrationsBefore(target: string): Promise<void> {
+async function migrationsBefore(target: string, tag: string): Promise<void> {
   const journal: { entries: Array<{ tag: string }> } = JSON.parse(
     await readFile(join(MIGRATIONS, 'meta', '_journal.json'), 'utf8'),
   );
-  const next = journal.entries.findIndex(({ tag }) => tag === DESIGN_GIT_MIGRATION);
+  const next = journal.entries.findIndex((entry) => entry.tag === tag);
   expect(next).toBeGreaterThan(0);
   const entries = journal.entries.slice(0, next);
   await mkdir(join(target, 'meta'), { recursive: true });
@@ -54,7 +61,7 @@ it('迁移 0059 中的审查后，为重复历史问题补齐各自稳定的 ID�
   try {
     const previous = join(root, 'migrations');
     const file = join(root, 'app.db');
-    await migrationsBefore(previous);
+    await migrationsBefore(previous, DESIGN_GIT_MIGRATION);
     openDatabase(file, previous).close();
     seedLegacyReview(file);
 
@@ -92,6 +99,63 @@ it('迁移 0059 中的审查后，为重复历史问题补齐各自稳定的 ID�
       }
     } finally {
       upgraded.close();
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it('升级 0060 数据库后仍可读取历史报告，对比基线与结果可以重新打开', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'aw-compare-migration-'));
+  try {
+    const previous = join(root, 'migrations');
+    const file = join(root, 'app.db');
+    await migrationsBefore(previous, COMPARE_GIT_MIGRATION);
+    openDatabase(file, previous).close();
+    seedLegacyReview(file);
+
+    const baseline: GitComparisonDTO = {
+      fromMatch: DesignKnowledgeMatch.Missing,
+      toMatch: DesignKnowledgeMatch.Reference,
+      toDesignId: 'reference',
+      sections: [{ status: GitComparisonStatus.Modified, title: '入口', fromPath: 'src/index.ts' }],
+      transactions: [],
+      summary: '源码变更',
+    };
+    const upgraded = openDatabase(file, MIGRATIONS);
+    try {
+      const repo = createGitReviewsRepo(upgraded.db);
+      expect(repo.find('old')?.comparison).toBeUndefined();
+      repo.insert({
+        id: 'compare',
+        projectId: 'project',
+        target: GitReviewTarget.Compare,
+        label: 'base → head',
+        fromSha: 'base',
+        toSha: 'head',
+        parent: null,
+        focus: null,
+        attemptId: 'attempt',
+        files: [],
+        comparison: baseline,
+        createdAt: 2,
+      });
+      expect(repo.find('compare')?.comparison).toEqual(baseline);
+      repo.setResult('compare', '完成', []);
+      expect(repo.find('compare')?.comparison).toEqual(baseline);
+      repo.setResult('compare', '完成', [], undefined, undefined, { ...baseline, summary: '已核验' });
+    } finally {
+      upgraded.close();
+    }
+
+    const reopened = openDatabase(file, MIGRATIONS);
+    try {
+      expect(createGitReviewsRepo(reopened.db).find('compare')?.comparison).toEqual({
+        ...baseline,
+        summary: '已核验',
+      });
+    } finally {
+      reopened.close();
     }
   } finally {
     await rm(root, { recursive: true, force: true });
