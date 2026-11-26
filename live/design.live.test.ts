@@ -90,6 +90,8 @@ it.each([
         );
         expect(profiles.length).toBeGreaterThan(0);
         for (const profile of profiles) {
+          // 样例只有纯计算和外部网关调用，没有声明或开启资源事务。
+          expect(profile.boundaries ?? []).toHaveLength(0);
           expect(design.diagrams.find(({ id }) => id === profile.diagramId)?.kind).toBe('business_flow');
         }
       }
