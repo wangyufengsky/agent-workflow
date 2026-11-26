@@ -10,6 +10,7 @@ import {
   McpToolName,
   OPENCODE_AGENT_NAME,
   ThemeId,
+  taskDetailSchema,
 } from '@aw/shared';
 import { type APIRequestContext, type APIResponse, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
@@ -19,6 +20,7 @@ import {
   git,
   patchSettings,
   queueCodeReviewerTurn,
+  queueTurn,
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 import { createPptFromSource } from './ppt-source-journey.ts';
@@ -386,6 +388,48 @@ test('冻结的审查范围、设计下钻、人工处置与离线导出在亮�
     theme: ThemeId.Codex,
     brief: /发版评审/,
   });
+
+  await page.goto(reviewUrl);
+  await page.getByRole('tab', { name: /回归建议/ }).click();
+  const skipped = '验证退款仍读取原单费用';
+  await page.getByRole('checkbox', { name: skipped }).uncheck();
+  await page.getByRole('checkbox', { name: regression }).uncheck();
+  const handoff = page.getByRole('button', { name: '据此发起测试' });
+  await expect(handoff).toBeDisabled();
+  await page.getByRole('checkbox', { name: regression }).check();
+  await handoff.click();
+  const requirement = await page.getByRole('textbox', { name: '需求', exact: true }).inputValue();
+  expect(requirement).toContain(regression);
+  expect(requirement).not.toContain(skipped);
+  expect(requirement).toContain(transactionTitle);
+  expect(requirement).toContain(reviewedSha.slice(0, 7));
+  const scope = page.getByRole('group', { name: '功能测试范围' });
+  const consent = scope.getByRole('checkbox', { name: /授权/ });
+  await expect(consent).not.toBeChecked();
+  await scope.getByRole('textbox', { name: /测试地址/ }).fill('/settlement');
+  await consent.check();
+  await page.screenshot({ path: info.outputPath('regression-task-prefill-light.png'), animations: 'disabled' });
+  await queueTurn(request, project, {}, [{ type: 'callTool', name: 'get_task_context', args: {} }, { type: 'hang' }]);
+  const createdTask = page.waitForResponse(
+    (response) => response.url().endsWith('/api/v1/tasks') && response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: /^开始/ }).click();
+  const task = taskDetailSchema.parse(await responseData(await createdTask));
+  try {
+    await expect(page.getByRole('tab', { name: '测试现场' })).toBeVisible();
+    expect(task.requirement).toBe(requirement);
+    expect(task.workflow.key).toBe('functional_test');
+    await expect
+      .poll(async () => {
+        const running = taskDetailSchema.parse(
+          await responseData(await request.get(`${API_BASE}/tasks/${task.id}`, { headers: AUTH })),
+        );
+        return running.activeAttempts.length;
+      })
+      .toBeGreaterThan(0);
+  } finally {
+    await expect(await request.post(`${API_BASE}/tasks/${task.id}/cancel`, { headers: AUTH, data: {} })).toBeOK();
+  }
 });
 
 test('工作区证据变化后提示历史报告差异，仍可阅读旧版基线', async ({ page, request }) => {

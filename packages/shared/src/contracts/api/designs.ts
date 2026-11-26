@@ -61,7 +61,7 @@ const designImpactCandidateSchema = z.strictObject({
   relPath: designRelativePathSchema.optional(),
   classification: z.enum([GitImpactClassification.Direct, GitImpactClassification.Indirect]),
   distance: count.max(DESIGN_IMPACT_MAX_DEPTH),
-  sourcePath: designRelativePathSchema,
+  sourcePath: id,
 });
 
 export const designImpactLookupSchema = z.strictObject({

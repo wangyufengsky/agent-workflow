@@ -28,7 +28,7 @@ export function designsOperations(service: DesignsService) {
   return [
     implement(listDesignsOp, (input) => service.list(input)),
     implement(getDesignSourceOp, ({ id, fileId }) => service.source(id, fileId)),
-    implement(getDesignStalenessOp, ({ id }) => service.staleness(id)),
+    implement(getDesignStalenessOp, ({ id, commitSha }) => service.staleness(id, commitSha)),
     implement(lookupDesignImpactOp, (input) => service.lookupImpact(input)),
     implement(getDesignOp, ({ id }) => service.get(id)),
     implement(createDesignOp, (input) => service.create(input)),

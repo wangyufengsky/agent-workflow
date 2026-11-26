@@ -6,6 +6,7 @@ import {
   ErrorCode,
   type GitComparisonItemDTO,
   type GitReviewDTO,
+  reviewRegressionChecks,
 } from '@aw/shared';
 
 function invalidMaterial(message: string): never {
@@ -92,8 +93,8 @@ export function renderGitReviewMaterial(review: GitReviewDTO) {
       ...comparison.transactions.map(comparisonLine),
     );
   }
-  const checks = new Set([...review.regressionChecks, ...review.impacts.flatMap((impact) => impact.suggestedChecks)]);
-  if (checks.size > 0) {
+  const checks = reviewRegressionChecks(review);
+  if (checks.length > 0) {
     lines.push('', '## Regression checks', ...Array.from(checks, (check) => `- ${check}`));
   }
   if (review.findings.length > 0) {

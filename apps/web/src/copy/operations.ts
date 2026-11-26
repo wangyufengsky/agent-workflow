@@ -152,6 +152,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.nodes.skip': '跳过步骤',
   'op.tasks.checkEvidence': '查看检查证据',
   'op.tasks.diff': '任务改动',
+  'op.tasks.designImpact': '查询任务设计影响',
   'op.tasks.diffFile': '查看任务的文件改动',
   'op.nodes.diff': '步骤改动',
   'op.nodes.diffFile': '查看步骤的文件改动',

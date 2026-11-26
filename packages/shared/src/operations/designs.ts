@@ -22,6 +22,7 @@ import {
   updateDesignRequestSchema,
   updateDesignTemplateRequestSchema,
 } from '../contracts/api/designs.ts';
+import { fullGitCommitShaSchema } from '../contracts/api/git.ts';
 import { designTemplateSchema } from '../contracts/design/template.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
@@ -60,8 +61,9 @@ export const getDesignStalenessOp = defineOperationContract({
   ...common,
   id: 'designs.staleness',
   title: 'op.designs.staleness',
-  description: 'Check whether project files have changed since this design was scanned',
-  input: byId,
+  description:
+    'Check whether project files have changed since this design was scanned, optionally comparing a specific commit',
+  input: byId.extend({ commitSha: fullGitCommitShaSchema.optional() }),
   output: designStalenessSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/designs/:id/staleness' },

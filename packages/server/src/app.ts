@@ -67,8 +67,10 @@ import { createDeliveryModule } from './modules/delivery/index.ts';
 import {
   createDesignsModule,
   createDesignsRepo,
+  createReadyDesignKnowledgeReader,
   createReviewKnowledgeReader,
   type DesignsService,
+  renderProjectDesignContext,
   syncBuiltinDesignTemplates,
 } from './modules/designs/index.ts';
 import { createDocumentProcessor } from './modules/document-processor/index.ts';
@@ -556,7 +558,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   server.addHook('onReady', () => projectModules.recover());
   server.addHook('preClose', () => projectModules.stopAll());
+  const readyDesignKnowledge = createReadyDesignKnowledgeReader(designsRepo, attempts.service);
+  const projectDesignContext = (projectId: string, targetSha: string | null) =>
+    renderProjectDesignContext(readyDesignKnowledge.read(projectId, targetSha), targetSha);
   const nodes = createNodesModule({
+    projectDesignContext,
     runIdeaCheck: (ctx, changedPaths, signal) =>
       runIdeaAcceptance({ worktreePath: ctx.directory, repoPath: ctx.repoPath, changedPaths, clock, env, signal }),
     runBrowserCase: (attempt, test, signal) => {
@@ -644,6 +650,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     databases: databases.service,
     knowledge: knowledge.service,
     gitReviews: gitReviews.service,
+    readyDesignKnowledge,
     locks,
     dataDir: config.dataDir,
   });
@@ -694,6 +701,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     tasks: tasks.service,
   });
   const initiatives = createInitiativesModule({
+    projectDesignContext,
+    hasReadyDesign: readyDesignKnowledge.hasReadyDesign,
     db: database.db,
     unit,
     events,

@@ -214,6 +214,23 @@
   gap: 8px;
 }
 
+.deliveryDesign {
+  padding: var(--s-3);
+}
+
+.deliveryDesign > summary {
+  cursor: pointer;
+}
+
+.deliveryDesign > ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  padding: 0;
+  margin: var(--s-2) 0 0;
+  list-style: none;
+}
+
 .output {
   max-height: 260px;
   overflow: auto;

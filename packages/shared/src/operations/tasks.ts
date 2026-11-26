@@ -21,6 +21,7 @@ import {
   planSchema,
   planSummarySchema,
   saveDraftPlanRequestSchema,
+  taskDesignImpactSchema,
   taskDetailSchema,
   taskEventSchema,
   taskSummarySchema,
@@ -392,6 +393,18 @@ export const taskDiffOp = defineOperationContract({
   output: diffSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/tasks/:id/diff' },
+});
+
+export const taskDesignImpactOp = defineOperationContract({
+  ...common,
+  id: 'tasks.designImpact',
+  title: 'op.tasks.designImpact',
+  description: 'Screen the files changed by the task for static associations in a ready project design',
+  input: byId,
+  output: taskDesignImpactSchema.nullable(),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/design-impact' },
+  refs: { id: InputRef.Task },
 });
 
 export const taskDiffFileOp = defineOperationContract({

@@ -23,6 +23,7 @@ export type NodesServiceDeps = {
   settings: SettingsService;
   prompts: Prompts;
   locks: RepoLocks;
+  projectDesignContext: (projectId: string, targetSha: string | null) => string;
   runIdeaCheck: (
     ctx: NodeRunContext,
     changedPaths: string[],
@@ -38,6 +39,7 @@ export type NodeRunContext = {
   projectId: string;
   taskKey: string;
   taskTitle: string;
+  workflowKey: string;
   browserTest?: boolean;
   functionalTest?: boolean;
   browserCase?: BrowserCase;

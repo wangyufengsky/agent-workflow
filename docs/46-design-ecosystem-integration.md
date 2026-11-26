@@ -88,7 +88,7 @@ flowchart LR
 ### 4.1 任务交付卡（Delivery）零 AI 影响预览与合入提醒
 
 - **交付前（零 AI）**：在任务详情交付区查看任务 worktree Diff 时，新增轻量只读查询 `tasks.designImpact`（复用 `screenDesignImpact`，零 AI、不新增表），若该项目存在已就绪设计，在交付卡折叠区展示「设计影响初筛：命中 M 个模块 / K 条交易（`exact`/`reference`）」，支持点击跳项目设计节点，帮助合并前最后把关。
-- **合并后（零 AI）**：任务合并进主分支成功后，若项目存在已就绪设计，调用一次 `designs.staleness`，若返回 `stale` 则在交付完成卡上展示一条轻量提示：「项目设计有 N 个文件变动（影响 M 章）· [打开项目设计去增量更新]」，不自动启动 AI。
+- **合并后（零 AI）**：任务合并进主分支成功后，若项目存在已就绪设计，调用一次 `designs.staleness`。项目根工作区位于其他分支时，按本次合入的提交检查。若返回 `stale`，交付完成卡展示文件变动数、受影响章节数和打开项目设计的入口。根工作区位于其他分支时，提示切换到合入分支后再增量更新。检查过期只读取数据。
 
 ### 4.2 需求计划（Initiatives）与详细设计（`detailed_design`）注入知识摘要
 
@@ -136,6 +136,6 @@ flowchart LR
 
 - [x] **Phase A**：助手在只读场景下调用 `designs.staleness` / `designs.lookupImpact` 不弹写确认；发起 `compare` 或 `incrementalUpdate` 正确走确认卡；助手无法调用 `gitReviews.updateFindingStatus`。
 - [x] **Phase B**：从项目设计与双版本对比报告均可一键创建 PPT，生成后更新项目设计不影响已冻结的 PPT 素材内容。
-- [ ] **Phase C**：任务交付页展示零 AI 影响初筛且不消耗模型额度；合入后展示过期提示且不自动触发 AI；回归建议预填功能测试任务可正常启动。
+- [x] **Phase C**：任务交付页展示零 AI 影响初筛且不消耗模型额度；合入后展示过期提示且不自动触发 AI；回归建议预填功能测试任务可正常启动。
 - [ ] **Phase D**：绑定项目的知识问答在存在设计时注入受控预算摘要，无设计时行为不变。
 - [ ] **Phase E**：`data-explorer` 在有/无只读数据库连接两种环境下均可正常生成设计，修改 DDL/SQL 后 Git 审查能追溯到受影响表与交易。

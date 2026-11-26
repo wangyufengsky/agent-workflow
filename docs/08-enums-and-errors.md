@@ -718,7 +718,7 @@ class AppError extends Error {
 | `GitImpactTargetKind` | `section` 章节或模块、`submodule` 子模块、`transaction` 交易、`file` 文件、`symbol` 符号 |
 | `GitReviewEvidenceState` | `available` 有对应版本源码、`changed` 工作区内容已变化、`unavailable` 证据无法读取或核对 |
 
-证据沿用 `DesignEvidenceClass`，设计版本匹配沿用 `DesignKnowledgeMatch`。设计快查一次接受最多 50 条项目相对路径。程序初筛上限为 3 层（`DESIGN_IMPACT_MAX_DEPTH`）、60 个节点（`DESIGN_IMPACT_MAX_ITEMS`），注入上下文上限为 16 KiB（`DESIGN_IMPACT_PROMPT_MAX_BYTES`）。一次提交最多包含 60 项业务影响（`GIT_REVIEW_IMPACTS_MAX`）与 30 条回归建议（`GIT_REVIEW_REGRESSION_CHECKS_MAX`）。
+证据沿用 `DesignEvidenceClass`，设计版本匹配沿用 `DesignKnowledgeMatch`。设计快查一次接受最多 50 条项目相对路径。程序初筛上限为 3 层（`DESIGN_IMPACT_MAX_DEPTH`）、60 个节点（`DESIGN_IMPACT_MAX_ITEMS`），注入上下文上限为 16 KiB（`DESIGN_IMPACT_PROMPT_MAX_BYTES`）。需求拆解及内置详细设计流程的项目设计目录按 UTF-8 限制为 16 KiB（`PROJECT_DESIGN_CONTEXT_MAX_BYTES`，含基线、覆盖与截断标记）。一次提交最多包含 60 项业务影响（`GIT_REVIEW_IMPACTS_MAX`）与 30 条回归建议（`GIT_REVIEW_REGRESSION_CHECKS_MAX`）。
 
 ## 项目设计（44）
 

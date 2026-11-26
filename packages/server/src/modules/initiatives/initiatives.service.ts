@@ -54,6 +54,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import { runGit } from '../git/index.ts';
 import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { RolesService } from '../roles/index.ts';
@@ -93,6 +94,8 @@ export type InitiativesServiceDeps = {
   projects: ProjectsService;
   roles: RolesService;
   prompts: Prompts;
+  projectDesignContext: (projectId: string, targetSha: string | null) => string;
+  hasReadyDesign: (projectId: string) => boolean;
 };
 
 const firstLine = (text: string) => text.trim().split('\n')[0]?.trim() ?? '';
@@ -122,6 +125,8 @@ export function createInitiativesService({
   projects,
   roles,
   prompts,
+  projectDesignContext,
+  hasReadyDesign,
 }: InitiativesServiceDeps) {
   const repo = createInitiativesRepo(db);
   const templates = createInitiativeTemplates(repo, unit, clock, (draft) => {
@@ -537,12 +542,22 @@ export function createInitiativesService({
   ): Promise<void> {
     attempts.requireReady();
     assertIdle(initiative.id);
+    const project = projects.getRecord(initiative.projectId);
+    let designContext = '';
+    if (mode === InitiativeRunMode.Breakdown && hasReadyDesign(project.id)) {
+      const { exitCode, stdout } = await runGit(
+        ['rev-parse', '--verify', '--quiet', `refs/heads/${initiative.baseBranch}^{commit}`],
+        { cwd: project.repoPath, okExitCodes: [0, 1] },
+      );
+      get(initiative.id);
+      assertIdle(initiative.id);
+      designContext = projectDesignContext(project.id, exitCode === 0 ? stdout.trim() : null);
+    }
     const runs = repo.runs(initiative.id);
     const previous = runs.at(-1);
     const planner = roles.getByKey(BuiltinRoleKey.Planner);
     const model = planner.model ?? settings.get('ai.defaultModel');
     const attemptId = randomUUID();
-    const project = projects.getRecord(initiative.projectId);
     const first = () =>
       startMessage(prompts, {
         projectName: project.name,
@@ -550,7 +565,7 @@ export function createInitiativesService({
         requirement: initiative.requirement,
         attachments: attachments.promptSection(attachments.listByOwner(owner(initiative.id)), MCP_TOOL_PREFIX),
         workflows: allowedWorkflowsOf(initiative),
-      });
+      }) + designContext;
     const started = attempts.dispatchObjectAttempt({
       purpose: SessionPurpose.Initiative,
       previousId: previous?.attemptId,

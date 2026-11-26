@@ -119,10 +119,10 @@ export function createDesignsService({
   }
   return {
     ...queries,
-    staleness(id: string) {
+    staleness(id: string, commitSha?: string) {
       const design = designById(id);
       const repoPath = design.projectId === null ? null : projects.getRecord(design.projectId).repoPath;
-      return readDesignStaleness(repo, design, repoPath);
+      return readDesignStaleness(repo, design, repoPath, commitSha);
     },
     lookupImpact({ id, paths }: LookupDesignImpactRequest): DesignImpactLookupDTO {
       const design = designById(id);

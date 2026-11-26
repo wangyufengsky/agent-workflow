@@ -30,10 +30,10 @@ import { queryKeys } from '../../api/query-keys.ts';
 export const designQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.design(id), queryFn: () => callOperation(getDesignOp, { id }) });
 
-export const designStalenessQuery = (id: string) =>
+export const designStalenessQuery = (id: string, commitSha?: string) =>
   queryOptions({
-    queryKey: [...queryKeys.design(id), 'staleness'],
-    queryFn: () => callOperation(getDesignStalenessOp, { id }),
+    queryKey: [...queryKeys.design(id), 'staleness', ...(commitSha === undefined ? [] : [commitSha])],
+    queryFn: () => callOperation(getDesignStalenessOp, { id, commitSha }),
   });
 
 export const designSourceQuery = (id: string, fileId: string) =>

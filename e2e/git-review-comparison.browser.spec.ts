@@ -133,6 +133,13 @@ test('从分支页打开分叉端点对比，查看冻结源码并离线阅读�
   expect(new URL(page.url()).searchParams.get('review')).not.toBe(id);
   await page.getByRole('combobox', { name: 'AI 审查' }).selectOption(review.id);
   await expect(view).toContainText(summary);
+  await page.getByRole('tab', { name: /回归建议/ }).click();
+  await page.getByRole('button', { name: '据此发起测试' }).click();
+  await expect(page.getByRole('group', { name: '功能测试范围' })).toBeVisible();
+  const requirement = await page.getByRole('textbox', { name: '需求', exact: true }).inputValue();
+  expect(requirement).toContain('验证跨版本退款读取原单的计费额度');
+  expect(requirement).toContain(from.slice(0, 7));
+  expect(requirement).toContain(to.slice(0, 7));
 });
 
 async function loadBody(response: APIResponse) {

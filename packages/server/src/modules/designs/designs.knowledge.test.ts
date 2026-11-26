@@ -1,12 +1,15 @@
 import {
   DesignDiagramKind,
   DesignEvidenceClass,
+  DesignKnowledgeMatch,
   DesignReviewState,
   DesignSectionKind,
   type DesignSubmodule,
   type DesignTransaction,
+  PROJECT_DESIGN_CONTEXT_MAX_BYTES,
 } from '@aw/shared';
 import { expect, it } from 'vitest';
+import { renderProjectDesignContext } from './designs.context.ts';
 import { buildProjectKnowledgeIndex } from './designs.knowledge.ts';
 import type { DesignDiagramRecord, DesignFile, DesignSection } from './designs.repo.ts';
 
@@ -38,6 +41,64 @@ function section(id: string, scopePaths: string[], blocks: DesignSection['blocks
     updatedAt: 1,
   };
 }
+
+it('设计目录在 UTF-8 预算内保留基线、覆盖、四类条目和截断说明', () => {
+  const path = 'src/api.ts';
+  const evidence = { evidenceClass: DesignEvidenceClass.Static, relPath: path, lineStart: 2, lineEnd: 3 };
+  const seed = section(
+    'first',
+    ['src'],
+    [
+      {
+        type: 'submodule',
+        id: 'handler',
+        title: '请求处理器',
+        summary: '不传入的正文',
+        files: [path],
+        behaviors: [{ title: '读取', markdown: '不传入的正文', evidence: [evidence] }],
+      },
+      { type: 'transaction', title: '发起付款', diagramId: 'flow', evidence: [evidence] },
+    ],
+  );
+  const flow: DesignDiagramRecord = {
+    id: 'flow',
+    designId: 'design',
+    sectionId: seed.id,
+    kind: DesignDiagramKind.BusinessFlow,
+    title: '付款流转',
+    nodes: [
+      { id: 'entry', label: '入口' },
+      { id: 'exit', label: '出口' },
+    ],
+    edges: [
+      {
+        id: 'call',
+        from: 'entry',
+        to: 'exit',
+        kind: '调用',
+        evidenceClass: DesignEvidenceClass.Static,
+        evidencePath: path,
+        lineStart: 2,
+        lineEnd: 3,
+      },
+    ],
+    updatedAt: 1,
+  };
+  const extra = Array.from({ length: 100 }, (_, i) =>
+    section(`section-${i}`, ['src'], [{ type: 'markdown', markdown: '概要' }]),
+  ).map((item) => ({ ...item, title: '超长章目录'.repeat(20) }));
+  const knowledge = buildProjectKnowledgeIndex({ id: 'design', sourceSnapshot }, [seed, ...extra], [], [flow]);
+  const prompt = renderProjectDesignContext({ match: DesignKnowledgeMatch.Exact, knowledge }, sourceSnapshot.commitSha);
+  expect(Buffer.byteLength(prompt)).toBeLessThanOrEqual(PROJECT_DESIGN_CONTEXT_MAX_BYTES);
+  expect(prompt).toContain(`"baselineSha":"${sourceSnapshot.commitSha}"`);
+  expect(prompt).toContain('"coverage":{"doneSections":101,"totalSections":101}');
+  expect(prompt).toContain('"section":"first"');
+  expect(prompt).toContain('"module":"请求处理器"');
+  expect(prompt).toContain('"transaction":"发起付款"');
+  expect(prompt).toContain('"dependency":"调用","section":"first","from":"入口","to":"出口"');
+  expect(prompt).not.toContain('不传入的正文');
+  expect(prompt).toMatch(/目录摘要已截断。\n<\/project-design-context>$/);
+});
 
 it('按稳定键保留图证据、同名符号和跨章节的文件引用', () => {
   const relPath = 'src/api.ts';

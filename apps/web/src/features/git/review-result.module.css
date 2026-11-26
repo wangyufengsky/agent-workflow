@@ -128,13 +128,11 @@
   padding: var(--s-3);
 }
 
-.checks ul,
 .suggestions {
   margin: 0;
   padding-inline-start: var(--s-5);
 }
 
-.checks li + li,
 .suggestions li + li {
   margin-top: var(--s-2);
 }
