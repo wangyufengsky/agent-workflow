@@ -137,5 +137,5 @@ flowchart LR
 - [x] **Phase A**：助手在只读场景下调用 `designs.staleness` / `designs.lookupImpact` 不弹写确认；发起 `compare` 或 `incrementalUpdate` 正确走确认卡；助手无法调用 `gitReviews.updateFindingStatus`。
 - [x] **Phase B**：从项目设计与双版本对比报告均可一键创建 PPT，生成后更新项目设计不影响已冻结的 PPT 素材内容。
 - [x] **Phase C**：任务交付页展示零 AI 影响初筛且不消耗模型额度；合入后展示过期提示且不自动触发 AI；回归建议预填功能测试任务可正常启动。
-- [ ] **Phase D**：绑定项目的知识问答在存在设计时注入受控预算摘要，无设计时行为不变。
+- [x] **Phase D**：绑定项目的知识问答在存在设计时注入受控预算摘要，无设计时行为不变。
 - [ ] **Phase E**：`data-explorer` 在有/无只读数据库连接两种环境下均可正常生成设计，修改 DDL/SQL 后 Git 审查能追溯到受影响表与交易。

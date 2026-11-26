@@ -594,6 +594,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     locks,
   });
   const knowledge = createKnowledgeModule({
+    projectDesignContext: (projectId) => projectDesignContext(projectId, null),
     db: database.db,
     unit,
     clock,

@@ -1,18 +1,21 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
+import { getKnowledgeOp, ThemeId, TranscriptEntryKind, transcriptPageSchema } from '@aw/shared';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
   appTool,
   createProject,
   type FakeStep,
+  git,
   patchSettings,
   queueAssistantTurn,
   queueResearchTurn,
   queueTurn,
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
+import { readyModuleDesign } from './ready-design-fixture.ts';
 
 // J12 (K-09): a question about a project, its research, an answer with citations, the cited source, a follow-up and
 // the history. The researcher's turns are played by FakeOpencode in the project repository. The file name sorts after
@@ -40,20 +43,29 @@ const file = (path: string, start: number, end: number) => ({
 
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
-test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原文 → 续问 → 对话记录', async ({ page, request }) => {
+test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原文 → 续问 → 对话记录', async ({ page, request }, info) => {
   const project = await createProject(request, null);
   mkdirSync(join(project.repoPath, 'src'));
   writeFileSync(join(project.repoPath, 'src/refund.ts'), REFUND);
   writeFileSync(join(project.repoPath, 'README.md'), '# Shop\n\nRefunds are rounded to cents.\n');
+  git(project.repoPath, 'add', 'src/refund.ts', 'README.md');
+  git(project.repoPath, 'commit', '-m', 'Add refund rules and implementation');
+  const design = await readyModuleDesign(request, project, {
+    path: 'src/refund.ts',
+    title: '退款清算模块',
+    summary: '退款金额先扣除手续费，再按分取整。',
+  });
+  const designRuns = (await design.read()).runs.map(({ id }) => id);
   await queueResearchTurn(request, project, [
     { type: 'tool', tool: 'grep', input: { pattern: 'Math.round' } },
     { type: 'tool', tool: 'read', input: { filePath: join(project.repoPath, 'src/refund.ts') } },
-    answer('退款在 `refund()` 中四舍五入到分 [1]，README 也这样说明 [2]。', [
+    answer('退款清算模块的 `refund()` 将净额四舍五入到分 [1]，README 也这样说明 [2]。', [
       file('src/refund.ts', 2, 3),
       file('README.md', 3, 3),
     ]),
   ]);
 
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`/knowledge?projectId=${project.id}`);
   await expect(page.getByRole('heading', { name: '关于这个项目，你想了解什么？' })).toBeVisible();
   await expect(page.getByText(/将从 代码 · 文档 中查找依据 · 网络检索关闭/)).toBeVisible();
@@ -69,7 +81,21 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   await expect(page.getByRole('button', { name: '问答权限 · 帮我批准' })).toBeVisible();
   const turn = page.getByTestId('knowledge-turn').first();
   await expect(turn).toContainText('退款金额在哪里四舍五入？');
+  await expect(turn).toContainText('退款清算模块的 refund() 将净额四舍五入到分');
   await expect(turn.getByRole('button', { name: '引用 1' })).toBeVisible();
+  const conversationId = new URL(page.url()).pathname.split('/').at(-1);
+  const detail = await request.get(`${API_BASE}/knowledge/conversations/${conversationId}`, { headers: AUTH });
+  await expect(detail).toBeOK();
+  const [firstTurn] = getKnowledgeOp.output.parse(await detail.json()).turns;
+  if (firstTurn === undefined) throw new Error('Missing first knowledge turn');
+  const transcript = await request.get(`${API_BASE}/attempts/${firstTurn.attempt.id}/transcript`, { headers: AUTH });
+  await expect(transcript).toBeOK();
+  const firstMessage = transcriptPageSchema
+    .parse(await transcript.json())
+    .entries.find(({ kind }) => kind === TranscriptEntryKind.UserMessage);
+  expect(firstMessage?.data.text).toContain('<project-design-context>');
+  expect(firstMessage?.data.text).toContain('退款清算模块');
+  expect(firstMessage?.data.text).toContain(git(project.repoPath, 'rev-parse', 'HEAD'));
   // Folded once answered: one read; open shows what the researcher did, the calls in a row folded (25 §4.3).
   const process = turn.getByTestId('research-process');
   const toggle = process.getByRole('button', { name: /研究过程/ });
@@ -87,6 +113,16 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   await expect(lines.locator('[data-cited="true"]')).toHaveCount(2);
   await expect(lines.locator('[data-cited="true"]').last()).toContainText('Math.round(net * 100) / 100');
   await expect(turn.getByRole('button', { name: '引用 1' })).toHaveAttribute('aria-pressed', 'true');
+  for (const [theme, tone] of [
+    [ThemeId.Codex, 'light'],
+    [ThemeId.Default, 'dark'],
+  ] as const) {
+    await patchSettings(request, { 'ui.theme': theme });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(panel).toBeVisible();
+    await expect(lines.locator('[data-cited="true"]').last()).toContainText('Math.round(net * 100) / 100');
+    await page.screenshot({ path: info.outputPath(`knowledge-design-citation-${tone}.png`), animations: 'disabled' });
+  }
   await panel.getByRole('button', { name: '下一处' }).click();
   await expect(panel).toContainText('README.md · 第 3 行');
   await expect(lines.locator('[data-cited="true"]')).toHaveText(/Refunds are rounded to cents\./);
@@ -119,6 +155,7 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   await expect(row).toContainText('1 处引用');
   await row.click();
   await expect(page.getByTestId('knowledge-turn')).toHaveCount(2);
+  expect((await design.read()).runs.map(({ id }) => id)).toEqual(designRuns);
 });
 
 test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引用看原文 → 卡片打开知识问答对话', async ({ page, request }) => {

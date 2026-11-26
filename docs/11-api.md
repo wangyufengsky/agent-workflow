@@ -450,7 +450,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- | --- | --- |
 | GET | `/knowledge/conversations?projectId&query&limit&cursor` | `knowledge.list` | read | `{ items: KnowledgeConversationSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配问题与回答 |
 | GET | `/knowledge/conversations/:id` | `knowledge.get` | read | `KnowledgeConversationDTO`（`permissionMode`、全部轮次、状态、回答、引用、`awaitingInput`） |
-| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources, model?, permissionMode? }`（界面省略权限时为 `ask`；`model`：`provider/model`；`null` 为 opencode 默认；省略为 `ai.defaultModel`，D67 ④） → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
+| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources, model?, permissionMode? }`（界面省略权限时为 `ask`；`model`：`provider/model`；`null` 为 opencode 默认；省略为 `ai.defaultModel`，D67 ④） → 201 详情。首轮在允许代码或文档来源且项目已有就绪设计时附带 16 KiB 以内的目录，并标明快照基线、覆盖及参考匹配。追问沿用已有上下文。opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
 | POST | `/knowledge/conversations/:id/turns` | `knowledge.followUp` | read | `{ question, model? }`（可换模型）；上一轮研究中 409 `KNOWLEDGE_CONVERSATION_BUSY` |
 | PATCH | `/knowledge/conversations/:id/permission-mode` | `knowledge.setPermissionMode` | critical | `{ permissionMode }` → 更新后的 `KnowledgeConversationDTO`；仅界面调用；可以在研究中修改，之后的新权限请求采用新档位，现有待审批项继续等待处理。研究员的只读限制与资料范围继续生效 |
 | POST | `/knowledge/conversations/:id/stop` | `knowledge.stop` | write | 中止研究中的一轮；已结束 409 `STATE_TRANSITION_INVALID` |

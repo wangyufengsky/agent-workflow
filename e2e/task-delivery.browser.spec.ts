@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DesignSectionKind, DesignStatus, getDesignOp, McpToolName, OPENCODE_AGENT_NAME, ThemeId } from '@aw/shared';
+import { ThemeId } from '@aw/shared';
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -15,6 +15,7 @@ import {
   submitResult,
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
+import { readyModuleDesign } from './ready-design-fixture.ts';
 
 // Journeys J5 and J6 (07 §5): delivery from the result card, with FakeOpencode playing the AI sessions.
 
@@ -52,51 +53,11 @@ async function greetingDesign(request: APIRequestContext, project: E2EProject) {
   git(project.repoPath, 'add', 'greet.ts');
   git(project.repoPath, 'commit', '-m', 'Add greeting');
 
-  const created = await request.post(`${API_BASE}/designs`, {
-    headers: AUTH,
-    data: { projectId: project.id, aiReviewEnabled: false },
+  return readyModuleDesign(request, project, {
+    path: 'greet.ts',
+    title: greetingModule,
+    summary: '供界面显示默认问候语。',
   });
-  await expect(created).toBeOK();
-  const { id, title } = getDesignOp.output.parse(await created.json());
-  const url = `${API_BASE}/designs/${id}`;
-  const outline = await request.put(`${url}/outline`, {
-    headers: AUTH,
-    data: {
-      sections: [{ kind: DesignSectionKind.Module, title: greetingModule, scopePaths: ['greet.ts'], selected: true }],
-    },
-  });
-  await expect(outline).toBeOK();
-  const [section] = getDesignOp.output.parse(await outline.json()).sections;
-  if (section === undefined) throw new Error('Missing greeting section');
-  await expect(
-    await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
-      headers: AUTH,
-      data: {
-        match: { title, agent: OPENCODE_AGENT_NAME.designer },
-        steps: [
-          {
-            type: 'callTool',
-            name: McpToolName.SubmitDesignSection,
-            args: {
-              sectionId: section.id,
-              summary: '供界面显示默认问候语。',
-              blocks: [{ type: 'markdown', markdown: '供界面显示默认问候语。' }],
-              files: [{ relPath: 'greet.ts', responsibility: '返回默认问候语', symbols: [] }],
-              diagrams: [],
-            },
-          },
-        ],
-      },
-    }),
-  ).toBeOK();
-  await expect(await request.post(`${url}/generate`, { headers: AUTH, data: {} })).toBeOK();
-  const read = async () => {
-    const response = await request.get(url, { headers: AUTH });
-    await expect(response).toBeOK();
-    return getDesignOp.output.parse(await response.json());
-  };
-  await expect.poll(async () => (await read()).status).toBe(DesignStatus.Ready);
-  return { id, read };
 }
 
 test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理、任务已完成', async ({ page, request }, info) => {
