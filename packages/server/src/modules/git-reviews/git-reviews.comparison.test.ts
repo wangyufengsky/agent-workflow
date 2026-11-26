@@ -7,9 +7,11 @@ import {
   type DesignTransaction,
   DiffFileStatus,
   ErrorCode,
+  type GitComparisonItemDTO,
   GitComparisonStatus,
+  gitComparisonItemSchema,
 } from '@aw/shared';
-import { expect, it } from 'vitest';
+import { assert, expect, it } from 'vitest';
 import { buildProjectKnowledgeIndex, type ReviewKnowledgeSelection } from '../designs/index.ts';
 import { buildGitComparison, mergeGitComparison, renderGitComparison } from './git-reviews.comparison.ts';
 
@@ -320,4 +322,33 @@ it('实体的双侧源码链接使用同一路径或 Git 确认改名，避免�
       toPath: 'cart/new.ts',
     },
   ]);
+});
+
+it('参考设计的源码示例能直接提交，错误提交能定位到应补的路径和不应引用的 ID', () => {
+  const ref = selection('reference', [section('fee-section', '手续费', 'fees')], DesignKnowledgeMatch.Reference);
+  const baseline = buildGitComparison(ref, ref, []);
+  const prompt = renderGitComparison(baseline);
+  const example = prompt.split('\n').find((line) => line.startsWith('{"status":"modified"'));
+  assert.isDefined(example);
+  const source = gitComparisonItemSchema.parse(JSON.parse(example));
+  expect(source).toMatchObject({ status: 'modified', fromPath: expect.any(String), toPath: expect.any(String) });
+  const submit = (row: GitComparisonItemDTO) => mergeGitComparison(baseline, { ...baseline, sections: [row] }, '完成');
+  expect(submit(source)?.sections).toEqual([source]);
+
+  for (const [row, hint] of [
+    [{ status: 'modified', title: '手续费' }, /fromPath.*toPath/],
+    [{ status: 'uncertain', title: '手续费' }, /fromPath or toPath/],
+    [{ ...source, fromId: 'fee-section', toId: 'fee-section' }, /omit fromId and toId/],
+  ] as const) {
+    expect(() => submit(row)).toThrow(
+      expect.objectContaining({
+        code: ErrorCode.ValidationFailed,
+        details: {
+          issues: [
+            expect.objectContaining({ path: ['comparison', 'sections', 0], message: expect.stringMatching(hint) }),
+          ],
+        },
+      }),
+    );
+  }
 });
