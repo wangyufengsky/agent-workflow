@@ -15,6 +15,7 @@ import {
   InboxStatus,
   PermissionDecision,
   resolveInboxOp,
+  reviseDesignOutlineOp,
   ServerEventType,
   TRANSACTION_EXPLORER_KEY,
   updateDesignOutlineOp,
@@ -129,3 +130,51 @@ it.each([
     }
   },
 );
+
+it('@live AI plans the refund project and generates its chosen chapters without manual confirmation', async () => {
+  const t = await createTestApp({ realOpencode: true });
+  try {
+    await t.app.start(t.port);
+    const { body: runtime } = await t.call(getRuntimeOp, {});
+    expect(runtime.status, runtime.status === 'ready' ? undefined : JSON.stringify(runtime)).toBe('ready');
+    const repo = await createTestRepo();
+    await cp(new URL('./fixtures/design-service/', import.meta.url), repo.path, { recursive: true });
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+    const { body: draft } = await t.call(createDesignOp, {
+      projectId: project.id,
+      templateKey: TRANSACTION_EXPLORER_KEY,
+      depth: DesignDepth.Quick,
+      aiReviewEnabled: false,
+    });
+    t.app.events.subscribe((event) => {
+      if (
+        event.type === ServerEventType.InboxUpdated &&
+        event.data.item.kind === InboxKind.Permission &&
+        event.data.item.status === InboxStatus.Open
+      )
+        void t.call(resolveInboxOp, { id: event.data.item.id, response: { decision: PermissionDecision.Reject } });
+    });
+    const finished = waitForEvent(
+      t.app.events,
+      ServerEventType.DesignUpdated,
+      ({ designId }) => {
+        if (designId !== draft.id) return false;
+        const design = t.app.services.designs.get(designId);
+        return design.status === DesignStatus.Ready || design.runs.at(-1)?.attempt.error != null;
+      },
+      20 * 60_000,
+    );
+    const [started] = await Promise.all([
+      t.call(reviseDesignOutlineOp, { id: draft.id, generateAfterPlanning: true, model: TEST_MODEL }),
+      finished,
+    ]);
+    expect(started.status).toBe(200);
+    const { body: result } = await t.call(getDesignOp, { id: draft.id });
+    expect(result.status, JSON.stringify(result.runs.map(({ attempt }) => attempt.error))).toBe(DesignStatus.Ready);
+    expect(result.doneSections).toBeGreaterThan(0);
+    expect(result.runs.map(({ kind }) => kind)).toEqual(['outline', ...result.sections.map(() => 'generate')]);
+    expect(result.sections.some(({ blocks }) => blocks?.some(({ type }) => type === 'transaction'))).toBe(true);
+  } finally {
+    await t.close();
+  }
+});

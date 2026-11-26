@@ -192,6 +192,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   }
 
   function usesSessionCommands(attempt: Attempt, agent: string): boolean {
+    if (isDesignAttemptKind(attempt.kind)) return agent === OPENCODE_AGENT_NAME[SessionAgent.Designer];
     return (
       attempt.taskId !== null &&
       attempt.kind === AttemptKind.Execute &&

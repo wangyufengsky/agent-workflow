@@ -273,6 +273,8 @@ export const RECALL_PAGE_MAX_CHARS = 4096;
 /** 项目设计的扫描、提交与图表上限（44 §9）。 */
 export const DESIGN_TITLE_MAX_CHARS = 160;
 export const DESIGN_MAX_SECTIONS = 64;
+/** 每个复审会话最多读取的完整章节数。 */
+export const DESIGN_REVIEW_BATCH_SIZE = 4;
 export const DESIGN_INSTRUCTION_MAX_CHARS = 8000;
 export const DESIGN_SCAN_MAX_FILE_BYTES = 512 * 1024;
 export const DESIGN_DIAGRAM_MAX_NODES = 100;

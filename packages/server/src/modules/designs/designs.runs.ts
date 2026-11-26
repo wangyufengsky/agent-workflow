@@ -4,6 +4,8 @@ import {
   AppError,
   AttemptKind,
   AttemptStatus,
+  DESIGN_MAX_SECTIONS,
+  DESIGN_REVIEW_BATCH_SIZE,
   type DesignAttemptKind,
   ErrorCode,
   isAttemptActive,
@@ -18,6 +20,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { planningInventory } from './designs.planning.ts';
 import type { createDesignsRepo, DesignRun, DesignSection, ProjectDesign } from './designs.repo.ts';
 
 type Dependencies = {
@@ -36,7 +39,10 @@ type Dependencies = {
 
 type ModelInput = { model?: string | null | undefined };
 type GenerateInput = ModelInput & { sectionId?: string | undefined };
-type ReviseOutlineInput = ModelInput & { instruction?: string | undefined };
+type ReviseOutlineInput = ModelInput & {
+  instruction?: string | undefined;
+  generateAfterPlanning?: boolean | undefined;
+};
 type ReviseSectionInput = ModelInput & {
   instruction: string;
   focusPath?: string | undefined;
@@ -45,14 +51,17 @@ type ReviseSectionInput = ModelInput & {
 };
 type PromptSection = Omit<DesignSection, 'reviewState' | 'reviewNotes' | 'previous' | 'updatedAt' | 'designId'>;
 type GenerationPlan = ReadonlySet<string>;
-type FollowUp = { kind: 'generate'; plan: GenerationPlan } | { kind: 'review' };
+type FollowUp =
+  | { kind: 'planned' }
+  | { kind: 'generate'; plan: GenerationPlan }
+  | { kind: 'review'; sectionIds: readonly string[] };
 type Work = {
   kind: DesignAttemptKind;
   targets: DesignSection[];
   prompt: string;
   instruction?: string | undefined;
   model: string | null;
-  generation?: GenerationPlan;
+  followUp?: FollowUp;
 };
 
 const promptSection = ({
@@ -85,7 +94,7 @@ function invalidState(message: string): never {
 export function createDesignRuns({ repo, attempts, projects, unit, clock, settings, prompts, log }: Dependencies) {
   const handoffs = new Map<string, DesignRun>();
   // 只记录本次请求的章节。重启后从已保存章节续作，不恢复未完成的内存队列。
-  const generations = new Map<string, GenerationPlan>();
+  const followUps = new Map<string, FollowUp>();
   const stopping = new Set<string>();
   let closed = false;
 
@@ -149,7 +158,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
             })),
           }
         : {}),
-      authorizedFiles: files,
+      ...(title === PromptName.DesignOutline ? planningInventory(files) : { authorizedFiles: files }),
     };
     return `${prompts[title]}\n\n本轮分析数据：\n${JSON.stringify(context)}`;
   }
@@ -200,7 +209,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
           ? { outlineConfirmedAt: now }
           : {}),
       });
-      if (work.generation !== undefined) generations.set(id, work.generation);
+      if (work.followUp !== undefined) followUps.set(id, work.followUp);
       publish(design.id);
       return started;
     });
@@ -211,17 +220,20 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
       kind: AttemptKind.DesignGenerate,
       targets: [target],
       model,
-      generation: plan,
+      followUp: { kind: 'generate', plan },
       prompt: `${promptFor(design, PromptName.DesignSection, [target])}\n本轮目标章节 ID：${target.id}`,
     });
   }
 
-  function reviewWork(design: ProjectDesign, targets: DesignSection[], model: string | null) {
+  function reviewWork(design: ProjectDesign, sections: DesignSection[], model: string | null) {
+    const targets = sections.slice(0, DESIGN_REVIEW_BATCH_SIZE);
+    const remaining = sections.slice(DESIGN_REVIEW_BATCH_SIZE);
     const ids = new Set(targets.map(({ id }) => id));
     const files = repo.listFiles(design.id).filter(({ sectionId }) => sectionId !== null && ids.has(sectionId));
     const diagrams = repo.listDiagrams(design.id).filter(({ sectionId }) => ids.has(sectionId));
     return run(design, {
       kind: AttemptKind.DesignReview,
+      ...(remaining.length ? { followUp: { kind: 'review' as const, sectionIds: remaining.map(({ id }) => id) } } : {}),
       targets,
       model,
       prompt:
@@ -241,30 +253,37 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     }
     const selected = selectedSections(design.id);
     const remaining = selected.filter((section) => section.blocks === null);
-    if (next.kind === 'generate') {
-      const target = remaining.find(({ id }) => next.plan.has(id));
+    if (next.kind !== 'review') {
+      const plan = next.kind === 'planned' ? new Set(remaining.map(({ id }) => id)) : next.plan;
+      const target = remaining.find(({ id }) => plan.has(id));
       if (target !== undefined) {
-        await generateWork(design, target, model, next.plan);
+        await generateWork(design, target, model, plan);
         return;
       }
-    } else if (design.aiReviewEnabled && selected.length > 0 && remaining.length === 0) {
-      await reviewWork(design, selected, model);
+    } else {
+      const batch = selected.filter(({ id }) => next.sectionIds.includes(id));
+      if (batch.length > 0) await reviewWork(design, batch, model);
       return;
     }
     publish(design.id);
   }
 
-  function scheduleHandoff(work: DesignRun, plan: GenerationPlan, model: string | null) {
-    if (latestRun(work.designId)?.id !== work.id || work.doneSectionIds.length === 0) return;
+  function scheduleHandoff(work: DesignRun, followUp: FollowUp, model: string | null) {
+    if (latestRun(work.designId)?.id !== work.id) return;
     const design = repo.findDesign(work.designId);
     if (design?.projectId == null) return;
-    const selected = selectedSections(design.id);
-    const remaining = selected.filter((section) => section.blocks === null);
-    const next: FollowUp | undefined = remaining.some(({ id }) => plan.has(id))
-      ? { kind: 'generate', plan }
-      : design.aiReviewEnabled && selected.length > 0 && remaining.length === 0
-        ? { kind: 'review' }
-        : undefined;
+    let next: FollowUp | undefined = followUp;
+    if (followUp.kind === 'generate') {
+      if (work.doneSectionIds.length === 0) return;
+      const selected = selectedSections(design.id);
+      const remaining = selected.filter((section) => section.blocks === null);
+      if (!remaining.some(({ id }) => followUp.plan.has(id))) {
+        next =
+          design.aiReviewEnabled && remaining.length === 0
+            ? { kind: 'review', sectionIds: selected.map(({ id }) => id) }
+            : undefined;
+      }
+    }
     if (next === undefined) return;
     handoffs.set(design.id, work);
     void handoff(work, model, next).catch((error: unknown) => {
@@ -278,11 +297,16 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     const work = repo.findRunByAttempt(attempt.id);
     if (work === undefined) return;
     if (type === 'ended') {
-      const plan = generations.get(attempt.id);
-      generations.delete(attempt.id);
+      const followUp = followUps.get(attempt.id);
+      followUps.delete(attempt.id);
       repo.updateDesign(work.designId, { updatedAt: clock.now() });
-      if (!closed && plan !== undefined && !stopping.has(work.designId) && attempt.status === AttemptStatus.Succeeded) {
-        scheduleHandoff(work, plan, attempt.model);
+      if (
+        !closed &&
+        followUp !== undefined &&
+        !stopping.has(work.designId) &&
+        attempt.status === AttemptStatus.Succeeded
+      ) {
+        scheduleHandoff(work, followUp, attempt.model);
       }
     }
     publish(work.designId);
@@ -296,12 +320,18 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
       assertIdle(id);
       if (design.outlineConfirmedAt !== null) invalidState('The design outline is already confirmed');
       const sections = repo.listSections(id);
+      if (
+        input.generateAfterPlanning &&
+        (design.sourceSnapshot.analyzableCount === 0 || sections.some((s) => !s.selected))
+      )
+        invalidState('Automatic planning requires analyzable files and a fully selected draft');
       await run(design, {
         kind: AttemptKind.DesignOutline,
+        ...(input.generateAfterPlanning ? { followUp: { kind: 'planned' as const } } : {}),
         targets: [],
         prompt:
           promptFor(design, PromptName.DesignOutline, [], sections.map(promptSection)) +
-          `\n用户对大纲的补充要求：${JSON.stringify(input.instruction ?? '')}`,
+          `\n可提交 1 至 ${DESIGN_MAX_SECTIONS} 个章节，每章由一个独立生成会话执行。\n用户对大纲的补充要求：${JSON.stringify(input.instruction ?? '')}`,
         instruction: input.instruction,
         model: modelFor(input),
       });
@@ -392,7 +422,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     close() {
       closed = true;
       handoffs.clear();
-      generations.clear();
+      followUps.clear();
       unsubscribe();
     },
   };
