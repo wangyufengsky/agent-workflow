@@ -117,9 +117,13 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
         .map((rule) => rule.permission);
       expect(new Set(visible)).toEqual(
         new Set(
-          [ATTEMPT_SUBMIT_TOOL[kind], McpToolName.ReportProgress, McpToolName.Recall].map(
-            (name) => `${MCP_TOOL_PREFIX}${name}`,
-          ),
+          [
+            ATTEMPT_SUBMIT_TOOL[kind],
+            McpToolName.ListDesignFiles,
+            McpToolName.ReadDesignSection,
+            McpToolName.ReportProgress,
+            McpToolName.Recall,
+          ].map((name) => `${MCP_TOOL_PREFIX}${name}`),
         ),
       );
       const evidence = { messageId: 'msg_source', partId: 'prt_source' };

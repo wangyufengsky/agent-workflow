@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -34,6 +35,9 @@ import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject, inboxOpens } from '../../../test/helpers/tasks.ts';
+
+import { DATABASE_FILE, openDatabase } from '../../core/db/database.ts';
+import { createDesignsRepo } from './designs.repo.ts';
 
 const DESIGNER = { agent: OPENCODE_AGENT_NAME.designer };
 const OUTLINE = [
@@ -110,7 +114,13 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
     ...DESIGNER,
     permission: [
       ...readonlyBashRules(),
-      ...[McpToolName.SubmitDesignOutline, McpToolName.ReportProgress, McpToolName.Recall].map((name) => ({
+      ...[
+        McpToolName.SubmitDesignOutline,
+        McpToolName.ListDesignFiles,
+        McpToolName.ReadDesignSection,
+        McpToolName.ReportProgress,
+        McpToolName.Recall,
+      ].map((name) => ({
         permission: MCP_TOOL_PREFIX + name,
         action: 'allow',
         pattern: '*',
@@ -552,4 +562,87 @@ it.each([1, 5])('按 AI 提交的 %i 章自动派工，每个会话收尾后才�
       [id, '/report complete'],
     ]),
   );
+});
+
+it('万文件扫描索引的总览首轮有界，章节能查询样本外路径，重写能分页取回原文', async () => {
+  const { id } = await createDraft(false);
+  const db = openDatabase(join(t.dataDir, DATABASE_FILE), join(import.meta.dirname, '../../../migrations'));
+  const records = createDesignsRepo(db.db);
+  const longText = '已核对交易路径。'.repeat(1000);
+  try {
+    const files = Array.from({ length: 9998 }, (_, i) => ({
+      id: randomUUID(),
+      designId: id,
+      sectionId: null,
+      contentHash: 'a'.repeat(64),
+      relPath: `src/main/java/example/payments/module${i % 25}/TransactionHandler${i}.java`,
+      responsibility: null,
+      symbols: [],
+      updatedAt: 1,
+    }));
+    records.insertFiles(files);
+    const { overview, endpoint, flow } = await optimize(id);
+    const query = 'TransactionHandler9997.java';
+    const outside = files.at(-1);
+    if (!outside) throw new Error('Missing fixture path');
+    t.fake.enqueue(
+      script()
+        .callTool(McpToolName.ListDesignFiles, { query })
+        .callTool(McpToolName.SubmitDesignSection, section(overview.id, longText)),
+      DESIGNER,
+    );
+    t.fake.enqueue(
+      script()
+        .callTool(McpToolName.ListDesignFiles, { query })
+        .callTool(McpToolName.ReadDesignSection, { sectionId: overview.id, field: 'summary' })
+        .callTool(McpToolName.SubmitDesignSection, section(endpoint.id, '入口')),
+      DESIGNER,
+    );
+    t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(flow.id, '流程')), DESIGNER);
+    const finished = waitForEvent(t.app.events, ServerEventType.DesignUpdated, () =>
+      records
+        .listSections(id)
+        .filter((s) => s.selected)
+        .every((s) => s.blocks !== null),
+    );
+    await t.call(generateDesignOp, { id });
+    await finished;
+    await t.fake.settled();
+    const first = t.fake.prompts[1]?.text ?? '';
+    expect(first).toContain('"fileCount":10000');
+    expect(first).not.toContain(query);
+    expect(Buffer.byteLength(first)).toBeLessThan(24 * 1024);
+    const pages = t.fake.toolCalls.filter((call) => call.name === McpToolName.ListDesignFiles);
+    expect(pages.map((p) => p.result)).toEqual([
+      { files: [{ relPath: outside.relPath, sectionId: null }], total: 1, nextOffset: null },
+      { files: [], total: 0, nextOffset: null },
+    ]);
+    expect(t.fake.toolCalls.find((call) => call.name === McpToolName.ReadDesignSection)?.result).toMatchObject({
+      code: ErrorCode.McpToolNotAllowed,
+    });
+
+    const expected = JSON.stringify(longText);
+    t.fake.enqueue(
+      script()
+        .callTool(McpToolName.ReadDesignSection, { sectionId: overview.id, field: 'summary' })
+        .callTool(McpToolName.ReadDesignSection, { sectionId: overview.id, field: 'summary', offset: 4096 })
+        .callTool(McpToolName.SubmitDesignSection, section(overview.id, '重写完成')),
+      DESIGNER,
+    );
+    const revised = ended(AttemptKind.DesignRevise);
+    expect((await t.call(reviseDesignSectionOp, { id, sectionId: overview.id, instruction: '核对原文' })).status).toBe(
+      200,
+    );
+    await revised;
+    await t.fake.settled();
+    expect(t.fake.prompts.at(-1)?.text).not.toContain(longText);
+    expect(
+      t.fake.toolCalls.filter((c) => c.name === McpToolName.ReadDesignSection && !c.isError).map((c) => c.result),
+    ).toEqual([
+      { content: expected.slice(0, 4096), nextOffset: 4096 },
+      { content: expected.slice(4096), nextOffset: null },
+    ]);
+  } finally {
+    db.close();
+  }
 });

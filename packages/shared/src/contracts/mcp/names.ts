@@ -34,6 +34,8 @@ export const McpToolName = {
   SubmitAnswer: 'submit_answer',
   SubmitOutline: 'submit_outline',
   SubmitSlide: 'submit_slide',
+  ReadDesignSection: 'read_design_section',
+  ListDesignFiles: 'list_design_files',
   SubmitDesignOutline: 'submit_design_outline',
   SubmitDesignSection: 'submit_design_section',
   SubmitDesignReview: 'submit_design_review',
@@ -114,7 +116,13 @@ export function isDesignAttemptKind(kind: AttemptKind): kind is DesignAttemptKin
 }
 
 export function designAttemptTools(kind: DesignAttemptKind): readonly McpToolName[] {
-  return [ATTEMPT_SUBMIT_TOOL[kind], McpToolName.ReportProgress, McpToolName.Recall];
+  return [
+    ATTEMPT_SUBMIT_TOOL[kind],
+    McpToolName.ListDesignFiles,
+    McpToolName.ReadDesignSection,
+    McpToolName.ReportProgress,
+    McpToolName.Recall,
+  ];
 }
 
 export function isAttemptSubmitTool(name: McpToolName): boolean {

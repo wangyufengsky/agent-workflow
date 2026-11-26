@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { cp, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -13,6 +14,8 @@ import {
   getRuntimeOp,
   InboxKind,
   InboxStatus,
+  MCP_TOOL_PREFIX,
+  McpToolName,
   PermissionDecision,
   resolveInboxOp,
   reviseDesignOutlineOp,
@@ -174,6 +177,80 @@ it('@live AI plans the refund project and generates its chosen chapters without 
     expect(result.doneSections).toBeGreaterThan(0);
     expect(result.runs.map(({ kind }) => kind)).toEqual(['outline', ...result.sections.map(() => 'generate')]);
     expect(result.sections.some(({ blocks }) => blocks?.some(({ type }) => type === 'transaction'))).toBe(true);
+  } finally {
+    await t.close();
+  }
+});
+
+it('@live 万文件项目总览按需查询样本外的退款入口并提交真实证据', async () => {
+  const t = await createTestApp({ realOpencode: true });
+  try {
+    await t.app.start(t.port);
+    const stamp = randomUUID();
+    const target = 'src/payments/ZRefundPolicy.ts';
+    const repo = await createTestRepo({ files: { [target]: `export const policyRevision = '${stamp}';\n` } });
+    const directory = join(repo.path, 'src', 'payments');
+    // README 和目标文件占两项，其余路径按字典序排在目标之前。
+    for (let start = 0; start < 9998; start += 64) {
+      await Promise.all(
+        Array.from({ length: Math.min(64, 9998 - start) }, (_, i) =>
+          writeFile(join(directory, `AHandler${start + i}.ts`), 'export {};\n'),
+        ),
+      );
+    }
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+    const { body: draft } = await t.call(createDesignOp, {
+      projectId: project.id,
+      depth: DesignDepth.Quick,
+      aiReviewEnabled: false,
+    });
+    expect(draft.sourceSnapshot.analyzableCount).toBe(10000);
+    await t.call(updateDesignOutlineOp, {
+      id: draft.id,
+      sections: [
+        {
+          kind: DesignSectionKind.Overview,
+          selected: true,
+          scopePaths: [],
+          title: '项目总览：查找 RefundPolicy 入口，引用其源码并写出 policyRevision 的精确值',
+        },
+      ],
+    });
+    t.app.events.subscribe((event) => {
+      if (
+        event.type === ServerEventType.InboxUpdated &&
+        event.data.item.kind === InboxKind.Permission &&
+        event.data.item.status === InboxStatus.Open
+      )
+        void t.call(resolveInboxOp, { id: event.data.item.id, response: { decision: PermissionDecision.Reject } });
+    });
+    const ended = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt }) => attempt.kind === AttemptKind.DesignGenerate && attempt.endedAt !== null,
+      10 * 60_000,
+    );
+    const [start, terminal] = await Promise.all([t.call(generateDesignOp, { id: draft.id, model: TEST_MODEL }), ended]);
+    expect(start.status).toBe(200);
+    expect(terminal.attempt.error).toBeNull();
+    const { body: result } = await t.call(getDesignOp, { id: draft.id });
+    expect(result.status).toBe(DesignStatus.Ready);
+    expect(JSON.stringify(result.sections)).toContain(stamp);
+    const transcript = await readFile(join(t.dataDir, 'runs', 'designs', `${terminal.attempt.id}.jsonl`), 'utf8');
+    expect(
+      transcript
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
+    ).toContainEqual(
+      expect.objectContaining({
+        kind: 'tool_result',
+        data: expect.objectContaining({
+          tool: MCP_TOOL_PREFIX + McpToolName.ListDesignFiles,
+          output: expect.stringContaining(target),
+        }),
+      }),
+    );
   } finally {
     await t.close();
   }

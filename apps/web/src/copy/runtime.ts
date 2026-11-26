@@ -87,6 +87,8 @@ export const TOOLS_COPY = {
       '知识问答：提交带引用的回答。引用的文件、行号或数据库连接不存在时返回问题，AI 修正后再提交。',
     [McpToolName.SubmitOutline]: 'PPT：提交大纲（每页的版式、标题与要点）以及 AI 对听众、时长的理解和假设。',
     [McpToolName.SubmitSlide]: 'PPT：按页码提交一页的内容与讲稿。字段超出版式的字数限制时返回问题，AI 精简后再提交。',
+    [McpToolName.ListDesignFiles]: '在当前设计范围内按路径查找文件。',
+    [McpToolName.ReadDesignSection]: '分页读取设计章节的范围、内容与证据。',
     [McpToolName.SubmitDesignOutline]: '提交项目设计大纲与各章节的分析范围。',
     [McpToolName.SubmitDesignSection]: '逐章提交项目设计的正文、文件详情与关系图。',
     [McpToolName.SubmitDesignReview]: '提交项目设计的复审结论与源码证据。',

@@ -6,6 +6,8 @@ import {
   AttemptStatus,
   DesignReviewState,
   ErrorCode,
+  type ListDesignFilesInput,
+  type ReadDesignSectionInput,
   ServerEventType,
   type SubmitDesignOutlineInput,
   type SubmitDesignReviewInput,
@@ -16,6 +18,8 @@ import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import { replaceSectionContent, snapshotSection } from './designs.content.ts';
+import { designFilePage, designScope } from './designs.planning.ts';
+import { readDesignSectionPage } from './designs.prompt-section.ts';
 import type { createDesignsRepo, DesignSection } from './designs.repo.ts';
 import { validateDesignOutline, validateDesignReview, validateDesignSection } from './designs.validator.ts';
 
@@ -60,21 +64,33 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
   function context(attempt: AttemptDTO, sectionId?: string) {
     const { design, run, projectId } = activeRun(attempt);
     const files = repo.listFiles(design.id);
-    const scope =
+    const inScope =
       sectionId !== undefined && run.targetSectionIds.includes(sectionId)
-        ? mustFindSection(design.id, sectionId).scopePaths
-        : [];
+        ? designScope([mustFindSection(design.id, sectionId)])
+        : undefined;
     return {
       root: projects.getRecord(projectId).repoPath,
-      files:
-        scope.length === 0
-          ? files
-          : files.filter(({ relPath }) => scope.some((path) => relPath === path || relPath.startsWith(`${path}/`))),
+      files: inScope === undefined ? files : files.filter(({ relPath }) => inScope(relPath)),
       targetSectionIds: run.targetSectionIds,
     };
   }
 
   return {
+    readSection(attempt: AttemptDTO, input: ReadDesignSectionInput) {
+      const { design, run } = activeRun(attempt);
+      if (attempt.kind !== AttemptKind.DesignOutline && !run.targetSectionIds.includes(input.sectionId))
+        throw new AppError(ErrorCode.McpToolNotAllowed, 'Section outside this design run');
+      return readDesignSectionPage(repo, mustFindSection(design.id, input.sectionId), input);
+    },
+    listFiles(attempt: AttemptDTO, { query = '', offset = 0 }: ListDesignFilesInput) {
+      const { design, run } = activeRun(attempt);
+      const targets = repo.listSections(design.id).filter(({ id }) => run.targetSectionIds.includes(id));
+      const inScope = designScope(targets);
+      const files = repo
+        .fileInventory(design.id)
+        .filter(({ relPath }) => attempt.kind === AttemptKind.DesignOutline || inScope(relPath));
+      return designFilePage(files, query, offset);
+    },
     submitOutline(attempt: AttemptDTO, input: SubmitDesignOutlineInput) {
       const { design } = activeRun(attempt);
       if (design.outlineConfirmedAt !== null)

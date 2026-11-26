@@ -102,6 +102,8 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.SubmitAnswer,
       McpToolName.SubmitOutline,
       McpToolName.SubmitSlide,
+      McpToolName.ListDesignFiles,
+      McpToolName.ReadDesignSection,
       McpToolName.SubmitDesignOutline,
       McpToolName.SubmitDesignSection,
       McpToolName.SubmitDesignReview,

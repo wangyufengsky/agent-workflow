@@ -288,7 +288,7 @@
 | 步骤 | 操作 | AI 尝试类型 | 行为与结果 |
 | --- | --- | --- | --- |
 | 优化大纲（可选） | `designs.reviseOutline` | `design_outline` | AI 读目录清单与入口文件，调用 `submit_design_outline` 更新章节树与 `scope_paths` |
-| 全量/继续生成 | `designs.generate` | `design_generate` | 首次调用锁定 `outline_confirmed_at`；按章节顺序对所有未完成章节（`blocks IS NULL`）逐章分析，每章提交即落库并推送 `design.updated`；每章一个独立会话，释放模型槽后再串行启动下一章。每轮带精简大纲和当前章授权清单。失败/停止保留提交结果，续作只处理尚未生成的勾选章 |
+| 全量/继续生成 | `designs.generate` | `design_generate` | 首次调用锁定 `outline_confirmed_at`；按章节顺序对所有未完成章节（`blocks IS NULL`）逐章分析，每章提交即落库并推送 `design.updated`；每章一个独立会话，释放模型槽后再串行启动下一章。每轮带精简大纲、当前授权目录的统计和文件样本，目录与样本合计最多 16 KiB；完整扫描索引保存在本地，可在本次会话内按路径查询和翻页。已生成的章节长字段按需分页读取。失败/停止保留提交结果，续作只处理尚未生成的勾选章 |
 | 局部重写 | `designs.reviseSection` | `design_revise` | 目标为单个章节（可带聚焦的文件路径/符号名/图 ID 与一句用户要求）；覆盖前把该章当前内容快照进 `previous` |
 | 独立复审（可选） | `designs.review`（或生成完成后自动衔接） | `design_review` | 独立新会话，对照源码抽查关键结论、无依据断言与跨模块遗漏，经 `submit_design_review` 写回各章 `review_state` 与 `review_notes` |
 | 停止与续作 | `designs.stop` / 再次 `designs.generate` | — | 停止中止当前尝试或取消等待中的交接，已提交章节完整保留；应用重启时未完成尝试标为 `interrupted`，用户点「继续生成」只补跑剩余未完成章节 |
@@ -438,6 +438,8 @@
 
 | 工具 | 允许的 `AttemptKind` | 输入与校验行为 |
 | --- | --- | --- |
+| `read_design_section` | 四种设计会话 | 按当前章节 ID、字段和偏移读取被首轮省略的范围、正文、文件说明或关系图；返回 JSON 文本及下一页偏移。 |
+| `list_design_files` | 四种设计会话 | 按路径子串搜索本次扫描且属于目标范围的文件；用 `nextOffset` 继续同一查询。大纲规划可查询整个扫描范围。 |
 | `submit_design_outline` | `design_outline` | `{ title?, sections: [{ kind, title, scopePaths[] }] }`；校验所有 `scopePaths` 在项目授权范围内且至少 1 章；失败返回 `VALIDATION_FAILED` |
 | `submit_design_section` | `design_generate` · `design_revise` | `{ sectionId, summary, blocks[], files[], diagrams[] }`；校验 `sectionId` 属于本次目标、所有路径/行号合法、图边端点闭合、`static` 边带证据；通过后单事务写入 `design_sections`/`design_files`/`design_diagrams` 并推送 `design.updated`，返回 `{ remainingSectionIds }` |
 | `submit_design_review` | `design_review` | `{ findings: [{ sectionId, reviewState, notes: [{ severity, message, relPath?, lineStart? }] }] }`；校验路径与 `sectionId`，更新各章复审状态并推送 `design.updated` |
@@ -547,7 +549,7 @@ packages/shared/src/
 ├─ design/status.ts                     designStatusOf（前后端共用）
 ├─ contracts/design/                    block / file / diagram / snapshot zod schema
 ├─ contracts/api/designs.ts             DTO
-├─ contracts/mcp/design-tools.ts        3 个执行 MCP 工具 schema
+├─ contracts/mcp/design-tools.ts        3 个提交工具与 2 个只读查询工具 schema
 └─ operations/designs.ts                操作清单
 
 packages/server/src/modules/designs/
@@ -581,7 +583,7 @@ apps/web/src/features/designs/
 | --- | --- | --- |
 | DG-01 | 枚举、常量、错误码、结构化模型 schema、`designStatusOf`；同步 `08` / `10` / `11` / `12` | 类型检查与校验单测通过 |
 | DG-02 | 数据库迁移、repo、程序扫描器（含排除规则、符号链接越界防护、初始大纲生成） | 扫描真实仓库与安全边界单测通过 |
-| DG-03 | `aw-designer` 配置、`SessionPurpose.Design`、3 个执行 MCP 工具与程序化校验器 | 工具契约与 `VALIDATION_FAILED` 提示单测通过 |
+| DG-03 | `aw-designer` 配置、`SessionPurpose.Design`、3 个提交工具、2 个只读查询工具与程序化校验器 | 工具契约与 `VALIDATION_FAILED` 提示单测通过 |
 | DG-04 | `designs.service`、操作清单、SSE、分片续作与局部重写（含 `previous` 恢复） | FakeOpencode 全链路集成测试通过 |
 | DG-05 | 离线 HTML 导出器（含静态阅读器资源、轻量 SVG 图、全局搜索、临时目录替换） | 导出产物在无服务 `file://` 环境下可用 |
 | DG-06 | 前端页面：列表、新建、大纲确认、三栏工作台、搜索、图下钻、复用 `ConversationStream` | 跟随/自由阅读、局部重写与四主题走查通过 |
