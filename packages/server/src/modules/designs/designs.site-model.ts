@@ -1,4 +1,4 @@
-import { type DesignSourceSnapshot, layoutDesignDiagram } from '@aw/shared';
+import { type DesignSourceSnapshot, layoutDesignDiagram, TRANSACTION_EXPLORER_KEY } from '@aw/shared';
 import type { DesignDiagramRecord, DesignFile, DesignSection, ProjectDesign } from './designs.records.ts';
 
 export type DesignSiteContents = {
@@ -36,6 +36,9 @@ export function designSiteModel({ design, sections, files, diagrams, exportedAt 
     schemaVersion: 1,
     designId: design.id,
     title: design.title,
+    transactionExplorer:
+      design.templateSnapshot.key === TRANSACTION_EXPLORER_KEY ||
+      completed.some(({ blocks }) => blocks.some((block) => block.type === 'transaction')),
     theme: design.theme,
     layoutStyle: design.layoutStyle,
     depth: design.depth,

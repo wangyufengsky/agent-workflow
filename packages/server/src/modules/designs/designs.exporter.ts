@@ -193,7 +193,10 @@ async function validateStage(stage: string, model: DesignSiteModel, json: string
   const diagramSections = new Map(model.diagrams.map(({ id, sectionId }) => [id, sectionId]));
   for (const section of model.sections) {
     for (const block of section.blocks) {
-      if (block.type === 'diagram_ref' && diagramSections.get(block.diagramId) !== section.id) {
+      if (
+        (block.type === 'diagram_ref' || block.type === 'transaction') &&
+        diagramSections.get(block.diagramId) !== section.id
+      ) {
         throw new Error('The staged design site contains an unresolved diagram reference');
       }
     }

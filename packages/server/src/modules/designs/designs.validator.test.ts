@@ -204,3 +204,35 @@ it('子模块引用本章的文件；每项功能的静态证据须指向真实�
     ),
   ).rejects.toMatchObject(issue(['blocks', 0, 'behaviors', 0, 'evidence', 0]));
 });
+
+it('每个交易档案引用本章独立的非空业务流程图并校验档案证据', async () => {
+  const context = await scopedProject();
+  const diagram = {
+    id: 'refund',
+    kind: DesignDiagramKind.BusinessFlow,
+    title: '退款',
+    nodes: [{ id: 'entry', label: '入口' }],
+    edges: [],
+  };
+  const evidence = { evidenceClass: DesignEvidenceClass.Static, relPath: source, lineStart: 1, lineEnd: 1 };
+  const profile = { type: 'transaction' as const, title: '退款', diagramId: diagram.id, evidence: [evidence] };
+  const input = { ...section, diagrams: [diagram], blocks: [profile] };
+  await expect(validateDesignSection(input, context)).resolves.toBeUndefined();
+  for (const key of ['fields', 'boundaries'] as const) {
+    const trace = { name: '订单号', steps: ['other'], description: '随请求传入', evidence: [evidence] };
+    await expect(
+      validateDesignSection({ ...input, blocks: [{ ...profile, [key]: [trace] }] }, context),
+    ).rejects.toMatchObject(issue(['blocks', 0, key, 0, 'steps', 0]));
+  }
+  for (const diagrams of [[], [{ ...diagram, nodes: [] }], [{ ...diagram, kind: DesignDiagramKind.Architecture }]]) {
+    await expect(validateDesignSection({ ...input, diagrams }, context)).rejects.toMatchObject(
+      issue(['blocks', 0, 'diagramId']),
+    );
+  }
+  await expect(validateDesignSection({ ...input, blocks: [profile, profile] }, context)).rejects.toMatchObject(
+    issue(['blocks', 1, 'diagramId']),
+  );
+  await expect(
+    validateDesignSection({ ...input, blocks: [{ ...profile, evidence: [{ ...evidence, lineEnd: 99 }] }] }, context),
+  ).rejects.toMatchObject(issue(['blocks', 0, 'evidence', 0]));
+});

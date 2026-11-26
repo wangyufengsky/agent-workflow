@@ -54,5 +54,16 @@
   "toggleOutline": "打开或收起目录",
   "version": "源码基线",
   "snapshot": "扫描快照",
-  "excerptNotice": "离线站点只包含已引用的源码片段。"
+  "excerptNotice": "离线站点只包含已引用的源码片段。",
+  "transactions": {
+    "catalog": "交易目录",
+    "filter": "筛选交易码、渠道、版本…",
+    "empty": "尚无已生成的交易档案。",
+    "noMatch": "没有匹配的交易。",
+    "chapter": "阅读所属章节",
+    "steps": "处理步骤",
+    "fields": "字段流转",
+    "boundaries": "事务范围",
+    "source": "查看对应源码或章节"
+  }
 }

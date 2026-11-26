@@ -4,6 +4,7 @@ import {
   type DesignDiagramEdge,
   type DesignDiagramNode,
   DesignEvidenceClass,
+  type DesignTransaction,
   layoutDesignDiagram,
 } from '@aw/shared';
 import {
@@ -22,8 +23,10 @@ import {
 import { type ReactNode, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
+import siteCopy from '../../copy/design-site.json';
 import { DESIGN_WORKBENCH_COPY as C, DESIGN_DIAGRAM_LABEL } from '../../copy/design-workbench.ts';
 import type { ReadingTarget } from './design-reading.ts';
+import { TransactionTraces } from './design-transaction-traces.tsx';
 import styles from './design-workbench.module.css';
 
 type FigureNode = Node<
@@ -32,6 +35,7 @@ type FigureNode = Node<
     group?: string;
     summary?: string;
     action?: () => void;
+    pressed?: boolean;
   },
   'designFigure'
 >;
@@ -56,6 +60,7 @@ function FigureNodeBody({ data }: NodeProps<FigureNode>) {
           type="button"
           className={`${styles.figureLabel} nodrag nopan`}
           title={data.summary}
+          aria-pressed={data.pressed}
           onClick={data.action}
         >
           {label}
@@ -82,6 +87,7 @@ const edgeTypes = { designFigure: FigureEdgeBody };
 
 type GraphProps = {
   diagram: DesignDiagramDTO;
+  transaction?: DesignTransaction | undefined;
   targetOf: (node: DesignDiagramNode) => ReadingTarget | undefined;
   onNavigate: (target: ReadingTarget) => void;
   source: (path: string, line?: number, end?: number) => ReactNode;
@@ -90,8 +96,7 @@ type GraphProps = {
 function coordinates(
   diagram: DesignDiagramDTO,
   collapsed: ReadonlySet<string>,
-  targetOf: GraphProps['targetOf'],
-  onNavigate: GraphProps['onNavigate'],
+  controlsFor: (node: DesignDiagramNode) => Pick<FigureNode['data'], 'action' | 'pressed'>,
   toggle: (group: string) => void,
 ): { nodes: FigureNode[]; edges: FigureEdge[] } {
   const visible = new Map<string, FigureNode['data']>();
@@ -112,12 +117,11 @@ function coordinates(
       continue;
     }
     projected.set(node.id, node.id);
-    const target = targetOf(node);
     visible.set(node.id, {
       label: node.label,
       ...(node.group === undefined ? {} : { group: node.group }),
       ...(node.summary === undefined ? {} : { summary: node.summary }),
-      ...(target === undefined ? {} : { action: () => onNavigate(target) }),
+      ...controlsFor(node),
     });
   }
   const projectedEdges = diagram.edges.flatMap((edge) => {
@@ -173,7 +177,7 @@ function evidenceLabel(edge: DesignDiagramEdge): string {
   return edge.evidenceClass === DesignEvidenceClass.Static ? C.static : C.inferred;
 }
 
-function Board({ diagram, targetOf, onNavigate, source }: GraphProps) {
+function Board({ diagram, targetOf, onNavigate, source, transaction }: GraphProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow<FigureNode, FigureEdge>();
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [hovered, setHovered] = useState<string>();
@@ -187,7 +191,20 @@ function Board({ diagram, targetOf, onNavigate, source }: GraphProps) {
       else next.add(group);
       return next;
     });
-  const { nodes, edges } = coordinates(diagram, collapsed, targetOf, onNavigate, toggle);
+  const [stepId, selectStep] = useState<string>();
+  const step = diagram.nodes.find((node) => node.id === stepId && !collapsed.has(node.group ?? ''));
+  const stepTarget = step === undefined ? undefined : targetOf(step);
+  const { nodes, edges } = coordinates(
+    diagram,
+    collapsed,
+    (node) => {
+      if (transaction)
+        return { pressed: node.id === step?.id, action: () => selectStep(node.id === stepId ? undefined : node.id) };
+      const target = targetOf(node);
+      return target === undefined ? {} : { action: () => onNavigate(target) };
+    },
+    toggle,
+  );
   return (
     <>
       <div className={styles.graphToolbar}>
@@ -261,6 +278,20 @@ function Board({ diagram, targetOf, onNavigate, source }: GraphProps) {
           </aside>
         )}
       </section>
+      {step !== undefined && (
+        <aside className={styles.proseBlock} aria-label={siteCopy.transactions.steps}>
+          <strong>{step.label}</strong>
+          {step.group && <span className={styles.sourceTag}>{step.group}</span>}
+          {step.summary && <p>{step.summary}</p>}
+          {stepTarget !== undefined ? (
+            <button type="button" className={styles.textButton} onClick={() => onNavigate(stepTarget)}>
+              {siteCopy.transactions.source}
+            </button>
+          ) : (
+            step.relPath && source(step.relPath)
+          )}
+        </aside>
+      )}
     </>
   );
 }
@@ -269,7 +300,7 @@ function IconGroup({ collapsed }: { collapsed: boolean }) {
   return <span aria-hidden="true">{collapsed ? '+' : '−'}</span>;
 }
 
-export function DesignDiagram({ diagram, targetOf, onNavigate, source }: GraphProps) {
+export function DesignDiagram({ diagram, targetOf, onNavigate, source, transaction }: GraphProps) {
   const nodes = new Map(diagram.nodes.map((node) => [node.id, node]));
   const endpoint = (id: string) => {
     const node = nodes.get(id);
@@ -289,9 +320,16 @@ export function DesignDiagram({ diagram, targetOf, onNavigate, source }: GraphPr
         <p className="hint">{C.noNodes}</p>
       ) : (
         <ReactFlowProvider>
-          <Board diagram={diagram} targetOf={targetOf} onNavigate={onNavigate} source={source} />
+          <Board
+            transaction={transaction}
+            diagram={diagram}
+            targetOf={targetOf}
+            onNavigate={onNavigate}
+            source={source}
+          />
         </ReactFlowProvider>
       )}
+      {transaction && <TransactionTraces transaction={transaction} diagram={diagram} source={source} />}
       <details className={styles.edgeList}>
         <summary>{C.textEdges}</summary>
         {diagram.edges.length === 0 ? (

@@ -47,8 +47,30 @@ export const designSubmoduleSchema = z.strictObject({
 });
 export type DesignSubmodule = z.infer<typeof designSubmoduleSchema>;
 
+const transactionTraceSchema = z.strictObject({
+  name: designTitleSchema,
+  steps: z.array(z.string().min(1)).min(1),
+  description: z.string().trim().min(1),
+  evidence: z.array(designEvidenceSchema).min(1),
+});
+
+export const designTransactionSchema = z.strictObject({
+  type: z.literal('transaction'),
+  title: designTitleSchema,
+  code: designTitleSchema.optional(),
+  channel: designTitleSchema.optional(),
+  version: designTitleSchema.optional(),
+  scenario: designTitleSchema.optional(),
+  fields: z.array(transactionTraceSchema).optional(),
+  boundaries: z.array(transactionTraceSchema).optional(),
+  diagramId: z.string().min(1),
+  evidence: z.array(designEvidenceSchema).min(1),
+});
+export type DesignTransaction = z.infer<typeof designTransactionSchema>;
+
 export const designBlockSchema = z.discriminatedUnion('type', [
   designSubmoduleSchema,
+  designTransactionSchema,
   z.strictObject({
     type: z.literal('markdown'),
     title: designTitleSchema.optional(),

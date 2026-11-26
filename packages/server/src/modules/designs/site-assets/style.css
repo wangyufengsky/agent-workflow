@@ -286,6 +286,7 @@ th {
 a.graph-node {
   cursor: pointer;
 }
+.graph-node[aria-pressed="true"] rect,
 a.graph-node:hover rect,
 a.graph-node:focus rect {
   stroke-width: 3;
@@ -537,4 +538,76 @@ main {
 .graph-canvas:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.transaction-catalog input[type="search"] {
+  max-width: 100%;
+  width: 28em;
+  padding: 0.55em 0.8em;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.transaction-catalog {
+  container-type: inline-size;
+  margin-block: 1.5rem;
+}
+.transaction-grid {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+.transaction-grid h2 {
+  margin-block: 0 0.65rem;
+}
+.transaction-canvas {
+  min-width: 0;
+}
+.transaction-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  max-height: 24rem;
+  overflow: auto;
+}
+.transaction-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem;
+  width: 100%;
+  text-align: start;
+  padding: 0.65rem;
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.transaction-list button[aria-pressed="true"] {
+  border-inline-start-color: var(--accent);
+  background: var(--surface);
+}
+.transaction-list code,
+.transaction-list small {
+  color: var(--muted);
+}
+.transaction-list small {
+  grid-column: 1 / -1;
+}
+@container (min-width: 40rem) {
+  .transaction-grid {
+    grid-template-columns: minmax(10rem, 26%) minmax(0, 1fr);
+  }
+}
+
+.transaction-canvas .graph-canvas {
+  height: clamp(16rem, 38vh, 28rem);
+}
+div.transaction-canvas > a {
+  display: block;
+  text-align: end;
+  font-size: 0.85rem;
 }

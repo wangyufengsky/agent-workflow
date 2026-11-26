@@ -54,6 +54,7 @@ it('通过 HTTP 轻量推荐、复制分析模板并保护设计引用的模板�
   });
   expect(listed.body.items).toMatchObject([
     { key: BuiltinDesignTemplateKey.General, name: '架构探索', kind: DesignTemplateKind.Builtin },
+    { key: BuiltinDesignTemplateKey.TransactionExplorer, name: '交易链路探索', kind: DesignTemplateKind.Builtin },
   ]);
   const base = listed.body.items.find((item) => item.key === BuiltinDesignTemplateKey.General);
   if (base === undefined) throw new Error('Built-in architecture template not found');

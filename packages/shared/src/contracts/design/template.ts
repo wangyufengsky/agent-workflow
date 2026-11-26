@@ -3,6 +3,8 @@ import { DESIGN_INSTRUCTION_MAX_CHARS, DESIGN_MAX_SECTIONS } from '../../constan
 import { designSectionKindSchema, designTemplateKindSchema } from '../../enums/design.ts';
 import { designRelativePathSchema, designTitleSchema } from './block.ts';
 
+export const TRANSACTION_EXPLORER_KEY = 'transaction-explorer';
+
 const designOutlineSectionFieldsSchema = z.strictObject({
   kind: designSectionKindSchema,
   title: designTitleSchema,

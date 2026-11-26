@@ -597,7 +597,7 @@ IDEA 联调组可由应用助手通过 `projects_modules` 读取，`tasks_create
 | 工具 | 允许的尝试 | 成功结果 |
 | --- | --- | --- |
 | submit_design_outline | design_outline | 校验范围并替换待确认大纲，返回 `{ accepted: true }` |
-| submit_design_section | design_generate、design_revise | 一个事务提交本轮唯一目标章节、子模块功能与证据、归属文件和图。子模块与正文随 previous 一起恢复，返回 `{ remainingSectionIds }` |
+| submit_design_section | design_generate、design_revise | 一个事务提交本轮唯一目标章节、子模块功能与证据、交易档案、归属文件和图。交易档案引用本章独立的非空业务流程图，提交成功后档案和图使用同一持久化图 ID。子模块与正文随 previous 一起恢复，返回 `{ remainingSectionIds }` |
 | submit_design_review | design_review | 至少提交一个已抽查章节，逐章写入结论与意见。本轮目标里未抽查的章节回到未复审，返回 `{ accepted: true }` |
 
 模型提交的字段见 [44 §7.2](44-project-design.md#72-执行-mcp-工具)。

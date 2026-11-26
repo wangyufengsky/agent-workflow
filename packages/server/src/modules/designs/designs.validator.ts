@@ -97,7 +97,8 @@ export async function validateDesignSection(input: SubmitDesignSectionInput, con
     ['diagrams'],
     'id',
   );
-  const diagrams = new Set(input.diagrams.map((diagram) => diagram.id));
+  const diagrams = new Map(input.diagrams.map((diagram) => [diagram.id, diagram]));
+  const transactionFlows = new Set<string>();
   const chapterFiles = new Set(input.files.map(({ relPath }) => relPath));
   const assignedFiles = new Set<string>();
   const submodules = new Set<string>();
@@ -105,6 +106,24 @@ export async function validateDesignSection(input: SubmitDesignSectionInput, con
     const field = ['blocks', i];
     if (block.type === 'diagram_ref' && !diagrams.has(block.diagramId))
       invalid([...field, 'diagramId'], 'Diagram is not part of this section');
+    if (block.type === 'transaction') {
+      const graph = diagrams.get(block.diagramId);
+      if (graph?.kind !== DesignDiagramKind.BusinessFlow || graph.nodes.length === 0)
+        invalid([...field, 'diagramId'], 'Reference a non-empty business flow in this section');
+      if (transactionFlows.has(block.diagramId))
+        invalid([...field, 'diagramId'], 'Use a separate flow diagram for each transaction profile');
+      transactionFlows.add(block.diagramId);
+      const steps = new Set(graph.nodes.map(({ id }) => id));
+      for (const key of ['fields', 'boundaries'] as const) {
+        for (const [index, trace] of (block[key] ?? []).entries()) {
+          for (const [j, step] of trace.steps.entries())
+            if (!steps.has(step))
+              invalid([...field, key, index, 'steps', j], 'Choose a step from this transaction flow');
+          await source.evidence(trace.evidence, [...field, key, index, 'evidence']);
+        }
+      }
+      await source.evidence(block.evidence, [...field, 'evidence']);
+    }
     if (block.type === 'code') {
       const lines = await source.lines(block.relPath, block.lineStart, block.lineEnd, [...field, 'lineEnd']);
       if (linesOf(block.code).join('\n') !== lines.slice(block.lineStart - 1, block.lineEnd).join('\n'))
