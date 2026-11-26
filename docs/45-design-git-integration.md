@@ -1,6 +1,6 @@
 # 45 · 项目设计与 Git 审查、版本对比融合
 
-> 状态：**设计稿（待评审）**。前端交互原型见 [design/45-design-git-integration/prototype.html](design/45-design-git-integration/prototype.html)（自包含单文件，浏览器直接打开，支持 4 个核心视图与 3 套应用主题切换）；样例图：[提交审查](design/45-design-git-integration/01-git-review-dark.png) · [双版本对比](design/45-design-git-integration/02-compare-dark.png) · [增量更新](design/45-design-git-integration/03-incremental-update-light.png) · [离线报告](design/45-design-git-integration/04-offline-report-light.png)。
+> 状态：**已实施（Phase 1–4）**。前端交互原型见 [design/45-design-git-integration/prototype.html](design/45-design-git-integration/prototype.html)（自包含单文件，浏览器直接打开，支持 4 个核心视图与 3 套应用主题切换）；样例图：[提交审查](design/45-design-git-integration/01-git-review-dark.png) · [双版本对比](design/45-design-git-integration/02-compare-dark.png) · [增量更新](design/45-design-git-integration/03-incremental-update-light.png) · [离线报告](design/45-design-git-integration/04-offline-report-light.png)。
 >
 > 来源说明：基于《Agent Workflow：详细设计、提交审查与版本对比融合方案（v0.1）》精简重构，去除不适配单机桌面应用的过度防御（自研 `ArtifactEvent` 事件溯源与 CAS、多写者冲突合并、仓库内多版本发布树、提前抽象的多 Harness 与 11 实体大一统图谱），对齐本仓库既有架构与规范（[03](03-architecture.md)、[06](06-coding-standards.md)、[07](07-testing-standards.md)、[27](27-git-workbench.md)、[38](38-convergence.md)、[44](44-project-design.md)）。
 
@@ -61,8 +61,8 @@
 新增只读操作 `designs.staleness`（`GET /designs/:id/staleness`），用于判断**设计相对当前工作区是否过期**：
 
 1. 若设计未绑定项目或项目目录不可用，返回 `{ state: 'unknown', reason }`，不阻断页面。
-2. **快速路径**：若存在 Git、且 `source_snapshot.dirty === false`、`source_snapshot.commitSha === currentHeadSha` 且当前工作区干净（`status.clean === true`），直接返回 `state: 'fresh'`。
-3. **精确比对路径**（其余情况，含脏工作区、提交前进/回退及无 Git 项目）：复用 `designs.scanner.ts` 的排除规则扫描当前工作区文件哈希，与 `design_files.content_hash` 比对得出新增、删除、内容变化的文件集合，再映射到受影响的 `design_sections`（命中 `design_files.section_id` 或 `scope_paths`）：
+2. **快速路径**：若各章共用全局基线、存在 Git，且 `source_snapshot.dirty === false`、`source_snapshot.commitSha === currentHeadSha` 且当前工作区干净（`status.clean === true`），直接返回 `state: 'fresh'`。
+3. **精确比对路径**（其余情况，含章节独立基线、脏工作区、提交前进/回退及无 Git 项目）：复用 `designs.scanner.ts` 的排除规则扫描当前工作区文件哈希，与章节记录的独立哈希（如有）或 `design_files.content_hash` 比对得出新增、删除、内容变化的文件集合，再映射到受影响的 `design_sections`（命中 `design_files.section_id` 或 `scope_paths`）：
    - 无任何文件增删改 → `state: 'fresh'`；
    - 存在增删改 → `state: 'stale'`，返回 `{ baseSha, headSha, changedFilesCount, affectedSectionIds, changedPathsSample }`。
 4. 进入项目设计工作台或 Git 工作台审查面板时按需调用，纯本地 IO，零模型消耗。
@@ -71,7 +71,7 @@
 
 在提交审查或双版本对比中，需明确区分设计快照能否代表某个目标版本 `targetSha`（`DesignKnowledgeMatch`）：
 
-- **`exact`（精确匹配）**：仅当 `source_snapshot.dirty === false && source_snapshot.commitSha === targetSha` 时成立，说明该设计完整对应此不可变提交，可直接用于双版本结构化对齐。
+- **`exact`（精确匹配）**：仅当各章共用全局基线且 `source_snapshot.dirty === false && source_snapshot.commitSha === targetSha` 时成立，说明该设计完整对应此不可变提交，可直接用于双版本结构化对齐。
 - **`reference`（参考线索）**：设计存在但来自其他提交或脏工作区（例如审查历史提交时选用项目最近一次设计）。仅作为影响初筛线索注入，界面与 prompt 均显式标明「参考设计（非当前目标版本）」，所有结论必须回到目标版本的真实源码与 Diff 核验，禁止把后来才出现的模块/交易当作该历史版本的事实。
 - **`missing`（无设计）**：项目尚无可用设计，直接退回原有源码审查/对比流程。
 
@@ -177,9 +177,9 @@ flowchart LR
 
 ## 7. 数据模型、API 与 MCP 工具增补
 
-### 7.1 SQLite 迁移（`0060_design_git_integration.sql`）
+### 7.1 SQLite 迁移
 
-仅在现有 `git_reviews` 表上追加可空列，完全兼容历史记录，不新增冗余表：
+审查迁移 `0060` 与双版本对比迁移 `0061` 共同为 `git_reviews` 追加以下可空列，兼容历史记录。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
@@ -192,6 +192,9 @@ flowchart LR
 | `comparison` | TEXT(JSON) NULL | `GitComparisonDTO`：仅 `compare` 双版本端点对比使用 |
 
 现有 `git_reviews.findings` JSON 项向后兼容扩展可选字段：`id`（缺失时读层按索引稳定回填）、`status`（缺省视为 `'open'`）、`affectedImpactIds`（可选）。
+
+增量更新迁移 `0062` 在 `design_sections` 中增加可空的 `source_hashes`，标记共享路径在各章实际使用的版本。全量更新成功后统一清除。
+`design_runs.is_incremental` 默认 false，工作台据此在刷新后为中断的增量更新提供正确的重试入口。
 
 ### 7.2 契约定义（`packages/shared/src/contracts/`）
 
@@ -212,7 +215,7 @@ flowchart LR
 - `gitComparisonSchema`（`compare` 双版本对比可选）：`{ fromDesignId?, toDesignId?, sections: ComparisonDiffItem[], transactions: ComparisonDiffItem[], summary: string }`
 
 在 `packages/shared/src/contracts/api/designs.ts` 新增：
-- `designStalenessSchema`：`{ state: 'fresh' | 'stale' | 'unknown', reason?, baseSha?, headSha?, changedFilesCount, affectedSectionIds: string[], changedPathsSample: string[] }`
+- `designStalenessSchema`：`{ state: 'fresh' | 'stale' | 'unknown', reason?, baseSha?, headSha?, changedFilesCount, affectedSectionIds: string[], changedPathsSample: string[], changedFilesSample?: { relPath, kind }[] }`
 
 ### 7.3 操作清单（Operation Registry）
 
@@ -262,12 +265,12 @@ flowchart LR
 
 全部使用真实 SQLite、真实临时 Git 仓库与 Fake `opencode`，禁止 `sleep`：
 
-- [ ] **兼容回归**：无项目设计快照时，`gitReviews.start`（`worktree` / `commit` / `branch` / `range`）与历史审查记录展示行为完全正常；`range` 保持 `mergeBase` 语义不变。
-- [ ] **过期检测与脏工作区**：在 `dirty` 状态下生成设计后撤销/修改工作区（`HEAD` 不变），`designs.staleness` 基于 `content_hash` 仍准确返回 `stale`；干净快照且 `HEAD` 未变时走快速路径返回 `fresh`。
-- [ ] **版本匹配区分**：仅当 `dirty === false && commitSha === targetSha` 时标为 `exact`；审查历史提交或脏快照仅标为 `reference`。
-- [ ] **影响传播与预算**：修改公共方法后，有界图扩散可追溯到直接与间接关联模块/交易；构造环路与超深图时正确去重并标注 `truncated: true`。
-- [ ] **边界校验**：`submit_findings` 提交无证据的 `static` 影响、越界路径或非法行号时返回 `VALIDATION_FAILED` 且不污染数据库。
-- [ ] **缺陷与影响分离及人工留痕**：无代码缺陷时仍可提交影响项；更新 Finding 状态持久化生效；重新审查生成新记录不覆盖旧审查状态。
-- [ ] **双版本端点对比**：分叉分支使用 `compare` 对比时，源码 Diff、两端设计对齐与 `git show` 均严格使用用户选定的 `(fromSha, toSha)`，不受 `merge-base` 或当前 `HEAD` 干扰。
-- [ ] **增量更新与保守基线推进**：仅勾选部分受影响章节（或更新期间 `HEAD` 前进）时，已成功章节落库并保留 `previous`，但不推进全局 `source_snapshot`，下次检测仍准确列出剩余未更新章节；全部受影响章节成功时推进到启动时冻结的基线，且历史 `git_reviews` 内容不变。
-- [ ] **离线导出与安全**：导出的审查/对比 HTML 不含外部资源 URL，恶意 `<script>` 提交信息/文件名正确转义，非空未知目录拒绝静默覆盖。
+- [x] **兼容回归**：无项目设计快照时，`gitReviews.start`（`worktree` / `commit` / `branch` / `range`）与历史审查记录展示行为完全正常；`range` 保持 `mergeBase` 语义不变。
+- [x] **过期检测与脏工作区**：在 `dirty` 状态下生成设计后撤销/修改工作区（`HEAD` 不变），`designs.staleness` 基于 `content_hash` 仍准确返回 `stale`；干净快照且 `HEAD` 未变时走快速路径返回 `fresh`。
+- [x] **版本匹配区分**：仅当 `dirty === false && commitSha === targetSha` 时标为 `exact`；审查历史提交或脏快照仅标为 `reference`。
+- [x] **影响传播与预算**：修改公共方法后，有界图扩散可追溯到直接与间接关联模块/交易；构造环路与超深图时正确去重并标注 `truncated: true`。
+- [x] **边界校验**：`submit_findings` 提交无证据的 `static` 影响、越界路径或非法行号时返回 `VALIDATION_FAILED` 且不污染数据库。
+- [x] **缺陷与影响分离及人工留痕**：无代码缺陷时仍可提交影响项；更新 Finding 状态持久化生效；重新审查生成新记录不覆盖旧审查状态。
+- [x] **双版本端点对比**：分叉分支使用 `compare` 对比时，源码 Diff、两端设计对齐与 `git show` 均严格使用用户选定的 `(fromSha, toSha)`，不受 `merge-base` 或当前 `HEAD` 干扰。
+- [x] **增量更新与保守基线推进**：部分勾选、停止或失败时，全局 `source_snapshot` 保留原值，已提交章节可恢复 `previous`。全选且全部成功时推进到启动时冻结的基线。更新期间 `HEAD` 前进或工作区再次编辑时，下次检测仍能识别新变动。历史 `git_reviews` 内容保持原样。
+- [x] **离线导出与安全**：导出的审查/对比 HTML 不含外部资源 URL，恶意 `<script>` 提交信息/文件名正确转义，非空未知目录拒绝静默覆盖。

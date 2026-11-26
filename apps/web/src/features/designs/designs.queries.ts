@@ -9,6 +9,7 @@ import {
   getDesignOp,
   getDesignSourceOp,
   getDesignStalenessOp,
+  incrementalUpdateDesignOp,
   listDesignsOp,
   listDesignTemplatesOp,
   type OperationContract,
@@ -73,6 +74,7 @@ export const useUpdateDesign = () => useDesignMutation(updateDesignOp);
 export const useUpdateDesignOutline = () => useDesignMutation(updateDesignOutlineOp);
 export const useReviseDesignOutline = () => useDesignMutation(reviseDesignOutlineOp);
 export const useGenerateDesign = () => useDesignMutation(generateDesignOp);
+export const useIncrementalUpdateDesign = () => useDesignMutation(incrementalUpdateDesignOp);
 export const useReviseDesignSection = () => useDesignMutation(reviseDesignSectionOp);
 export const useRestoreDesignSection = () => useDesignMutation(restoreDesignSectionOp);
 export const useReviewDesign = () => useDesignMutation(reviewDesignOp);

@@ -117,7 +117,10 @@ export function createDesignQueries({ repo, projects, attempts, inbox, runs: des
       if (design === undefined) throw new AppError(ErrorCode.DesignNotFound, 'Project design not found', { id });
       const sections = repo
         .listSections(id)
-        .map(({ designId: _designId, previous, ...section }) => ({ ...section, hasPrevious: previous !== null }));
+        .map(({ designId: _designId, sourceHashes: _sourceHashes, previous, ...section }) => ({
+          ...section,
+          hasPrevious: previous !== null,
+        }));
       const files = repo.listFiles(id).map(({ designId: _designId, ...file }) => file);
       const diagrams = repo.listDiagrams(id).map(({ designId: _designId, ...diagram }) => diagram);
       const records = repo.listRuns(id);

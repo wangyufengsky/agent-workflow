@@ -728,7 +728,9 @@ class AppError extends Error {
 `none / passed / needs_attention`。显示状态由选中章节的完成数、大纲确认时间和最近一次尝试推导，
 取值为 `outlining / outline_ready / generating / reviewing / incomplete / ready / failed`。
 
-`DesignStalenessState` 表示设计与当前工作区的比较结果。文件内容与扫描基线一致时为 `fresh`，有新增、删除或内容变化时为 `stale`，项目解绑或目录不可用时为 `unknown`。
+`DesignStalenessState` 表示设计与当前工作区的比较结果。文件内容与扫描基线一致时为 `fresh`，有新增、删除或内容变化时为 `stale`，项目解绑或目录不可用时为 `unknown`。变更样例的 `DesignFileChangeKind` 取 `added`（新增）、`removed`（删除）或 `modified`（内容变化）。
+
+部分更新或恢复上一版可能使章节采用不同的源码基线。这时过期检测会逐章比对哈希，版本匹配只可作为参考。
 
 `DesignKnowledgeMatch` 表示设计与指定 Git 提交的匹配度。快照在干净工作区生成且提交 SHA 等于目标 SHA 时为 `exact`，有可用章节但无法精确匹配时为 `reference`，项目没有可用章节时为 `missing`。知识覆盖率按已完成的选中章节数与选中章节总数计算。[设计知识投影与过期检测](45-design-git-integration.md#2-轻量项目知识读视图与过期检测)
 
@@ -739,7 +741,7 @@ class AppError extends Error {
 | --- | --- | --- |
 | DESIGN_NOT_FOUND | 404 | 设计或指定模板不存在 |
 | DESIGN_SECTION_NOT_FOUND | 404 | 指定设计没有该章 |
-| DESIGN_BUSY | 409 | 设计仍有活动尝试 |
+| DESIGN_BUSY | 409 | 设计正在冻结增量更新的源码、执行尝试或交接下一章 |
 | DESIGN_EXPORT_DIR_NOT_EMPTY | 409 | 导出目录包含其他文件，需用户确认 |
 | DESIGN_TEMPLATE_READONLY | 403 | 内置模板只读 |
 

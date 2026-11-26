@@ -20,6 +20,10 @@ export const DesignKnowledgeMatch = {
 export type DesignKnowledgeMatch = (typeof DesignKnowledgeMatch)[keyof typeof DesignKnowledgeMatch];
 export const designKnowledgeMatchSchema = z.enum(DesignKnowledgeMatch);
 
+export const DesignFileChangeKind = { Added: 'added', Removed: 'removed', Modified: 'modified' } as const;
+export type DesignFileChangeKind = (typeof DesignFileChangeKind)[keyof typeof DesignFileChangeKind];
+export const designFileChangeKindSchema = z.enum(DesignFileChangeKind);
+
 export const DesignStalenessState = {
   Fresh: 'fresh',
   Stale: 'stale',

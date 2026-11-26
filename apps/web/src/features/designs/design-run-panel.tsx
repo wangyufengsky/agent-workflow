@@ -12,17 +12,38 @@ type RunPanelProps = {
   design: DesignDTO;
   active: DesignRunDTO | undefined;
   canGenerate: boolean;
+  canRetryIncremental: boolean;
   latest: DesignRunDTO | undefined;
   onRetry: (run: DesignRunDTO) => void;
   onClose: () => void;
 };
 
-export function DesignRunPanel({ design, active, canGenerate, latest, onRetry, onClose }: RunPanelProps) {
+export function DesignRunPanel({
+  design,
+  active,
+  canGenerate,
+  canRetryIncremental,
+  latest,
+  onRetry,
+  onClose,
+}: RunPanelProps) {
   const [olderId, setOlderId] = useState<string>();
   const latestId = active?.id ?? latest?.id;
   const shown = active ?? design.runs.find(({ id }) => id === olderId) ?? latest;
   const sectionId = progressSection(shown);
   const title = design.sections.find(({ id }) => id === sectionId)?.title;
+  const isIncremental = shown?.isIncremental === true;
+  const canRetry =
+    shown !== undefined &&
+    shown.id === latestId &&
+    active === undefined &&
+    canGenerate &&
+    (isIncremental
+      ? canRetryIncremental &&
+        (shown.attempt.status === AttemptStatus.Failed || shown.attempt.status === AttemptStatus.Aborted)
+      : shown.attempt.status === AttemptStatus.Failed);
+  const done = isIncremental ? shown.doneSectionIds.length : design.doneSections;
+  const total = isIncremental ? shown.targetSectionIds.length : design.totalSections;
   return (
     <aside className={styles.activity} aria-label={C.attempts}>
       <div className={styles.paneTitle}>
@@ -31,18 +52,16 @@ export function DesignRunPanel({ design, active, canGenerate, latest, onRetry, o
       </div>
       <div className={styles.activityBody}>
         <div className={styles.progress}>
-          <span>{C.progress(design.doneSections, design.totalSections)}</span>
-          <span className="hint">
-            {C.sessionPlan(
-              design.totalSections,
-              design.aiReviewEnabled ? Math.ceil(design.totalSections / DESIGN_REVIEW_BATCH_SIZE) : 0,
-            )}
-          </span>
-          <progress
-            value={design.doneSections}
-            max={Math.max(1, design.totalSections)}
-            aria-label={C.progress(design.doneSections, design.totalSections)}
-          />
+          <span>{isIncremental ? C.incrementalProgress(done, total) : C.progress(done, total)}</span>
+          {!isIncremental && (
+            <span className="hint">
+              {C.sessionPlan(
+                design.totalSections,
+                design.aiReviewEnabled ? Math.ceil(design.totalSections / DESIGN_REVIEW_BATCH_SIZE) : 0,
+              )}
+            </span>
+          )}
+          <progress value={done} max={Math.max(1, total)} aria-label={C.progress(done, total)} />
           {!design.handoffPending && title !== undefined && <span className="hint">{C.current(title)}</span>}
           {shown?.attempt.progress !== null && shown?.attempt.progress !== undefined && <p>{shown.attempt.progress}</p>}
         </div>
@@ -63,14 +82,15 @@ export function DesignRunPanel({ design, active, canGenerate, latest, onRetry, o
               </label>
             )}
             {shown.attempt.error !== null && <ErrorState error={shown.attempt.error} message={C.lastFailure} />}
-            {shown.id === latestId &&
-              shown.attempt.status === AttemptStatus.Failed &&
-              canGenerate &&
-              active === undefined && (
-                <Button size="sm" icon="refresh" onClick={() => onRetry(shown)}>
-                  {shown.kind === DesignRunKind.Generate ? C.reattempt : C.reattemptRun}
-                </Button>
-              )}
+            {canRetry && (
+              <Button size="sm" icon="refresh" onClick={() => onRetry(shown)}>
+                {isIncremental
+                  ? C.incrementalRetry
+                  : shown.kind === DesignRunKind.Generate
+                    ? C.reattempt
+                    : C.reattemptRun}
+              </Button>
+            )}
             <ConversationStream
               key={shown.attempt.id}
               attemptId={shown.attempt.id}

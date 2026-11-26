@@ -1,4 +1,4 @@
-import { DesignDiagramKind, DesignReviewState } from '@aw/shared';
+import { DesignDiagramKind, DesignFileChangeKind, DesignReviewState } from '@aw/shared';
 
 export const DESIGN_REVIEW_LABEL: Record<DesignReviewState, string> = {
   [DesignReviewState.None]: '尚未复审',
@@ -19,6 +19,28 @@ export const DESIGN_WORKBENCH_COPY = {
   staleImpact: (files: number, sections: number) =>
     `相对设计快照有 ${files} 个文件变化，可能影响 ${sections} 个章节。不会自动调用 AI。`,
   locateAffected: '定位首个受影响章节',
+  incrementalUpdate: '按变更增量更新',
+  incrementalRetry: '重试增量更新',
+  incrementalProgress: (done: number, total: number) => `增量更新 · ${done} / ${total} 章节`,
+  incrementalFileKind: {
+    [DesignFileChangeKind.Added]: '新增',
+    [DesignFileChangeKind.Removed]: '删除',
+    [DesignFileChangeKind.Modified]: '修改',
+  },
+  incrementalTarget: (sha: string) => `当前工作区 · ${sha.slice(0, 8)}`,
+  incrementalLocalTarget: '当前工作区',
+  incrementalFreeze: '开始更新时重新扫描并冻结目标基线，更新期间的后续改动留待下次检测。',
+  incrementalSelection: (count: number, total: number) => `受影响章节 · 已选 ${count} / ${total}`,
+  incrementalFiles: (count: number) => `变更文件 · ${count} 个`,
+  incrementalMoreFiles: (count: number) => `另有 ${count} 个变更文件`,
+  incrementalFull: '基线推进策略 · 全部受影响章节更新后推进',
+  incrementalFullDetail: '全部受影响章节成功后，将设计快照推进到启动时冻结的目标基线。',
+  incrementalPartial: '基线推进策略 · 保留当前基线',
+  incrementalPartialDetail: '提交选中章节的新内容，剩余章节将在下次检测时继续提示。',
+  incrementalNone: '请选择要更新的章节。',
+  incrementalPrevious: '重写每章前自动保存上一版，可在章节中恢复。',
+  incrementalInstruction: '补充要求（可选）',
+  incrementalSubmit: (count: number) => `开始增量更新（${count} 章）`,
   affected: '受影响',
   overview: '项目概览',
   projectLevel: '项目',

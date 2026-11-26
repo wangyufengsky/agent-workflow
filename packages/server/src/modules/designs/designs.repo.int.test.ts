@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,11 +12,13 @@ import {
   DesignLayoutStyle,
   DesignReviewState,
   DesignSectionKind,
+  DesignStalenessState,
   DesignTemplateKind,
   ThemeId,
 } from '@aw/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createTestRepo } from '../../../test/helpers/git.ts';
 import { systemClock } from '../../core/clock.ts';
 import { loadConfig } from '../../core/config.ts';
 import { type Database, openDatabase } from '../../core/db/database.ts';
@@ -23,7 +26,10 @@ import { createUnitOfWork } from '../../core/db/unit-of-work.ts';
 import { createEventBus } from '../../core/event-bus.ts';
 import { attemptsTable } from '../attempts/index.ts';
 import { projectsTable } from '../projects/index.ts';
+import { commitDesignUpdateSection, freezeDesignUpdate, materializeDesignUpdateFiles } from './designs.incremental.ts';
 import { createDesignsRepo, type ProjectDesign } from './designs.repo.ts';
+import { scanDesignProject } from './designs.scanner.ts';
+import { readDesignStaleness } from './designs.staleness.ts';
 import { syncBuiltinDesignTemplates } from './designs.templates.ts';
 
 const seeds = loadBuiltinDesignTemplates(loadConfig({ AW_API_TOKEN: 'x'.repeat(32), AW_DATA_DIR: '/tmp' }).promptsDir);
@@ -74,6 +80,93 @@ describe('项目设计的 SQLite 持久化', () => {
   afterEach(() => {
     database.close();
     rmSync(directory, { recursive: true, force: true });
+  });
+
+  it('重叠范围部分提交后分别跟踪增删改，切回原干净 HEAD 时只提示已更新章节', async () => {
+    const { db } = database;
+    const repo = createDesignsRepo(db);
+    const modified = 'src/modified.ts';
+    const removed = 'src/removed.ts';
+    const added = 'src/added.ts';
+    const worktree = await createTestRepo({ files: { [modified]: 'old', [removed]: 'old' } });
+    const scan = await scanDesignProject(worktree.path, [], 1);
+    const head = await worktree.git('rev-parse', 'HEAD');
+    db.insert(projectsTable)
+      .values({
+        id: 'overlap-project',
+        name: 'overlap',
+        slug: 'overlap',
+        repoPath: worktree.path,
+        defaultBranch: 'main',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    const record = { ...design('overlap', 'overlap-project'), sourceSnapshot: scan.snapshot, outlineConfirmedAt: 1 };
+    repo.insertDesign(record);
+    repo.insertSections(
+      ['first', 'second'].map((id, i) => ({
+        id,
+        designId: record.id,
+        seq: i + 1,
+        selected: true,
+        kind: DesignSectionKind.Overview,
+        title: id,
+        scopePaths: ['src'],
+        summary: '原章',
+        blocks: [{ type: 'markdown', markdown: '原章正文' }],
+        reviewState: DesignReviewState.None,
+        reviewNotes: null,
+        previous: null,
+        updatedAt: 1,
+      })),
+    );
+    repo.insertFiles(
+      scan.files.map((file) => ({
+        ...file,
+        id: file.relPath,
+        designId: record.id,
+        sectionId: null,
+        responsibility: null,
+        symbols: [],
+        updatedAt: 1,
+      })),
+    );
+
+    expect(repo.findLatestKnowledgeDesign('overlap-project', head)?.id).toBe(record.id);
+    await writeFile(join(worktree.path, modified), 'new');
+    await rm(join(worktree.path, removed));
+    await writeFile(join(worktree.path, added), 'new');
+    const frozen = await freezeDesignUpdate(repo, record, worktree.path, 2);
+    expect(frozen.affectedSectionIds).toEqual(['first', 'second']);
+    db.transaction(() => {
+      materializeDesignUpdateFiles(repo, record.id, 'first', frozen);
+      commitDesignUpdateSection(repo, record.id, 'first', frozen);
+    });
+
+    expect(repo.findDesign(record.id)?.sourceSnapshot).toEqual(scan.snapshot);
+    expect(repo.findLatestKnowledgeDesign('overlap-project', head)).toBeUndefined();
+    expect(await readDesignStaleness(repo, record, worktree.path)).toMatchObject({
+      state: DesignStalenessState.Stale,
+      affectedSectionIds: ['second'],
+      changedFilesSample: [
+        { relPath: added, kind: 'added' },
+        { relPath: modified, kind: 'modified' },
+        { relPath: removed, kind: 'removed' },
+      ],
+    });
+
+    await worktree.git('restore', '--', 'src');
+    await rm(join(worktree.path, added));
+    expect(await readDesignStaleness(repo, record, worktree.path)).toMatchObject({
+      state: DesignStalenessState.Stale,
+      affectedSectionIds: ['first'],
+      changedFilesSample: [
+        { relPath: added, kind: 'removed' },
+        { relPath: modified, kind: 'modified' },
+        { relPath: removed, kind: 'added' },
+      ],
+    });
   });
 
   it('从迁移创建所有表并持久化勾选状态、文件和图，按外键保留或移除数据', () => {

@@ -1,5 +1,5 @@
-import type { DesignTemplate } from '@aw/shared';
-import { and, asc, desc, eq, exists, inArray, isNotNull, lt, or, type SQL, sql } from 'drizzle-orm';
+import type { DesignSourceHashes, DesignSourceSnapshot, DesignTemplate } from '@aw/shared';
+import { and, asc, desc, eq, exists, inArray, isNotNull, lt, notExists, or, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import {
   type DesignDiagramRecord,
@@ -39,11 +39,18 @@ function knowledgeDesigns(db: DbExecutor, projectId: string, targetSha?: string)
     .select({ id: sections.id })
     .from(sections)
     .where(and(eq(sections.designId, designs.id), eq(sections.selected, true), isNotNull(sections.blocks)));
+  const mixed = db
+    .select({ id: sections.id })
+    .from(sections)
+    .where(and(eq(sections.designId, designs.id), isNotNull(sections.sourceHashes)));
   const baseline =
     targetSha === undefined
       ? undefined
-      : sql`json_extract(${designs.sourceSnapshot}, '$.commitSha') = ${targetSha}
-          and json_extract(${designs.sourceSnapshot}, '$.dirty') = 0`;
+      : and(
+          sql`json_extract(${designs.sourceSnapshot}, '$.commitSha') = ${targetSha}
+            and json_extract(${designs.sourceSnapshot}, '$.dirty') = 0`,
+          notExists(mixed),
+        );
   return db
     .select()
     .from(designs)
@@ -155,6 +162,30 @@ export function createDesignsRepo(db: DbExecutor) {
     ): void {
       db.update(designs).set(patch).where(eq(designs.id, id)).run();
     },
+    setSourceSnapshot(id: string, snapshot: DesignSourceSnapshot): void {
+      db.update(designs)
+        .set({ sourceSnapshot: JSON.stringify(snapshot) })
+        .where(eq(designs.id, id))
+        .run();
+    },
+    hasSectionSourceHashes(designId: string): boolean {
+      return (
+        db
+          .select({ id: sections.id })
+          .from(sections)
+          .where(and(eq(sections.designId, designId), isNotNull(sections.sourceHashes)))
+          .get() !== undefined
+      );
+    },
+    setSectionSourceHashes(designId: string, sectionId: string, hashes: DesignSourceHashes): void {
+      db.update(sections)
+        .set({ sourceHashes: JSON.stringify(hashes) })
+        .where(and(eq(sections.designId, designId), eq(sections.id, sectionId)))
+        .run();
+    },
+    clearSectionSourceHashes(designId: string): void {
+      db.update(sections).set({ sourceHashes: null }).where(eq(sections.designId, designId)).run();
+    },
     deleteDesign(id: string): void {
       db.delete(designs).where(eq(designs.id, id)).run();
     },
@@ -215,12 +246,18 @@ export function createDesignsRepo(db: DbExecutor) {
     listFiles(designId: string): DesignFile[] {
       return db.select().from(files).where(eq(files.designId, designId)).orderBy(asc(files.relPath)).all().map(toFile);
     },
-    listFileHashes(designId: string) {
-      return db
-        .select({ relPath: files.relPath, contentHash: files.contentHash })
-        .from(files)
-        .where(eq(files.designId, designId))
-        .all();
+    updateFileHash(designId: string, id: string, contentHash: string): void {
+      db.update(files)
+        .set({ contentHash })
+        .where(and(eq(files.designId, designId), eq(files.id, id)))
+        .run();
+    },
+    deleteFiles(designId: string, ids: readonly string[]): void {
+      for (let offset = 0; offset < ids.length; offset += FILES_PER_BATCH) {
+        db.delete(files)
+          .where(and(eq(files.designId, designId), inArray(files.id, ids.slice(offset, offset + FILES_PER_BATCH))))
+          .run();
+      }
     },
     updateFile(file: DesignFile): void {
       const { id, designId, relPath: _relPath, contentHash: _hash, ...row } = fromFile(file);

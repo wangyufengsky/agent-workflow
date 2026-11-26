@@ -1,7 +1,7 @@
 import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
-import { readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { isAbsolute, join, posix, relative, sep } from 'node:path';
+import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
 import { DESIGN_SCAN_MAX_FILE_BYTES, type DesignSourceSnapshot } from '@aw/shared';
 import { readRepoRoot, readStatus } from '../git/index.ts';
 import { designExclusion } from './designs.exclusions.ts';
@@ -15,7 +15,7 @@ export async function readDesignGitStatus(root: string) {
 }
 
 /** 对目录本身应用排除规则，目录命中后只记一个跳过项，不读取其中的条目。 */
-export async function scanDesignFiles(root: string, patterns: readonly string[]) {
+export async function scanDesignFiles(root: string, patterns: readonly string[], snapshotDir?: string) {
   const files: ScannedDesignFile[] = [];
   const skipped = new Map<string, number>();
   const skip = (reason: string) => skipped.set(reason, (skipped.get(reason) ?? 0) + 1);
@@ -73,6 +73,12 @@ export async function scanDesignFiles(root: string, patterns: readonly string[])
         skip('binary');
         continue;
       }
+      if (snapshotDir !== undefined) {
+        // 使用与哈希相同的字节，链接仅保存扫描允许读取的普通文件内容。
+        const destination = join(snapshotDir, relPath);
+        await mkdir(dirname(destination), { recursive: true });
+        await writeFile(destination, bytes);
+      }
       files.push({ relPath, contentHash: createHash('sha256').update(bytes).digest('hex') });
     }
   }
@@ -80,15 +86,28 @@ export async function scanDesignFiles(root: string, patterns: readonly string[])
   return { files: files.sort((a, b) => a.relPath.localeCompare(b.relPath, 'en')), skipped };
 }
 
-export async function scanDesignProject(repoPath: string, patterns: readonly string[], scannedAt: number) {
+export async function scanDesignProject(
+  repoPath: string,
+  patterns: readonly string[],
+  scannedAt: number,
+  snapshotDir?: string,
+) {
   const root = await realpath(repoPath);
-  const { files, skipped } = await scanDesignFiles(root, patterns);
-  const features = await inspectDesignProject(root, patterns);
-  const status = await readDesignGitStatus(root);
+  const startStatus = snapshotDir === undefined ? undefined : await readDesignGitStatus(root);
+  const { files, skipped } = await scanDesignFiles(root, patterns, snapshotDir);
+  const features = await inspectDesignProject(snapshotDir ?? root, patterns);
+  const endStatus = await readDesignGitStatus(root);
+  const status = snapshotDir === undefined ? endStatus : startStatus;
+  // 扫描期间变动的工作区不能沿用干净 HEAD 的过期检测快路径。
+  const changedWhileScanning =
+    snapshotDir !== undefined &&
+    (startStatus?.commit !== endStatus?.commit ||
+      startStatus?.branch !== endStatus?.branch ||
+      endStatus?.clean === false);
   const snapshot: DesignSourceSnapshot = {
     branch: status?.branch ?? null,
     commitSha: status?.commit ?? null,
-    dirty: status !== undefined && !status.clean,
+    dirty: changedWhileScanning || (status !== undefined && !status.clean),
     scannedAt,
     analyzableCount: files.length,
     skippedCount: [...skipped.values()].reduce((a, b) => a + b, 0),

@@ -784,9 +784,14 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置架构探索及交易链路探索模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
 | designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；AI 规划只在确认前进行。POST 可传 generateAfterPlanning: true，全选草稿规划成功后自动逐章生成。省略时只保存新大纲 |
 | designs.generate | POST /designs/:id/generate | 首次省略 sectionId 确认大纲。未勾选任何章节返回 400 VALIDATION_FAILED。每个章节使用独立会话，依次释放模型槽再续下一章。确认后只补未生成的选中章，带 sectionId 仅重试其中一章。确认前指定章节、重试未选章或已生成章返回 409 STATE_TRANSITION_INVALID |
+| designs.incrementalUpdate | POST /designs/:id/incremental-update | write。显式启动勾选章节的增量更新，返回最新 `DesignDTO`。请求体为 `{ sectionIds: string[], instruction?: string }`，章节 ID 互异且至少一个，补充要求上限 8000 字 |
 | designs.reviseSection / restoreSection | POST /designs/:id/sections/:sectionId/revise 或 /restore | 重写前保存最近一版，恢复一次同时还原正文、文件和图 |
 | designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止可中止活动尝试或取消待交接，保留已提交内容 |
 | designs.export | POST /designs/:id/export | 已完成至少一章且无活动运行时导出。离线 HTML 只打包引用片段。非托管目录须显式确认覆盖；助手发起覆盖时逐次确认 |
 | designs.delete | DELETE /designs/:id | critical，删除关联尝试、会话流及数据库内容，已导出的站点由用户保管 |
 
-`designs.staleness` 在快照及当前 Git 工作区均干净且 HEAD 等于快照提交时直接返回 `fresh`。这条快速路径采用 Git 的干净状态，单独改动被 Git 忽略的文件不会触发扫描。其余可读目录（包括无 Git 的目录）使用设计创建时的排除规则重新扫描，与已保存的文件内容哈希比对。有差异返回 `stale`，文件内容一致返回 `fresh`。项目解绑或目录不可用时返回 `unknown`，`reason` 分别为 `project_unbound`、`directory_unavailable`。检测在本机完成，模型调用数为零。
+增量更新要求大纲已确认。服务端在启动时重扫，按大纲顺序执行仍受影响且已勾选的章节。选区已失效返回 400 VALIDATION_FAILED，运行冲突返回 409 DESIGN_BUSY，大纲未确认返回 409 STATE_TRANSITION_INVALID。每章沿用现有会话流，`runs[].isIncremental` 标识增量分片，可通过 `designs.stop` 停止。停止或失败后，重新读取过期状态并确认仍需更新的章节。
+
+每章提交时同时保存上一版、章节内容及相关文件哈希。覆盖启动时的全部受影响章节且全部成功后，在最后一章的同一事务中保存冻结快照并清理已删除文件。部分提交保留原全局快照，后续进入工作台仍会显示剩余受影响章节；更新期间的新增变动在下一次检测中反映。已生成的 Git 审查报告保留原内容。
+
+`designs.staleness` 的 `stale` 响应还提供 `changedFilesSample`，最多 20 条，按路径排列，每条含 `relPath` 和 `kind`（新增、删除或修改）。章节有独立哈希基线时逐章比对。其余设计在快照及当前 Git 工作区均干净且 HEAD 等于快照提交时直接返回 `fresh`。这条快速路径采用 Git 的干净状态，单独改动被 Git 忽略的文件不会触发扫描。其余可读目录（包括无 Git 的目录）使用设计创建时的排除规则重新扫描，与已保存的文件内容哈希比对。有差异返回 `stale`，文件内容一致返回 `fresh`。项目解绑或目录不可用时返回 `unknown`，`reason` 分别为 `project_unbound`、`directory_unavailable`。检测在本机完成，模型调用数为零。

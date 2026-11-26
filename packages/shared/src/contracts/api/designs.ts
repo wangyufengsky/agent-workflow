@@ -7,6 +7,7 @@ import {
 } from '../../constants/limits.ts';
 import {
   designDepthSchema,
+  designFileChangeKindSchema,
   designLayoutStyleSchema,
   designReviewStateSchema,
   designRunKindSchema,
@@ -38,6 +39,9 @@ export const designStalenessSchema = z.strictObject({
   changedFilesCount: count,
   affectedSectionIds: z.array(id),
   changedPathsSample: z.array(z.string().min(1)),
+  changedFilesSample: z
+    .array(z.object({ relPath: designRelativePathSchema, kind: designFileChangeKindSchema }))
+    .optional(),
 });
 export type DesignStalenessDTO = z.infer<typeof designStalenessSchema>;
 
@@ -90,6 +94,7 @@ export type DesignDiagramDTO = z.infer<typeof designDiagramDtoSchema>;
 export const designRunSchema = byId.extend({
   seq: z.int().positive(),
   kind: designRunKindSchema,
+  isIncremental: z.boolean().optional(),
   attempt: attemptSummarySchema,
   targetSectionIds: z.array(id),
   doneSectionIds: z.array(id),
@@ -166,6 +171,15 @@ export const reviseDesignOutlineRequestSchema = byId.extend({
 export type ReviseDesignOutlineRequest = z.infer<typeof reviseDesignOutlineRequestSchema>;
 export const generateDesignRequestSchema = byId.extend({ sectionId: id.optional(), model: modelChoiceSchema });
 export type GenerateDesignRequest = z.infer<typeof generateDesignRequestSchema>;
+export const incrementalUpdateDesignRequestSchema = byId.extend({
+  sectionIds: z
+    .array(id)
+    .min(1)
+    .max(DESIGN_MAX_SECTIONS)
+    .refine((ids) => new Set(ids).size === ids.length),
+  instruction: instruction.optional(),
+});
+export type IncrementalUpdateDesignRequest = z.infer<typeof incrementalUpdateDesignRequestSchema>;
 export const reviseDesignSectionRequestSchema = designSectionRefSchema.extend({
   instruction,
   focusPath: designRelativePathSchema.optional(),
