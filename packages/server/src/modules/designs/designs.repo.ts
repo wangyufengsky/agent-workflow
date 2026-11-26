@@ -1,5 +1,5 @@
 import type { DesignTemplate } from '@aw/shared';
-import { and, asc, desc, eq, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, inArray, isNotNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import {
   type DesignDiagramRecord,
@@ -41,6 +41,20 @@ export function createDesignsRepo(db: DbExecutor) {
     },
     findDesign(id: string): ProjectDesign | undefined {
       const row = db.select().from(designs).where(eq(designs.id, id)).get();
+      return row === undefined ? undefined : toDesign(row);
+    },
+    findLatestKnowledgeDesign(projectId: string): ProjectDesign | undefined {
+      const completed = db
+        .select({ id: sections.id })
+        .from(sections)
+        .where(and(eq(sections.designId, designs.id), eq(sections.selected, true), isNotNull(sections.blocks)));
+      const row = db
+        .select()
+        .from(designs)
+        .where(and(eq(designs.projectId, projectId), exists(completed)))
+        .orderBy(desc(designs.updatedAt), desc(designs.id))
+        .limit(1)
+        .get();
       return row === undefined ? undefined : toDesign(row);
     },
     page(

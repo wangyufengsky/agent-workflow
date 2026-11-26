@@ -14,6 +14,12 @@ export const DESIGN_DIAGRAM_LABEL: Record<DesignDiagramKind, string> = {
 
 export const DESIGN_WORKBENCH_COPY = {
   workspace: '设计工作台',
+  staleBadge: (count: number) => `已过期 · ${count} 个文件变化`,
+  staleNotice: '检测到工作区内容变动（零 AI 哈希比对）',
+  staleImpact: (files: number, sections: number) =>
+    `相对设计快照有 ${files} 个文件变化，可能影响 ${sections} 个章节。不会自动调用 AI。`,
+  locateAffected: '定位首个受影响章节',
+  affected: '受影响',
   overview: '项目概览',
   projectLevel: '项目',
   projectOutline: '项目大纲',

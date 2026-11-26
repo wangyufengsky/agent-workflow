@@ -8,6 +8,7 @@ import {
   generateDesignOp,
   getDesignOp,
   getDesignSourceOp,
+  getDesignStalenessOp,
   listDesignsOp,
   listDesignTemplatesOp,
   type OperationContract,
@@ -27,6 +28,12 @@ import { queryKeys } from '../../api/query-keys.ts';
 
 export const designQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.design(id), queryFn: () => callOperation(getDesignOp, { id }) });
+
+export const designStalenessQuery = (id: string) =>
+  queryOptions({
+    queryKey: [...queryKeys.design(id), 'staleness'],
+    queryFn: () => callOperation(getDesignStalenessOp, { id }),
+  });
 
 export const designSourceQuery = (id: string, fileId: string) =>
   queryOptions({
@@ -82,11 +89,15 @@ export function useStopDesign() {
   });
 }
 
-export function useDeleteDesign() {
+export function useDeleteDesign(onDeleted: () => Promise<void>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => callOperation(deleteDesignOp, { id }),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.designs }),
+    onSuccess: async () => {
+      // 删除事件可能先让详情页卸载，变更回调仍需完成导航。
+      await onDeleted();
+      await client.invalidateQueries({ queryKey: queryKeys.designs });
+    },
   });
 }
 

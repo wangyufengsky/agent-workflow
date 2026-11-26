@@ -46,6 +46,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [39-office-files.md](39-office-files.md) | Word 与 Excel 文件（已实现，待检查，D193–D201）：上传 .docx / .xlsx 时提取文字、Excel 概览与表格查询工具、助手生成与修改文件、预览与另存为、依赖与上限 | 全员 |
 | [43-workflow-experience.md](43-workflow-experience.md) | 项目对话、任务验收与交付改进（共 12 项，第一批已实现），含会话续接、重验、流程图前置、计划存为模板、PR 状态与跨功能关联 | 全员 |
 | [44-project-design.md](44-project-design.md) | 项目设计工作台（设计稿，核心口径已确认）：面向已有仓库的现状技术设计工作台、程序扫描与大纲确认、分片实时生成、图下钻与显式离线 HTML 站点导出 | 全员 |
+| [45-design-git-integration.md](45-design-git-integration.md) | 项目设计与 Git 审查、版本对比融合（设计稿，待评审）：基于现有设计数据的轻量知识索引、两段式变更影响分析、提交审查增强、双版本对比与按变更增量更新设计 | 全员 |
 
 ## 维护规则
 

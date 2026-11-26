@@ -768,6 +768,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | 操作 | 路径 | 请求与返回 |
 | --- | --- | --- |
 | designs.source | GET /designs/:id/files/:fileId/source | 仅本机阅读器可用。验证文件归属与扫描哈希，匹配返回 available 和全文；变化返回 changed，解绑或不可读返回 unavailable。此操作不暴露给助手 |
+| designs.staleness | GET /designs/:id/staleness | read，只读比较设计与当前工作区。返回 `state`、变更文件总数 `changedFilesCount`、按目录顺序排列的受影响已勾选章节 `affectedSectionIds` 与最多 20 条相对路径样例 `changedPathsSample`。基线或当前提交可用时附 `baseSha`、`headSha`。设计不存在返回 404 DESIGN_NOT_FOUND |
 | designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试。`handoffPending` 表示正在等候衔接下一章或自动复审，其间 `activeRunId` 为空，仍可停止 |
 | designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |
 | designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
@@ -778,3 +779,5 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止可中止活动尝试或取消待交接，保留已提交内容 |
 | designs.export | POST /designs/:id/export | 已完成至少一章且无活动运行时导出。离线 HTML 只打包引用片段。非托管目录须显式确认覆盖；助手发起覆盖时逐次确认 |
 | designs.delete | DELETE /designs/:id | critical，删除关联尝试、会话流及数据库内容，已导出的站点由用户保管 |
+
+`designs.staleness` 在快照及当前 Git 工作区均干净且 HEAD 等于快照提交时直接返回 `fresh`。这条快速路径采用 Git 的干净状态，单独改动被 Git 忽略的文件不会触发扫描。其余可读目录（包括无 Git 的目录）使用设计创建时的排除规则重新扫描，与已保存的文件内容哈希比对。有差异返回 `stale`，文件内容一致返回 `fresh`。项目解绑或目录不可用时返回 `unknown`，`reason` 分别为 `project_unbound`、`directory_unavailable`。检测在本机完成，模型调用数为零。

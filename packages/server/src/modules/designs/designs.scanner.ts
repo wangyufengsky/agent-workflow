@@ -9,9 +9,13 @@ import { inspectDesignProject } from './designs.features.ts';
 
 export type ScannedDesignFile = { relPath: string; contentHash: string };
 
+export async function readDesignGitStatus(root: string) {
+  if ((await readRepoRoot(root)) === undefined) return undefined;
+  return readStatus(root, { readOnly: true, includeUntracked: true });
+}
+
 /** 对目录本身应用排除规则，目录命中后只记一个跳过项，不读取其中的条目。 */
-export async function scanDesignProject(repoPath: string, patterns: readonly string[], scannedAt: number) {
-  const root = await realpath(repoPath);
+export async function scanDesignFiles(root: string, patterns: readonly string[]) {
   const files: ScannedDesignFile[] = [];
   const skipped = new Map<string, number>();
   const skip = (reason: string) => skipped.set(reason, (skipped.get(reason) ?? 0) + 1);
@@ -73,8 +77,14 @@ export async function scanDesignProject(repoPath: string, patterns: readonly str
     }
   }
   await visit(root, '');
+  return { files: files.sort((a, b) => a.relPath.localeCompare(b.relPath, 'en')), skipped };
+}
+
+export async function scanDesignProject(repoPath: string, patterns: readonly string[], scannedAt: number) {
+  const root = await realpath(repoPath);
+  const { files, skipped } = await scanDesignFiles(root, patterns);
   const features = await inspectDesignProject(root, patterns);
-  const status = (await readRepoRoot(root)) === undefined ? undefined : await readStatus(root);
+  const status = await readDesignGitStatus(root);
   const snapshot: DesignSourceSnapshot = {
     branch: status?.branch ?? null,
     commitSha: status?.commit ?? null,
@@ -86,7 +96,7 @@ export async function scanDesignProject(repoPath: string, patterns: readonly str
     techStack: features.techStack,
   };
   return {
-    files: files.sort((a, b) => a.relPath.localeCompare(b.relPath, 'en')),
+    files,
     snapshot,
     recommendedTemplateKey: features.recommendedTemplateKey,
   };

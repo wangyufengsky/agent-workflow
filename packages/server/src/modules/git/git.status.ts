@@ -56,8 +56,19 @@ export function parseStatus(output: string): WorkTreeStatus {
 }
 
 /** Branch, upstream distance and changes of the work tree at `cwd`. */
-export async function readStatus(cwd: string): Promise<WorkTreeStatus> {
-  const { stdout } = await runGit(['status', '--porcelain=v2', '--branch', '-z'], { cwd });
+export async function readStatus(
+  cwd: string,
+  options?: { readOnly?: boolean; includeUntracked?: boolean },
+): Promise<WorkTreeStatus> {
+  const args = [
+    ...(options?.readOnly === true ? ['--no-optional-locks'] : []),
+    'status',
+    '--porcelain=v2',
+    '--branch',
+    '-z',
+    ...(options?.includeUntracked === true ? ['--untracked-files=normal'] : []),
+  ];
+  const { stdout } = await runGit(args, { cwd });
   return parseStatus(stdout);
 }
 

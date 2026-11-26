@@ -32,6 +32,7 @@ import type { createDesignsRepo, DesignSection, ProjectDesign } from './designs.
 import type { DesignRuns } from './designs.runs.ts';
 import { scanDesignProject } from './designs.scanner.ts';
 import { readDesignSource } from './designs.source.ts';
+import { readDesignStaleness } from './designs.staleness.ts';
 import { createDesignTemplates } from './designs.templates.ts';
 import { validateDesignOutline } from './designs.validator.ts';
 
@@ -111,6 +112,11 @@ export function createDesignsService({
   }
   return {
     ...queries,
+    staleness(id: string) {
+      const design = designById(id);
+      const repoPath = design.projectId === null ? null : projects.getRecord(design.projectId).repoPath;
+      return readDesignStaleness(repo, design, repoPath);
+    },
     async source(id: string, fileId: string) {
       const design = designById(id);
       const file = repo.findFile(id, fileId);

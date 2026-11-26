@@ -716,6 +716,10 @@ class AppError extends Error {
 `none / passed / needs_attention`。显示状态由选中章节的完成数、大纲确认时间和最近一次尝试推导，
 取值为 `outlining / outline_ready / generating / reviewing / incomplete / ready / failed`。
 
+`DesignStalenessState` 表示设计与当前工作区的比较结果。文件内容与扫描基线一致时为 `fresh`，有新增、删除或内容变化时为 `stale`，项目解绑或目录不可用时为 `unknown`。
+
+`DesignKnowledgeMatch` 表示设计与指定 Git 提交的匹配度。快照在干净工作区生成且提交 SHA 等于目标 SHA 时为 `exact`，有可用章节但无法精确匹配时为 `reference`，项目没有可用章节时为 `missing`。知识覆盖率按已完成的选中章节数与选中章节总数计算。[设计知识投影与过期检测](45-design-git-integration.md#2-轻量项目知识读视图与过期检测)
+
 `designer` 对应 `aw-designer`。`design_generate` 每章独占一个全新的会话，独立复审另开会话。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
 `design_review`。实体类型为 `design`，设计更新事件为 `design.updated`。
 

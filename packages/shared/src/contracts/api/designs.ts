@@ -11,6 +11,7 @@ import {
   designReviewStateSchema,
   designRunKindSchema,
   designSectionKindSchema,
+  designStalenessStateSchema,
   designStatusSchema,
 } from '../../enums/design.ts';
 import { themeIdSchema } from '../../enums/ui.ts';
@@ -28,6 +29,17 @@ const count = z.int().nonnegative();
 const instruction = z.string().trim().min(1).max(DESIGN_INSTRUCTION_MAX_CHARS);
 export const designSectionRefSchema = byId.extend({ sectionId: id });
 export const designTemplateRefSchema = z.object({ key: id });
+
+export const designStalenessSchema = z.strictObject({
+  state: designStalenessStateSchema,
+  reason: z.string().min(1).optional(),
+  baseSha: id.optional(),
+  headSha: id.optional(),
+  changedFilesCount: count,
+  affectedSectionIds: z.array(id),
+  changedPathsSample: z.array(z.string().min(1)),
+});
+export type DesignStalenessDTO = z.infer<typeof designStalenessSchema>;
 
 export const designSummarySchema = byId.extend({
   title: designTitleSchema,

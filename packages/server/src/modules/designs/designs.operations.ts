@@ -7,6 +7,7 @@ import {
   generateDesignOp,
   getDesignOp,
   getDesignSourceOp,
+  getDesignStalenessOp,
   listDesignsOp,
   listDesignTemplatesOp,
   restoreDesignSectionOp,
@@ -25,6 +26,7 @@ export function designsOperations(service: DesignsService) {
   return [
     implement(listDesignsOp, (input) => service.list(input)),
     implement(getDesignSourceOp, ({ id, fileId }) => service.source(id, fileId)),
+    implement(getDesignStalenessOp, ({ id }) => service.staleness(id)),
     implement(getDesignOp, ({ id }) => service.get(id)),
     implement(createDesignOp, (input) => service.create(input)),
     implement(updateDesignOp, (input) => service.update(input)),
