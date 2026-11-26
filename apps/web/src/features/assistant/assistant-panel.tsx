@@ -28,6 +28,8 @@ function Panel({ open, docked, onClosed }: { open: boolean; docked: boolean; onC
   const [draft, setDraft] = useState<{ activeId: string | null; projectId: string | null } | null>(null);
   const [initialized, setInitialized] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const aside = useRef<HTMLElement>(null);
+  const wasOpen = useRef(false);
   const list = conversations.data ?? [];
   // 缓存可能先出现新会话，再送出首条消息。空列表的输入框要保持草稿，直到发送成功并选中新会话。
   if (!initialized && conversations.isSuccess) {
@@ -43,12 +45,20 @@ function Panel({ open, docked, onClosed }: { open: boolean; docked: boolean; onC
   }, [activeId]);
 
   useEffect(() => {
-    if (open) input.current?.focus();
-  }, [open]);
+    const focused = document.activeElement;
+    // 历史尚未加载时输入框不可用，打开面板先把焦点交给侧栏。读取完成后，若焦点仍在侧栏或已丢失，再聚焦输入框。
+    if (open && (!wasOpen.current || focused === aside.current || focused === document.body)) {
+      if (conversations.isPending) aside.current?.focus();
+      else input.current?.focus();
+    }
+    wasOpen.current = open;
+  }, [open, conversations.isPending]);
 
   return (
     <ConversationContinuation conversation={active} onContinued={setActive}>
       <aside
+        ref={aside}
+        tabIndex={-1}
         className={styles.panel}
         data-state={open ? 'open' : 'closed'}
         data-busy={busy || undefined}

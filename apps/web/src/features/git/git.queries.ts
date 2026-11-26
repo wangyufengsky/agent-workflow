@@ -43,6 +43,7 @@ import {
 import { useEffect } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
+import { refreshServerQueries } from '../../api/refresh-server-queries.ts';
 import type { FileDiffQuery } from '../../components/diff/diff-browser.tsx';
 
 const key = queryKeys.gitResource;
@@ -156,8 +157,8 @@ export const gitReviewQuery = (reviewId: string) =>
 /** A review started, submitted or ended (27 §7.4): its project's lists and the review itself. */
 export async function refreshGitReview(qc: QueryClient, projectId: string, reviewId: string): Promise<void> {
   await Promise.all([
-    qc.invalidateQueries({ queryKey: [...queryKeys.git(projectId), 'reviews'] }),
-    qc.invalidateQueries({ queryKey: queryKeys.gitReview(reviewId) }),
+    refreshServerQueries(qc, [...queryKeys.git(projectId), 'reviews']),
+    refreshServerQueries(qc, queryKeys.gitReview(reviewId)),
   ]);
 }
 

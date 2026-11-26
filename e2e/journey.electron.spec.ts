@@ -91,7 +91,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   });
   expect(settings.ok()).toBe(true);
 
-  await pickWorkflow(page, /修 Bug/);
+  await pickWorkflow(page, '修 Bug');
   await page
     .getByLabel('需求')
     .fill('median 返回了错误的结果：median([10, 9, 1]) 应该是 9，实际是 10。请找到原因并修复。');

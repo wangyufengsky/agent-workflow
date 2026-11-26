@@ -33,7 +33,7 @@ Each task gets its own branch and Git worktree. Tasks can run in parallel withou
 
 The app and its task data run locally. **Local-first does not mean offline inference:** model calls send relevant context to your configured provider. Optional hosting and network features contact their respective services.
 
-## Use project designs across workflows (v1.8.1)
+## Use project designs across workflows (v1.8.2)
 
 - Ask the assistant which modules or transactions a file change could affect, or inspect the same preliminary impact in a task's delivery card. Impact screening and post-merge freshness checks run locally. Starting a Git review or an incremental design update through the assistant requires confirmation each time.
 - Create presentations from a design, Git review, or version comparison. The presentation keeps a snapshot of its source material. Selected regression checks can also prefill a functional test task.

@@ -281,9 +281,20 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
 
   // With reduced motion the panel only fades; it still opens and closes (D84).
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.reload();
-  await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
-  await page.keyboard.press('ControlOrMeta+j');
+  // 在历史会话仍在读取时打开面板，覆盖输入框先禁用、再随会话挂载的顺序。
+  const { promise: conversationsHeld, resolve: releaseConversations } = Promise.withResolvers<void>();
+  await page.route('**/assistant/conversations', async (route) => {
+    await conversationsHeld;
+    await route.continue();
+  });
+  try {
+    await page.reload();
+    await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
+    await page.keyboard.press('ControlOrMeta+j');
+    await expect(panel.getByLabel('发给助手的消息')).toBeDisabled();
+  } finally {
+    releaseConversations();
+  }
   await expect(card).toContainText('已删除');
   await expect(card.getByRole('button', { name: '打开' })).toBeDisabled();
   await page.keyboard.press('Escape');

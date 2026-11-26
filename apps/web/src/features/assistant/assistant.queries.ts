@@ -30,7 +30,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { ApiError, apiToken, callOperation, getJson } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { useUiStore } from '../../state/ui.store.ts';
@@ -87,8 +87,10 @@ export const conversationTranscript = (id: string): TranscriptSource => ({
 /** 历史向前翻页，实时消息仍按 seq 接在文件快照之后。关闭聊天时释放已展开的旧页。 */
 export function useAssistantHistory(id: string) {
   const source = conversationTranscript(id);
+  const viewId = useId();
   const pages = useInfiniteQuery({
-    queryKey: source.key,
+    // 每次打开只读最新一页。上一视图关闭时，其缓存可能仍在请求或等待回收。
+    queryKey: [...source.key, viewId],
     gcTime: 0,
     initialPageParam: null as number | null,
     queryFn: ({ pageParam }) =>

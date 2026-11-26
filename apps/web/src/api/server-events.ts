@@ -33,6 +33,7 @@ import { removeTask, updateNode, updateTask } from '../features/tasks/tasks.quer
 import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
 import { queryKeys } from './query-keys.ts';
+import { refreshServerQueries } from './refresh-server-queries.ts';
 
 const DECK_ATTEMPT_KINDS: readonly AttemptKind[] = [AttemptKind.DeckOutline, AttemptKind.DeckSlides];
 
@@ -174,7 +175,7 @@ export function useServerEvents(): void {
       });
     }
     source.addEventListener(ServerEventType.Resync, () => {
-      void queryClient.invalidateQueries();
+      void refreshServerQueries(queryClient);
       void companion?.resync();
     });
     return () => {
