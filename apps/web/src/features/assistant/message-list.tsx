@@ -227,7 +227,7 @@ function useHistoryError(conversationId: string, message: string) {
     ({ error, reset }: ErrorComponentProps) => {
       const retry = async () => {
         await Promise.all([
-          client.invalidateQueries({ queryKey: conversationTranscript(conversationId).key, exact: true }),
+          client.invalidateQueries({ queryKey: conversationTranscript(conversationId).key }),
           client.invalidateQueries({ queryKey: confirmationsQuery(conversationId).queryKey, exact: true }),
         ]);
         reset();
