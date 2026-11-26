@@ -157,6 +157,7 @@ export function createFakeOpencode() {
       modelId: 'fake-model',
       name: 'Fake Model',
       contextLimit: 128_000,
+      inputBudget: 120_000,
       variants: ['low', 'deep'],
     },
     {
@@ -164,6 +165,7 @@ export function createFakeOpencode() {
       modelId: 'fake-model-2',
       name: 'Fake Model 2',
       contextLimit: 128_000,
+      inputBudget: 120_000,
       supportsImage: true,
     },
   ];
@@ -467,6 +469,9 @@ export function createFakeOpencode() {
       mcpClients.clear();
     },
     isConnected: () => connected,
+    async agentRules() {
+      return [];
+    },
     async sessionRules({ sessionId }) {
       return sessionOf(sessionId).permission ?? [];
     },

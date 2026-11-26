@@ -16,6 +16,7 @@ import {
   generateDesignOp,
   getDesignOp,
   InboxKind,
+  MCP_TOOL_PREFIX,
   McpToolName,
   OPENCODE_AGENT_NAME,
   readonlyBashRules,
@@ -103,7 +104,18 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
   const { id, projectId, path } = await createDraft(true);
   const { overview, endpoint, flow } = await optimize(id);
   const originalSummary = `初版总览 · 源码在 ${join(path, 'src', 'endpoint.ts')}`;
-  expect(t.fake.sessions[0]).toMatchObject({ directory: path, ...DESIGNER, permission: readonlyBashRules() });
+  expect(t.fake.sessions[0]).toMatchObject({
+    directory: path,
+    ...DESIGNER,
+    permission: [
+      ...readonlyBashRules(),
+      ...[McpToolName.SubmitDesignOutline, McpToolName.ReportProgress, McpToolName.Recall].map((name) => ({
+        permission: MCP_TOOL_PREFIX + name,
+        action: 'allow',
+        pattern: '*',
+      })),
+    ],
+  });
 
   const editedOutline = (await get(id)).sections.map(({ id, kind, title, scopePaths, selected }) => ({
     id,

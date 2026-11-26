@@ -71,6 +71,7 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     const sessionId = first.opencodeSessionId;
     if (!sessionId) throw new Error('Missing first session');
     const job = {
+      recallTool: 'agent-workflow_recall',
       owner: { kind: 'attempt' as const, id: first.id, taskId: task.id },
       sessionId,
       directory: repo.path,
@@ -125,7 +126,7 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     } finally {
       reopened.close();
     }
-    // 工作树已不受管、快照为空，已保存的摘要仍能重建上方分类与下方消息。
+    // 重启后仍能查看持久摘要；重建的窗口装得下原始证据。
     t.fake.sessionMessages = async () =>
       [
         {
@@ -155,10 +156,19 @@ it('同一物理会话单飞行，满槽跳过，切换尝试后释放 Worker �
     await t.call(updateSettingsOp, { 'ai.contextEngine': false });
     const { body: detail } = await t.call(getAttemptContextOp, { id: next.id });
     expect(detail).toMatchObject({ budget: null, reconstructed: true, summary: { summaryText: 'msg_a' } });
-    expect(detail.historyParts.summary).toBeGreaterThan(0);
-    expect(detail.historyParts.toolOutput).toBeLessThan(10);
+    expect(detail.historyParts.summary).toBe(0);
+    expect(detail.messages.find((message) => message.id === 'msg_a')).toMatchObject({
+      status: 'kept',
+      preview: expect.stringContaining('found found found'),
+    });
     expect(detail.historyParts.system).toBeGreaterThan(0);
     expect(detail.historyParts.tools).toBeGreaterThan(0);
+    const model = t.fake.models.find((m) => m.modelId === 'fake-model');
+    if (!model) throw new Error('Missing fake-model');
+    model.inputBudget = 2000;
+    const { body: tight } = await t.call(getAttemptContextOp, { id: next.id });
+    expect(tight.limit).toBe(2000);
+    expect(tight.messages.find((message) => message.id === 'msg_a')).toMatchObject({ status: 'summarized' });
     const waiting = Promise.withResolvers<void>(),
       late = Promise.withResolvers<string>();
     t.fake.promptDocument = async () => {

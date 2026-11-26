@@ -163,7 +163,7 @@ function errorResult(info: ErrorInfo, hint: string | undefined): CallToolResult 
 export function createAssistantToolRegistry(
   tools: readonly AssistantTool[],
   deps: { settings: SettingsService; log: Logger; findBySession(sessionId: string): Conversation | undefined },
-): McpTools {
+): McpTools & { permits(name: string): boolean } {
   const { settings, log } = deps;
   const usable = (tool: AssistantTool) => tool.mode === UiMode.Simple || settings.get('ui.mode') === UiMode.Pro;
 
@@ -178,6 +178,7 @@ export function createAssistantToolRegistry(
   }
 
   return {
+    permits: (name) => tools.some((tool) => tool.name === name && usable(tool)),
     list: (): Tool[] =>
       tools.filter(usable).map((t) =>
         ToolSchema.parse({

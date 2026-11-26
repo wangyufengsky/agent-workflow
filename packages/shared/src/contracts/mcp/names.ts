@@ -113,10 +113,9 @@ export function isDesignAttemptKind(kind: AttemptKind): kind is DesignAttemptKin
   return DESIGN_ATTEMPT_KINDS.some((candidate) => candidate === kind);
 }
 
-export const DESIGN_MCP_TOOLS: readonly McpToolName[] = [
-  ...new Set(DESIGN_ATTEMPT_KINDS.map((kind) => ATTEMPT_SUBMIT_TOOL[kind])),
-  McpToolName.ReportProgress,
-];
+export function designAttemptTools(kind: DesignAttemptKind): readonly McpToolName[] {
+  return [ATTEMPT_SUBMIT_TOOL[kind], McpToolName.ReportProgress, McpToolName.Recall];
+}
 
 export function isAttemptSubmitTool(name: McpToolName): boolean {
   return name === McpToolName.BrowserSubmitReport || Object.values(ATTEMPT_SUBMIT_TOOL).some((tool) => tool === name);

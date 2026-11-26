@@ -1,12 +1,12 @@
 import {
   AppError,
-  ATTEMPT_SUBMIT_TOOL,
   type AttemptDTO,
   type AttemptKind,
   AttemptStatus,
   BROWSER_TEST_TOOLS,
   type BrowserTestSubmitTool,
   DATABASE_ANALYST_TOOLS,
+  designAttemptTools,
   ErrorCode,
   type ErrorInfo,
   functionalTestTools,
@@ -63,6 +63,7 @@ const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
 
 export type ToolRegistry = {
   list(): Tool[];
+  permits(name: McpToolName, attempt: AttemptDTO): boolean;
   /** What the MCP tools page shows (11 §10). */
   info(): McpToolInfo[];
   call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<CallToolResult>;
@@ -104,27 +105,29 @@ export function createToolRegistry(
         attemptId: attempt.id,
       });
     }
-    if (
-      isDesignAttemptKind(attempt.kind) &&
-      tool.name !== ATTEMPT_SUBMIT_TOOL[attempt.kind] &&
-      tool.name !== McpToolName.ReportProgress
-    )
-      throw new AppError(ErrorCode.McpToolNotAllowed, 'This project design attempt can only use its declared tools');
+    const denied = restriction(tool, attempt);
+    if (denied) throw denied;
+    return attempt;
+  }
+
+  function restriction(tool: McpToolDefinition, attempt: AttemptDTO): AppError | undefined {
+    if (isDesignAttemptKind(attempt.kind) && !designAttemptTools(attempt.kind).includes(tool.name))
+      return new AppError(ErrorCode.McpToolNotAllowed, 'This project design attempt can only use its declared tools');
     if (
       attempts.liveAgentOf(attempt.id) === OPENCODE_AGENT_NAME[SessionAgent.DatabaseAnalyst] &&
       !DATABASE_ANALYST_TOOLS.includes(tool.name)
     )
-      throw new AppError(ErrorCode.McpToolNotAllowed, 'This database analysis step can only use its declared tools');
+      return new AppError(ErrorCode.McpToolNotAllowed, 'This database analysis step can only use its declared tools');
     const phase = functionalPhase(attempt);
     if (phase !== undefined && isFunctionalTestNode(phase) && !functionalTestTools(phase).includes(tool.name)) {
-      throw new AppError(ErrorCode.McpToolNotAllowed, 'This functional test step can only use its declared tools');
+      return new AppError(ErrorCode.McpToolNotAllowed, 'This functional test step can only use its declared tools');
     }
     if (tool.name.startsWith('test_') && (phase === undefined || !isFunctionalTestNode(phase))) {
-      throw new AppError(ErrorCode.McpToolNotAllowed, 'Only functional test steps can use this tool');
+      return new AppError(ErrorCode.McpToolNotAllowed, 'Only functional test steps can use this tool');
     }
     const testSubmit = browserTestSubmit(attempt);
     if (tool.name === McpToolName.BrowserSubmitReport && testSubmit !== tool.name) {
-      throw new AppError(ErrorCode.McpToolNotAllowed, 'This tool is only for the browser test report step');
+      return new AppError(ErrorCode.McpToolNotAllowed, 'This tool is only for the browser test report step');
     }
     // A session from an earlier version may still have the previous submit_result permission.
     if (
@@ -133,15 +136,15 @@ export function createToolRegistry(
       tool.name !== McpToolName.SubmitResult &&
       !BROWSER_TEST_TOOLS.includes(tool.name)
     ) {
-      throw new AppError(ErrorCode.McpToolNotAllowed, 'This browser test can only use its test tools');
+      return new AppError(ErrorCode.McpToolNotAllowed, 'This browser test can only use its test tools');
     }
     if (!tool.allowedKinds.includes(attempt.kind)) {
-      throw new AppError(ErrorCode.McpToolNotAllowed, `${tool.name} is not allowed in ${attempt.kind} attempts`, {
+      return new AppError(ErrorCode.McpToolNotAllowed, `${tool.name} is not allowed in ${attempt.kind} attempts`, {
         kind: attempt.kind,
         allowedKinds: tool.allowedKinds,
       });
     }
-    return attempt;
+    return undefined;
   }
 
   function errorResult(info: ErrorInfo, hint: string | undefined, guide?: unknown): CallToolResult {
@@ -157,6 +160,10 @@ export function createToolRegistry(
   }
 
   return {
+    permits(name, attempt) {
+      const tool = tools.find((t) => t.name === name);
+      return tool !== undefined && restriction(tool, attempt) === undefined;
+    },
     list: () =>
       tools.map((t) =>
         ToolSchema.parse({

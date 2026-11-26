@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import {
+  ATTEMPT_SUBMIT_TOOL,
   AttemptKind,
   AttemptStatus,
   DesignDepth,
@@ -10,6 +11,7 @@ import {
   DesignSectionKind,
   ErrorCode,
   MCP_SESSION_ARG,
+  MCP_TOOL_PREFIX,
   McpToolName,
   ServerEventType,
   SessionAgent,
@@ -22,6 +24,7 @@ import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject } from '../../../test/helpers/tasks.ts';
 import { DATABASE_FILE, openDatabase } from '../../core/db/database.ts';
+import { OpencodeEventType } from '../opencode/index.ts';
 import { createDesignsRepo } from './designs.repo.ts';
 
 it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快照并更新复审', async () => {
@@ -108,7 +111,39 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
         callTool(mcp, tool, { ...input, [MCP_SESSION_ARG]: attempt.opencodeSessionId });
       const unrelated =
         kind === AttemptKind.DesignOutline ? McpToolName.SubmitDesignSection : McpToolName.SubmitDesignOutline;
-      for (const tool of [unrelated, McpToolName.Recall, McpToolName.AskUser, McpToolName.DbListConnections]) {
+      const permissions = await t.fake.sessionRules({ sessionId: attempt.opencodeSessionId, directory: source.path });
+      const visible = permissions
+        .filter((rule) => rule.permission.startsWith(MCP_TOOL_PREFIX) && rule.action === 'allow')
+        .map((rule) => rule.permission);
+      expect(new Set(visible)).toEqual(
+        new Set(
+          [ATTEMPT_SUBMIT_TOOL[kind], McpToolName.ReportProgress, McpToolName.Recall].map(
+            (name) => `${MCP_TOOL_PREFIX}${name}`,
+          ),
+        ),
+      );
+      const evidence = { messageId: 'msg_source', partId: 'prt_source' };
+      expect(await submit(McpToolName.Recall, evidence)).toMatchObject({
+        isError: true,
+        body: { code: ErrorCode.NotFound },
+      });
+      t.fake.replay([
+        {
+          type: OpencodeEventType.Tool,
+          sessionId: attempt.opencodeSessionId,
+          ...evidence,
+          callId: 'call_read',
+          tool: 'read',
+          status: 'completed',
+          input: {},
+          output: 'chapter evidence',
+        },
+      ]);
+      expect(await submit(McpToolName.Recall, evidence)).toEqual({
+        isError: false,
+        body: { content: 'chapter evidence', offset: 0, totalLength: 16, nextOffset: null },
+      });
+      for (const tool of [unrelated, McpToolName.AskUser, McpToolName.DbListConnections]) {
         expect(await submit(tool, {})).toMatchObject({
           isError: true,
           body: { code: ErrorCode.McpToolNotAllowed },

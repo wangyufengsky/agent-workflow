@@ -14,7 +14,7 @@ import type { Logger } from '../../core/logger.ts';
 
 import { OPENCODE_CONTEXT_PATH } from './opencode.config.ts';
 
-import { type ContextOwner, ownerLog, recallToolName } from './opencode.context-owner.ts';
+import { type ContextOwner, ownerLog } from './opencode.context-owner.ts';
 import type { createContextSummaries } from './opencode.summaries.ts';
 
 const directoryQuery = z.object({ directory: z.string().min(1), sessionId: z.string().optional() });
@@ -46,6 +46,7 @@ export function createBudgetSnapshots() {
 export function registerContextRoutes(
   server: FastifyInstance,
   deps: {
+    recallTool(owner: ContextOwner, sessionId: string, directory: string): Promise<string | undefined>;
     snapshots: ReturnType<typeof createBudgetSnapshots>;
     manage(owner: ContextOwner, sessionId: string, model: string): void;
     token: string;
@@ -69,13 +70,14 @@ export function registerContextRoutes(
         const owner = deps.owner(sessionId, directory);
         if (!owner) return { enabled: false, ownerId: null };
         const enabled = deps.enabled();
+        const recallTool = enabled ? await deps.recallTool(owner, sessionId, directory) : undefined;
         return {
           enabled,
           kind: owner.kind,
           ownerId: owner.id,
           toolBytes: deps.toolBytes(owner.kind === 'attempt'),
-          recallTool: recallToolName(owner),
-          ...(enabled && { summary: deps.summaries.get(sessionId, owner) }),
+          recallTool,
+          ...(recallTool && { summary: deps.summaries.get(sessionId, owner) }),
         };
       });
       routes.post('/budget', async (req) => {
@@ -90,13 +92,17 @@ export function registerContextRoutes(
         if (enabled) deps.manage(owner, data.sessionId, data.model);
         deps.snapshots.set(data.sessionId, { ...data, receipt, overBudgetWarning, blocked });
         if (blocked) deps.block(owner, data.sessionId);
-        else if (summary && enabled)
-          void deps.summaries.generate({
-            ...summary,
-            sessionId: data.sessionId,
-            owner,
-            directory,
-          });
+        else if (summary && enabled) {
+          const recallTool = await deps.recallTool(owner, data.sessionId, directory);
+          if (recallTool)
+            void deps.summaries.generate({
+              recallTool,
+              ...summary,
+              sessionId: data.sessionId,
+              owner,
+              directory,
+            });
+        }
         deps.log.info({ ...data, ...ownerLog(owner), effective, overBudgetWarning, blocked }, 'context budget');
         return { blocked };
       });

@@ -11,8 +11,12 @@ import {
   askKnowledgeOp,
   BashPolicy,
   cancelTaskOp,
+  createDesignOp,
+  DesignSectionKind,
   ErrorCode,
+  generateDesignOp,
   getAttemptContextOp,
+  getDesignOp,
   getKnowledgeOp,
   getNodeOp,
   InboxKind,
@@ -28,6 +32,7 @@ import {
   resolveInboxOp,
   ServerEventType,
   TranscriptSystemEvent,
+  updateDesignOutlineOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -183,22 +188,19 @@ function scriptedModel(): Server {
           contextRequests.push(messages);
           const count = messages.filter((m) => m.role === 'tool').length;
           if (messages.some((m) => textOf(m).includes('[AW prior work]'))) {
-            const result = last ? textOf(last) : '';
-            const ref = coordinates.exec(messages.map(textOf).join('\n'));
-            if (ref && !result.includes('Latest batch before worker')) {
-              calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2], limit: 1024 })];
-            } else {
-              calls = [
-                operation(McpToolName.SubmitResult, {
-                  summary: 'Finished with summary',
-                  notes:
-                    messages.some((m) => textOf(m).includes('EVIDENCE_AFTER_FREEZE')) &&
-                    result.includes('Latest batch before worker')
-                      ? 'EVIDENCE_AFTER_FREEZE and recalled earlier read'
-                      : 'missing evidence',
-                }),
-              ];
-            }
+            const evidence = messages
+              .filter((m) => m.role === 'tool')
+              .map(textOf)
+              .join('\n');
+            calls = [
+              operation(McpToolName.SubmitResult, {
+                summary: 'Finished with summary',
+                notes:
+                  evidence.includes('EVIDENCE_AFTER_FREEZE') && evidence.includes('Latest batch before worker')
+                    ? 'Used old and new evidence alongside the summary'
+                    : 'missing evidence',
+              }),
+            ];
           } else if (count === 0) calls = [{ name: 'grep', args: { pattern: 'EARLY_FINDING', include: 'bulk.txt' } }];
           else if (count === 1) calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
           else if (count === 2) {
@@ -206,39 +208,48 @@ function scriptedModel(): Server {
             calls = [{ name: 'read', args: { filePath: 'new.txt' } }];
           } else calls = [operation(McpToolName.SubmitResult, { summary: 'Missing summary' })];
         }
-      } else if (hasProbe(FOREIGN_PROBE)) {
-        const ref = coordinates.exec(prompt);
-        if (ref) calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2] })];
-        else if (last?.role === 'tool')
-          calls = [operation(McpToolName.SubmitResult, { summary: 'Checked foreign reference', notes: textOf(last) })];
-      } else if (hasProbe(CONTEXT_PROBE) || hasProbe(DISABLE_PROBE) || hasProbe(RECALL_PROBE)) {
+      } else if (hasProbe(RECALL_PROBE) || hasProbe(FOREIGN_PROBE)) {
+        contextRequests.push(messages);
+        const outputs = messages.filter((m) => m.role === 'tool').map(textOf);
+        const userPrompt = messages
+          .filter((m) => m.role === 'user')
+          .map(textOf)
+          .join('\n');
+        const sectionId = /本轮目标章节 ID：([\w-]+)/.exec(userPrompt)?.[1];
+        const submit = (summary: string) =>
+          operation(McpToolName.SubmitDesignSection, {
+            sectionId,
+            summary,
+            blocks: [{ type: 'markdown', markdown: summary }],
+            files: [],
+            diagrams: [],
+          });
+        const ref = coordinates.exec(hasProbe(FOREIGN_PROBE) ? userPrompt : (outputs[0] ?? ''));
+        const offset = /"nextOffset"\s*:\s*(\d+)/.exec(outputs[2] ?? '')?.[1];
+        if (hasProbe(FOREIGN_PROBE) && ref) {
+          calls =
+            outputs.length === 0
+              ? [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2] })]
+              : [submit(outputs[0] ?? '')];
+        } else if (outputs.length < 2) {
+          calls = [{ name: 'read', args: { filePath: outputs.length === 0 ? 'bulk.txt' : 'latest.txt' } }];
+        } else if (ref && outputs.length === 2 && names.includes(`${MCP_TOOL_PREFIX}${McpToolName.Recall}`)) {
+          calls = [operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2], limit: 16 })];
+        } else if (ref && outputs.length === 3 && offset) {
+          calls = [
+            operation(McpToolName.Recall, { messageId: ref[1], partId: ref[2], offset: Number(offset), limit: 1024 }),
+          ];
+        } else {
+          const evidence = outputs.join('\n');
+          const first = /FIRST=([a-f0-9-]+)/.exec(evidence)?.[1];
+          const second = /SECOND=([a-f0-9-]+)/.exec(evidence)?.[1];
+          calls = [submit([first, second].join(' / '))];
+        }
+      } else if (hasProbe(CONTEXT_PROBE) || hasProbe(DISABLE_PROBE)) {
         contextRequests.push(messages);
         const reads = messages.filter((m) => m.role === 'tool').length;
         if (reads < 2) calls = [{ name: 'read', args: { filePath: reads === 0 ? 'bulk.txt' : 'latest.txt' } }];
-        else if (hasProbe(RECALL_PROBE)) {
-          const outputs = messages.filter((m) => m.role === 'tool').map(textOf);
-          const reference = outputs[0] ?? '';
-          const ref = coordinates.exec(reference);
-          const tool = names.find(
-            (name) => name === `${MCP_TOOL_PREFIX}${McpToolName.Recall}` && reference.includes(name),
-          );
-          const page = outputs.at(-1) ?? '';
-          if (ref && tool && reads === 2)
-            calls = [{ name: tool, args: { messageId: ref[1], partId: ref[2], limit: 16 } }];
-          else if (ref && tool && reads === 3) {
-            const offset = /"nextOffset"\s*:\s*(\d+)/.exec(page)?.[1];
-            if (offset)
-              calls = [
-                { name: tool, args: { messageId: ref[1], partId: ref[2], offset: Number(offset), limit: 1024 } },
-              ];
-          } else if (reads === 4) {
-            const evidence = /EVIDENCE=([a-f0-9-]+)/.exec(page)?.[1];
-            if (evidence)
-              calls = [
-                operation(McpToolName.SubmitResult, { summary: 'Recovered evidence from page two', notes: evidence }),
-              ];
-          }
-        } else if (reads === 2 && hasProbe(DISABLE_PROBE)) {
+        else if (reads === 2 && hasProbe(DISABLE_PROBE)) {
           await t.call(updateSettingsOp, { 'ai.contextEngine': false });
           calls = [{ name: 'read', args: { filePath: 'README.md' } }];
         } else calls = [operation(McpToolName.SubmitResult, { summary: 'Read both files', notes: 'completed' })];
@@ -685,7 +696,7 @@ it('@opencode 结束命令需要权限时可以授权，保留已提交结果', 
 }, 45_000);
 
 it.each([
-  ['折叠', { context: 131072 }],
+  ['充足预算', { context: 131072 }],
   ['首步超限', { context: 2048 }],
   ['运行中停用', { context: 27000 }],
   ['新任务关闭', { context: 131072 }],
@@ -776,9 +787,9 @@ it.each([
       {
         const last = contextRequests.at(-1) ?? [];
         expect(last.filter((m) => m.role === 'tool').map(textOf)).toEqual([
-          native
-            ? expect.stringContaining('RAW_CONTEXT_EVIDENCE')
-            : expect.stringMatching(/AW read messageId=.*partId=.*bulk.txt/),
+          warning || disable
+            ? expect.stringMatching(/AW read messageId=.*partId=.*bulk.txt/)
+            : expect.stringContaining('RAW_CONTEXT_EVIDENCE'),
           expect.stringContaining('LATEST_CONTEXT_EVIDENCE'),
         ]);
         expect(last.filter((m) => m.role === 'tool').map((m) => m.tool_call_id)).toEqual(
@@ -815,50 +826,78 @@ it.each([
   45000,
 );
 
-it('M2 真实 Session 从折叠引用分页回查并提交证据，其他 Session 读不到同一片段', async () => {
-  contextRequests.length = 0;
-  await t.call(updateSettingsOp, { 'ai.contextEngine': true, 'ai.defaultModel': `${PROVIDER}/${MODEL}` });
-  const evidence = randomUUID();
-  const { project } = await addProject(t, {
-    checkCommand: null,
-    files: {
-      'bulk.txt': `EVIDENCE=${evidence}\n${Array(200).fill('large file line '.repeat(12)).join('\n')}`,
-      'latest.txt': 'latest read',
-    },
-  });
-  const taskIds: string[] = [];
-  async function run(requirement: string) {
-    const finished = nodeReaches(t, 'locate', NodeStatus.AwaitingAcceptance, 30000);
-    const task = await createTask(t, {
-      projectId: project.id,
-      workflow: 'bugfix',
-      requirement,
-      checkpoints: { accept_each_node: true },
+it.each([
+  ['原文', 131072],
+  ['分页召回', 40000],
+] as const)(
+  'M2 设计会话使用跨批次的两份证据提交章节（%s）',
+  async (source, context) => {
+    const first = randomUUID();
+    const second = randomUUID();
+    const spec = providerFor(model);
+    const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
+    const { project } = await addProject(t, {
+      files: {
+        'bulk.txt': `FIRST=${first}\n${Array(200).fill('large file line '.repeat(12)).join('\n')}`,
+        'latest.txt': `SECOND=${second}\n${Array(200).fill('latest file line '.repeat(12)).join('\n')}`,
+        'opencode.json': JSON.stringify({
+          model: projectModel,
+          provider: {
+            [PROJECT_PROVIDER]: {
+              ...spec,
+              models: { [MODEL]: { ...spec.models[MODEL], limit: { context, output: 1024 } } },
+            },
+          },
+        }),
+      },
     });
-    taskIds.push(task.id);
-    const { node } = await finished;
-    return (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
-  }
-  try {
-    const source = await run(RECALL_PROBE);
-    expect(source.attempts).toHaveLength(1);
-    expect(source.result?.notes).toBe(evidence);
-    expect(contextRequests).toHaveLength(5);
-    const projected = contextRequests[2] ?? [];
-    expect(projected.map(textOf).join('')).not.toContain(evidence);
-    const reference = projected.filter((m) => m.role === 'tool').map(textOf)[0] ?? '';
-    const ref = coordinates.exec(reference);
-    if (!ref) throw new Error('Missing folded source coordinates');
-    const foreign = await run(`${FOREIGN_PROBE} ${ref[0]}`);
-    expect(foreign.attempts).toHaveLength(1);
-    expect(foreign.result?.notes).toContain(ErrorCode.NotFound);
-    expect(foreign.result?.notes).toContain('current session');
-    expect(foreign.result?.notes).not.toContain(evidence);
-  } finally {
-    for (const id of taskIds) await t.call(cancelTaskOp, { id });
-    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
-  }
-}, 90000);
+    await t.call(updateSettingsOp, { 'ai.contextEngine': true, 'ai.defaultModel': null });
+    async function run(title: string) {
+      contextRequests.length = 0;
+      const { body: design } = await t.call(createDesignOp, { projectId: project.id, aiReviewEnabled: false });
+      const edited = await t.call(updateDesignOutlineOp, {
+        id: design.id,
+        sections: [{ kind: DesignSectionKind.Module, title, scopePaths: ['bulk.txt', 'latest.txt'], selected: true }],
+      });
+      expect(edited.status).toBe(200);
+      const ended = waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        ({ attempt }) => attempt.kind === AttemptKind.DesignGenerate && attempt.endedAt !== null,
+        30000,
+      );
+      const [started, terminal] = await Promise.all([
+        t.call(generateDesignOp, { id: design.id, model: projectModel }),
+        ended,
+      ]);
+      expect(started.status).toBe(200);
+      expect(terminal.attempt.error).toBeNull();
+      return (await t.call(getDesignOp, { id: design.id })).body.sections[0]?.summary;
+    }
+    try {
+      const result = await run(RECALL_PROBE);
+      expect(result).toBe(`${first} / ${second}`);
+      const outputs = contextRequests[2]?.filter((m) => m.role === 'tool').map(textOf);
+      expect(outputs?.[1]).toContain(second);
+      if (source === '原文') {
+        expect(outputs?.[0]).toContain(first);
+        expect(contextRequests).toHaveLength(3);
+      } else {
+        const ref = coordinates.exec(outputs?.[0] ?? '');
+        if (!ref) throw new Error('Missing folded source coordinates');
+        expect(outputs?.[0]).not.toContain(first);
+        expect(contextRequests).toHaveLength(5);
+        const foreign = await run(`${FOREIGN_PROBE} ${ref[0]}`);
+        expect(foreign).toContain(ErrorCode.NotFound);
+        expect(foreign).toContain('current session');
+        expect(foreign).not.toContain(first);
+      }
+    } finally {
+      await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+    }
+  },
+  90_000,
+);
 
 it('M3 真实溢出压缩恢复后，主请求在途时生成无工具摘要，同一 Session 下一请求带新证据并完成', async () => {
   contextRequests.length = 0;
@@ -921,15 +960,15 @@ it('M3 真实溢出压缩恢复后，主请求在途时生成无工具摘要，�
     expect(detail.result?.summary, JSON.stringify(t.logs.filter((l) => String(l.msg).startsWith('context ')))).toBe(
       'Finished with summary',
     );
-    expect(detail.result?.notes).toBe('EVIDENCE_AFTER_FREEZE and recalled earlier read');
+    expect(detail.result?.notes).toBe('Used old and new evidence alongside the summary');
     expect(detail.attempts).toHaveLength(1);
-    expect(contextRequests).toHaveLength(5);
+    expect(contextRequests).toHaveLength(4);
     expect(workerTools).toEqual([[]]);
     const before = (contextRequests[2] ?? []).map(textOf).join('');
     const after = (contextRequests[3] ?? []).map(textOf).join('');
     expect(before).toContain('EARLY_FINDING');
     expect(after).toContain('Verified the early finding');
-    expect(after).toContain('agent-workflow_recall]');
+    expect(after).toContain('Latest batch before worker');
     expect(after).not.toContain('EARLY_FINDING');
     expect(after.length).toBeLessThan(before.length * 0.7);
     const owner = detail.attempts[0];
@@ -941,7 +980,7 @@ it('M3 真实溢出压缩恢复后，主请求在途时生成无工具摘要，�
     expect(view.compactions).toBe(1);
     expect(view.messages.some((m) => m.status === 'archived' && !m.sent && m.projectedTokens === 0)).toBe(true);
     expect(view.budget?.calibrated).toBe(true);
-    expect(view.messages.some((m) => m.status === 'folded')).toBe(true);
+    expect(view.messages.some((m) => m.status === 'folded')).toBe(false);
     const recovered = t.logs.findIndex((l) => l.msg === 'context overflow recovery continued');
     expect(recovered).toBeGreaterThan(0);
     const budgets = t.logs

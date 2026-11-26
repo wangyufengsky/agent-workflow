@@ -404,6 +404,12 @@
   "description": "agent-workflow project design analyst",
   "prompt": "<protocol-design.md>",
   "permission": {
+    "*": "deny",
+    "read": "allow",
+    "grep": "allow",
+    "glob": "allow",
+    "bash": "ask",
+    "agent-workflow_*": "deny",
     "edit": "deny",
     "question": "deny",
     "webfetch": "deny",
@@ -419,7 +425,7 @@
 - 会话工作目录为项目根目录（只读）；`opencode.dispatch.ts` 的 `SessionPurpose` 新增 `Design`。
 - `SessionAgent` 新增 `designer`（`OPENCODE_AGENT_NAME.designer = 'aw-designer'`）；`AttemptKind` 新增 `design_outline`、`design_generate`、`design_revise`、`design_review`。
 
-设计角色单独分配内置 `aw-design-analysis` Skill，详见 [41](41-skills.md)。只读权限及工具提交的边界仍由协议和服务端校验。
+创建会话时按 §7.2 放行本阶段的执行 MCP 工具。设计角色单独分配内置 `aw-design-analysis` Skill，详见 [41](41-skills.md)。只读权限及工具提交的边界仍由协议和服务端校验。
 
 ### 7.2 执行 MCP 工具
 
@@ -429,6 +435,7 @@
 | `submit_design_section` | `design_generate` · `design_revise` | `{ sectionId, summary, blocks[], files[], diagrams[] }`；校验 `sectionId` 属于本次目标、所有路径/行号合法、图边端点闭合、`static` 边带证据；通过后单事务写入 `design_sections`/`design_files`/`design_diagrams` 并推送 `design.updated`，返回 `{ remainingSectionIds }` |
 | `submit_design_review` | `design_review` | `{ findings: [{ sectionId, reviewState, notes: [{ severity, message, relPath?, lineStart? }] }] }`；校验路径与 `sectionId`，更新各章复审状态并推送 `design.updated` |
 | `report_progress` | 全部四种 | 复用既有工具，展示在工作台进度与 `ConversationStream` 标题行 |
+| `recall` | 全部四种 | 从当前物理会话按消息和片段取回已经读取的工具文本，分页规则见 12 §6.19。每章独立会话，其他章节的引用不能跨会话打开。 |
 | 其他工具（`submit_result`、`ask_user`、`db_*` 等） | 禁止 | `MCP_TOOL_NOT_ALLOWED` |
 
 提示词 `protocol-design.md` 核心约束：

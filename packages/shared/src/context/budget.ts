@@ -1,4 +1,4 @@
-import { DEFAULT_BYTES_PER_TOKEN, MAX_BYTES_PER_TOKEN, MIN_BYTES_PER_TOKEN } from './limits.ts';
+import { DEFAULT_BYTES_PER_TOKEN, MAX_BYTES_PER_TOKEN, MIN_BYTES_PER_TOKEN, SOFT_BUDGET_RATIO } from './limits.ts';
 import type { Messages } from './messages.ts';
 
 export { DEFAULT_BYTES_PER_TOKEN, SOFT_BUDGET_RATIO } from './limits.ts';
@@ -6,6 +6,26 @@ export const SUMMARY_LABEL = '[AW prior work]\n';
 const IMAGE_TOKEN_ESTIMATE = 2048;
 const encoder = new TextEncoder();
 export const bytes = (value: unknown) => encoder.encode(JSON.stringify(value)).length;
+export function modelInputBudget(
+  limit: { context: number; output: number; input?: number },
+  outputReserve = limit.output,
+) {
+  const input = limit.input !== undefined && limit.input > 0 ? limit.input : limit.context;
+  return limit.context > 0 ? Math.max(0, Math.min(input, limit.context - outputReserve)) : null;
+}
+
+/** 达到软预算所需释放的历史文本字节，媒体与外部工具独立按 token 计。 */
+export function excessHistoryBytes(
+  size: ReturnType<typeof historySize>,
+  limit: number | null,
+  overheadBytes: number,
+  externalTokens: number,
+  ratio: number,
+) {
+  if (limit === null) return 0;
+  const textBudget = Math.floor((limit * SOFT_BUDGET_RATIO - size.media - externalTokens) * ratio - overheadBytes);
+  return Math.max(0, size.text - textBudget);
+}
 export type Sample = { bytes: number; tokens: number };
 /** 外部 MCP 定义在相邻轮次固定；相邻实测的差分消去这项未知常数。 */
 export function calibrate(sample: Sample, previous: Sample | undefined, external: boolean): number | undefined {

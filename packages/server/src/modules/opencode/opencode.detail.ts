@@ -4,12 +4,13 @@ import {
   activeWindow,
   DEFAULT_BYTES_PER_TOKEN,
   eligible,
+  excessHistoryBytes,
   hasModelContent,
   historySize,
   type Messages,
-  projectionReceipt,
   projectWindow,
   referenceText,
+  requestRecallTool,
   SUMMARY_LABEL,
 } from '@aw/shared/context';
 import { type OpencodeClient, parseModelRef } from './opencode.client.ts';
@@ -44,6 +45,12 @@ export function createContextInspector(
   prompts: Prompts,
   mcpToolBytes: (execution: boolean) => number,
   canProject: (directory: string) => boolean,
+  recallTool: (
+    owner: ContextOwner,
+    sessionId: string,
+    directory: string,
+    agent?: string,
+  ) => Promise<string | undefined>,
 ) {
   const nativeSizes = new Map<string, Promise<number>>();
   function nativeBytes(directory: string, model: string) {
@@ -120,17 +127,30 @@ export function createContextInspector(
     const billed = reply?.role === 'assistant' ? reply.tokens : null;
     const limit = budget
       ? budget.limit
-      : (catalog?.available.find((m) => `${m.providerId}/${m.modelId}` === model)?.contextLimit ?? null);
+      : (catalog?.available.find((m) => `${m.providerId}/${m.modelId}` === model)?.inputBudget ?? null);
     const rate = budget?.bytesPerToken ?? DEFAULT_BYTES_PER_TOKEN;
+    const native = fallback && configured && model !== configured ? await lookup(model) : initialBytes;
+    const systemBytes = budget
+      ? 0
+      : Buffer.byteLength(contextBasePrompt(prompts, user?.agent, owner.kind === 'attempt')) +
+        Buffer.byteLength(user?.system ?? '');
+    const toolsBytes = budget ? 0 : mcpToolBytes(owner.kind === 'attempt') + native;
+    // 有回执时展示当时实际发送的引用；重建才读取此物理会话当前的权限。
+    const recall = snapshot
+      ? recallToolName(owner.kind)
+      : connected
+        ? await recallTool(owner, sessionId, directory, user?.agent)
+        : undefined;
     const summary = sessionId ? (summaries.get(sessionId, owner) ?? null) : null;
     // 进程重启或快照淘汰后只能按当前规则重建，不能把后来发布的摘要冒充历史发送记录。
     let receipt = snapshot?.receipt;
     let countedWindow = active;
     const reconstructed = !receipt && !!sessionId && (!!summary || canProject(directory));
     if (reconstructed) {
-      const { folded, projected } = projectWindow(active, summary ?? undefined, recallToolName(owner));
-      countedWindow = projected;
-      receipt = projectionReceipt(active, folded, projected, summary ?? undefined);
+      const excess = excessHistoryBytes(historySize(active), limit, systemBytes + toolsBytes, 0, rate);
+      const window = projectWindow(active, excess, requestRecallTool(recall, user?.tools), summary ?? undefined);
+      countedWindow = window.projected;
+      receipt = window.receipt;
     }
     const sent = new Set(receipt?.sent);
     const removed = new Set(receipt?.summarized);
@@ -148,7 +168,7 @@ export function createContextInspector(
       const parts = m.parts.map((p) => {
         if (archived || hasSummary || !foldedIds.has(p.id) || p.type !== 'tool' || p.state.status !== 'completed')
           return p;
-        const reference = referenceText(p, id, recallToolName(owner));
+        const reference = referenceText(p, id, recall);
         if (!reference) return p;
         folded.push({
           messageId: id,
@@ -199,19 +219,9 @@ export function createContextInspector(
       } satisfies ContextDetailDTO['messages'][number];
     });
     const raw = historySize(countedWindow);
-    const native = fallback && configured && model !== configured ? await lookup(model) : initialBytes;
-
     const historyParts = {
-      system:
-        budget?.systemTokens ??
-        Math.ceil(
-          (Buffer.byteLength(contextBasePrompt(prompts, user?.agent, owner.kind === 'attempt')) +
-            Buffer.byteLength(user?.system ?? '')) /
-            rate,
-        ),
-      tools: budget
-        ? budget.toolTokens + budget.externalTokens
-        : Math.ceil((mcpToolBytes(owner.kind === 'attempt') + native) / rate),
+      system: budget?.systemTokens ?? Math.ceil(systemBytes / rate),
+      tools: budget ? budget.toolTokens + budget.externalTokens : Math.ceil(toolsBytes / rate),
       dialogue: Math.ceil(raw.dialogue / rate),
       toolOutput: Math.ceil(raw.toolOutput / rate),
       summary: Math.ceil(raw.summary / rate),

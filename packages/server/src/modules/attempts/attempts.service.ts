@@ -15,6 +15,7 @@ import {
   type BrowserTestSubmitTool,
   ErrorCode,
   type FunctionalTestNode,
+  isDesignAttemptKind,
   isTerminalState,
   type McpToolName,
   type ModelEffort,
@@ -320,6 +321,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       checkCommands: input.checkCommands,
       web: input.web,
       browserTestSubmit: input.browserTestSubmit,
+      designKind: isDesignAttemptKind(input.kind) ? input.kind : undefined,
       functionalTestNode: input.functionalTestNode,
       offline: settings.get('network.offline'),
       allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
@@ -569,7 +571,17 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     async recall(attempt: AttemptDTO, input: RecallInput, signal?: AbortSignal): Promise<RecallOutput> {
       if (attempt.opencodeSessionId === null)
         throw new AppError(ErrorCode.McpAttemptUnresolved, 'Attempt has no physical session');
-      return recallPage(opencode, attempt.opencodeSessionId, attempt.directory, input, signal);
+      return recallPage(
+        opencode,
+        {
+          sessionId: attempt.opencodeSessionId,
+          directory: attempt.directory,
+          kind: 'attempt',
+          agent: state.sessionOf(attempt.id)?.agent,
+        },
+        input,
+        signal,
+      );
     },
     hasActiveDirectory: repo.hasActiveDirectory,
     contextOwner(sessionId: string, directory: string) {

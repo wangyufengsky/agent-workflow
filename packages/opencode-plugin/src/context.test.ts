@@ -1,5 +1,5 @@
 import { MCP_TOOL_PREFIX, McpToolName, SETTING_DEFAULTS } from '@aw/shared';
-import { applySummary, freezePrefix, projectHistory } from '@aw/shared/context';
+import { applySummary, freezePrefix, projectHistory, projectWindow } from '@aw/shared/context';
 import type { Hooks } from '@opencode-ai/plugin';
 import { expect, it } from 'vitest';
 import { historyBytes } from './context.ts';
@@ -29,10 +29,36 @@ function read(id: string, path = '/repo/large.txt', loaded: string[] = [], state
     ],
   };
 }
+const executionRecall = MCP_TOOL_PREFIX + McpToolName.Recall;
+
+it('预算充足或当前会话不能回查时保留所有批次的原文', () => {
+  const messages = [read('a'), read('b'), read('c')] as unknown as Messages;
+  const summary = { uptoMessageId: 'a', summaryText: 'Prior reference → agent-workflow_recall' };
+  for (const [excess, recallTool] of [
+    [0, executionRecall],
+    [10000, undefined],
+  ] as const) {
+    const window = projectWindow(messages, excess, recallTool, summary);
+    expect(window.projected).toEqual(messages);
+    expect(window.receipt).toMatchObject({ folded: [], summarized: [], anchor: null });
+  }
+});
+
+it('预算紧张时先折最旧的文件，已腾出所需空间就保留后续批次', () => {
+  const messages = [read('a'), read('b'), read('c')] as unknown as Messages;
+  const { projected, summarySource, receipt } = projectWindow(messages, 2000, executionRecall);
+  expect(receipt.folded).toEqual(['pa']);
+  expect(freezePrefix(summarySource)?.source).toContain('evidence'.repeat(300));
+  expect(projected[0]?.parts[0]).toMatchObject({
+    state: { output: expect.stringContaining('→ agent-workflow_recall]') },
+  });
+  expect(projected.slice(1)).toEqual(messages.slice(1));
+});
+
 it('只投影早期普通文件正文，保留标识、最新批次和局部规则', () => {
   const source = [read('a'), read('b', '/repo/AGENTS.md'), read('c', '/repo/x', ['/repo/CLAUDE.md']), read('d')];
   const original = structuredClone(source);
-  const projected = projectHistory(source as unknown as Messages);
+  const projected = projectHistory(source as unknown as Messages, executionRecall, Number.POSITIVE_INFINITY);
   expect(projected.slice(1)).toEqual(original.slice(1));
   expect(projected[0]?.parts[0]).toMatchObject({
     callID: 'ca',
@@ -49,7 +75,7 @@ it('规则提醒、失败调用、附件与未完成调用所在的证据保持�
     read('pending', undefined, [], { status: 'running' }),
     read('latest'),
   ];
-  expect(projectHistory(source as unknown as Messages)).toEqual(source);
+  expect(projectHistory(source as unknown as Messages, executionRecall, Number.POSITIVE_INFINITY)).toEqual(source);
 });
 
 it('按数组中的终点替换完整前缀，保留规则、新指令和最新工具批次，失效终点回退', () => {
@@ -63,21 +89,21 @@ it('按数组中的终点替换完整前缀，保留规则、新指令和最新�
   const rule = read('rules', '/repo/AGENTS.md');
   const latest = read('b');
   const during = [root, evidence, rule, latest] as unknown as Messages;
-  const frozen = freezePrefix(projectHistory(during));
+  const frozen = freezePrefix(during);
   expect(frozen?.uptoMessageId).toBe('z');
   expect(frozen?.source).toContain('original goal');
   expect(frozen?.source).toContain('"partId":"pz"');
   const summary = { uptoMessageId: 'z', summaryText: 'Found the evidence' };
   const newer = user('new instruction');
   const tail = read('a');
-  const history = projectHistory([...during, newer, tail] as unknown as Messages);
+  const history = [...during, newer, tail] as unknown as Messages;
   const projected = applySummary(history, summary);
   expect(projected[0]).toEqual(root);
   expect(projected[1]?.parts).toMatchObject([{ type: 'text', text: expect.stringContaining(summary.summaryText) }]);
   expect(projected.slice(2)).toEqual(history.slice(2));
   expect(applySummary(history, { ...summary, uptoMessageId: 'absent' })).toBe(history);
   expect(applySummary(history, { ...summary, uptoMessageId: 'a' })).toBe(history);
-  expect(applySummary(projectHistory(during), summary)[0]).toEqual(root);
+  expect(applySummary(during, summary)[0]).toEqual(root);
 });
 
 it('后一轮摘要继承已发布摘要并包含新增证据，只有原摘要时不重跑', () => {
@@ -115,7 +141,7 @@ it('内联图片按张估算，直接附件和工具截图的预算独立于 bas
 it('默认开启，助手折叠引用指向自己的 Recall 通道', () => {
   expect(SETTING_DEFAULTS['ai.contextEngine']).toBe(true);
   const messages = [read('old'), read('new')] as unknown as Messages;
-  expect(projectHistory(messages, 'agent-workflow-app_recall')[0]?.parts[0]).toMatchObject({
+  expect(projectHistory(messages, 'agent-workflow-app_recall', 2000)[0]?.parts[0]).toMatchObject({
     state: { output: expect.stringContaining('→ agent-workflow-app_recall]') },
   });
 });
