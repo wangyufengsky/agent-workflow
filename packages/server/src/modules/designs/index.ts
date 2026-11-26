@@ -12,6 +12,7 @@ import { createDesignQueries } from './designs.queries.ts';
 import type { createDesignsRepo } from './designs.repo.ts';
 import { createDesignRuns } from './designs.runs.ts';
 import { createDesignsService } from './designs.service.ts';
+import { createDesignSubmissions } from './designs.submissions.ts';
 
 export type { DesignsService } from './designs.service.ts';
 export function createDesignsModule(deps: {
@@ -30,7 +31,12 @@ export function createDesignsModule(deps: {
   const runs = createDesignRuns(deps);
   const queries = createDesignQueries({ ...deps, runs });
   const service = createDesignsService({ ...deps, queries, runs });
-  return { service, knowledge: createProjectKnowledgeReader(deps.repo), operations: designsOperations(service) };
+  return {
+    service,
+    knowledge: createProjectKnowledgeReader(deps.repo),
+    operations: designsOperations(service),
+    submissions: createDesignSubmissions({ ...deps, incrementalFor: runs.incrementalFor }),
+  };
 }
 
 export { designExclusion } from './designs.exclusions.ts';
@@ -49,5 +55,5 @@ export {
   type ProjectDesign,
 } from './designs.repo.ts';
 export { createReviewKnowledgeReader, type ReviewKnowledgeSelection } from './designs.review-knowledge.ts';
-export { createDesignSubmissions, type DesignSubmissions } from './designs.submissions.ts';
+export type { DesignSubmissions } from './designs.submissions.ts';
 export { syncBuiltinDesignTemplates } from './designs.templates.ts';

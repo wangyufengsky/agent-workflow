@@ -18,9 +18,17 @@ import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import { replaceSectionContent, snapshotSection } from './designs.content.ts';
+import {
+  commitDesignUpdateSection,
+  commitDesignUpdateSnapshot,
+  filesForDesignUpdateSection,
+  materializeDesignUpdateFiles,
+  snapshotDesignUpdateSection,
+} from './designs.incremental.ts';
 import { designFilePage, designScope } from './designs.planning.ts';
 import { readDesignSectionPage } from './designs.prompt-section.ts';
 import type { createDesignsRepo, DesignSection } from './designs.repo.ts';
+import type { DesignRuns } from './designs.runs.ts';
 import { validateDesignOutline, validateDesignReview, validateDesignSection } from './designs.validator.ts';
 
 type Dependencies = {
@@ -29,13 +37,14 @@ type Dependencies = {
   projects: Pick<ProjectsService, 'getRecord'>;
   unit: UnitOfWork;
   clock: Clock;
+  incrementalFor: DesignRuns['incrementalFor'];
 };
 
 function invalid(path: (string | number)[], message: string): never {
   throw new AppError(ErrorCode.ValidationFailed, 'Invalid project design submission', { issues: [{ path, message }] });
 }
 
-export function createDesignSubmissions({ repo, attempts, projects, unit, clock }: Dependencies) {
+export function createDesignSubmissions({ repo, attempts, projects, unit, clock, incrementalFor }: Dependencies) {
   function activeRun(attempt: AttemptDTO) {
     if (attempts.get(attempt.id).status !== AttemptStatus.Running)
       throw new AppError(ErrorCode.McpAttemptUnresolved, 'This project design attempt has ended');
@@ -64,13 +73,19 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
   function context(attempt: AttemptDTO, sectionId?: string) {
     const { design, run, projectId } = activeRun(attempt);
     const files = repo.listFiles(design.id);
-    const inScope =
+    const section =
       sectionId !== undefined && run.targetSectionIds.includes(sectionId)
-        ? designScope([mustFindSection(design.id, sectionId)])
+        ? mustFindSection(design.id, sectionId)
         : undefined;
+    const frozen = incrementalFor(attempt.id)?.frozen;
+    const inScope = section === undefined ? undefined : designScope([section]);
+    const authorized =
+      frozen !== undefined && section !== undefined
+        ? filesForDesignUpdateSection(section, frozen, files)
+        : files.filter(({ relPath }) => inScope === undefined || inScope(relPath));
     return {
-      root: projects.getRecord(projectId).repoPath,
-      files: inScope === undefined ? files : files.filter(({ relPath }) => inScope(relPath)),
+      root: frozen === undefined ? projects.getRecord(projectId).repoPath : attempt.directory,
+      files: authorized,
       targetSectionIds: run.targetSectionIds,
     };
   }
@@ -86,9 +101,16 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
       const { design, run } = activeRun(attempt);
       const targets = repo.listSections(design.id).filter(({ id }) => run.targetSectionIds.includes(id));
       const inScope = designScope(targets);
-      const files = repo
-        .fileInventory(design.id)
-        .filter(({ relPath }) => attempt.kind === AttemptKind.DesignOutline || inScope(relPath));
+      const inventory = repo.fileInventory(design.id);
+      const frozen = incrementalFor(attempt.id)?.frozen;
+      const [target] = targets;
+      const files =
+        frozen !== undefined && target !== undefined
+          ? filesForDesignUpdateSection(target, frozen, inventory).map(({ relPath, sectionId }) => ({
+              relPath,
+              sectionId,
+            }))
+          : inventory.filter(({ relPath }) => attempt.kind === AttemptKind.DesignOutline || inScope(relPath));
       return designFilePage(files, query, offset);
     },
     submitOutline(attempt: AttemptDTO, input: SubmitDesignOutlineInput) {
@@ -131,6 +153,8 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
       if (run.doneSectionIds.includes(section.id)) invalid(['sectionId'], 'This section has already been submitted');
 
       const now = clock.now();
+      const incremental = incrementalFor(attempt.id);
+      const frozen = incremental?.frozen;
       const files = repo.listFiles(design.id);
       const oldDiagrams = repo.listDiagrams(design.id).filter(({ sectionId }) => sectionId === section.id);
       const oldDiagramIds = new Set(oldDiagrams.map(({ id }) => id));
@@ -154,11 +178,26 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
           ),
           diagrams: input.diagrams.map((diagram) => ({ ...diagram, id: diagramId(diagram.id) })),
         };
-        const previous =
+        let previous =
           attempt.kind === AttemptKind.DesignRevise ? snapshotSection(section, files, oldDiagrams) : section.previous;
-        replaceSectionContent(repo, section, files, content, previous, now);
+        if (frozen !== undefined) {
+          if (previous !== null) previous = { ...previous, sourceHashes: snapshotDesignUpdateSection(section, frozen) };
+          materializeDesignUpdateFiles(repo, design.id, section.id, frozen);
+        }
+        replaceSectionContent(
+          repo,
+          section,
+          frozen === undefined ? files : repo.listFiles(design.id),
+          content,
+          previous,
+          now,
+        );
+        if (frozen !== undefined) commitDesignUpdateSection(repo, design.id, section.id, frozen);
         repo.updateRunDone(run.id, done);
-        if (remainingSectionIds.length === 0) attempts.markSubmitted(attempt.id);
+        if (remainingSectionIds.length === 0) {
+          if (incremental?.advancesSnapshot) commitDesignUpdateSnapshot(repo, design.id, incremental.frozen);
+          attempts.markSubmitted(attempt.id);
+        }
         publish(design.id, now);
       });
       return { remainingSectionIds };

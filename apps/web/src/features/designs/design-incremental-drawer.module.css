@@ -1,0 +1,67 @@
+.content {
+  display: grid;
+  gap: 1rem;
+}
+
+.content p,
+.content h3 {
+  margin: 0;
+}
+
+.target,
+.strategy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.checklist {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.checklist legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+  font-weight: 600;
+}
+
+.chapter,
+.files li {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+}
+
+.chapter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chapter[data-selected="true"] {
+  border-color: var(--ok-line);
+  background: var(--ok-fill);
+}
+
+.files {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+.files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.files li span {
+  flex: none;
+}

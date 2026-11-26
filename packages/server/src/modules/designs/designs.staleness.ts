@@ -1,45 +1,12 @@
 import { constants } from 'node:fs';
 import { access, realpath, stat } from 'node:fs/promises';
 import { type DesignStalenessDTO, DesignStalenessState } from '@aw/shared';
-import { buildProjectKnowledgeIndex } from './designs.knowledge.ts';
-import { designScope } from './designs.planning.ts';
-import type { createDesignsRepo, DesignFile, ProjectDesign } from './designs.repo.ts';
+import { observeDesignChanges } from './designs.changes.ts';
+import type { createDesignsRepo, ProjectDesign } from './designs.repo.ts';
 import { readDesignGitStatus, type ScannedDesignFile, scanDesignFiles } from './designs.scanner.ts';
 
 const CHANGED_PATHS_SAMPLE_LIMIT = 20;
-
-function changedPaths(baseline: readonly ScannedDesignFile[], current: readonly ScannedDesignFile[]) {
-  const remaining = new Map(baseline.map(({ relPath, contentHash }) => [relPath, contentHash]));
-  const changed: string[] = [];
-  for (const { relPath, contentHash } of current) {
-    if (remaining.get(relPath) !== contentHash) changed.push(relPath);
-    remaining.delete(relPath);
-  }
-  return [...changed, ...remaining.keys()].sort((a, b) => a.localeCompare(b, 'en'));
-}
-
-function affectedSections(
-  repo: ReturnType<typeof createDesignsRepo>,
-  design: ProjectDesign,
-  files: readonly DesignFile[],
-  paths: readonly string[],
-) {
-  const sections = repo.listSections(design.id);
-  const knowledge = buildProjectKnowledgeIndex(design, sections, files, repo.listDiagrams(design.id));
-  const changed = new Set(paths);
-  const affected = new Set(files.filter(({ relPath }) => changed.has(relPath)).map(({ sectionId }) => sectionId));
-  for (const path of paths) {
-    for (const id of knowledge.getFileReferences(path).sectionIds) affected.add(id);
-  }
-  // 即使章节尚未生成，也可按大纲判断哪些范围有文件变化。
-  return sections
-    .filter(
-      (section) =>
-        section.selected &&
-        (affected.has(section.id) || (section.blocks === null && paths.some(designScope([section])))),
-    )
-    .map(({ id }) => id);
-}
+type Repo = ReturnType<typeof createDesignsRepo>;
 
 async function readWorktree(repoPath: string) {
   try {
@@ -67,7 +34,7 @@ function matchesCleanHead(design: ProjectDesign, status: Awaited<ReturnType<type
 }
 
 export async function findFreshDesign(
-  repo: Pick<ReturnType<typeof createDesignsRepo>, 'listFileHashes'>,
+  repo: Repo,
   candidates: readonly ProjectDesign[],
   repoPath: string,
 ): Promise<ProjectDesign | undefined> {
@@ -77,15 +44,14 @@ export async function findFreshDesign(
   const scanned = new Map<string, readonly ScannedDesignFile[]>();
   try {
     for (const design of candidates) {
-      if (matchesCleanHead(design, worktree.status)) return design;
+      if (matchesCleanHead(design, worktree.status) && !repo.hasSectionSourceHashes(design.id)) return design;
       const key = JSON.stringify(design.excludePatterns);
       let current = scanned.get(key);
       if (current === undefined) {
         current = (await scanDesignFiles(worktree.root, design.excludePatterns)).files;
         scanned.set(key, current);
       }
-      if (current.length !== design.sourceSnapshot.analyzableCount) continue;
-      if (changedPaths(repo.listFileHashes(design.id), current).length === 0) return design;
+      if (observeDesignChanges(repo, design, repo.listFiles(design.id), current).changes.length === 0) return design;
     }
   } catch (error) {
     if (!directoryUnavailable(error)) throw error;
@@ -94,7 +60,7 @@ export async function findFreshDesign(
 }
 
 export async function readDesignStaleness(
-  repo: ReturnType<typeof createDesignsRepo>,
+  repo: Repo,
   design: ProjectDesign,
   repoPath: string | null,
 ): Promise<DesignStalenessDTO> {
@@ -108,20 +74,21 @@ export async function readDesignStaleness(
   const headSha = worktree.status?.commit ?? null;
   const currentSha = headSha === null ? {} : { headSha };
   const fresh = { ...empty, ...currentSha, state: DesignStalenessState.Fresh };
-  if (matchesCleanHead(design, worktree.status)) return fresh;
+  if (matchesCleanHead(design, worktree.status) && !repo.hasSectionSourceHashes(design.id)) return fresh;
 
   try {
     const { files: current } = await scanDesignFiles(worktree.root, design.excludePatterns);
-    const baseline = repo.listFiles(design.id);
-    const changed = changedPaths(baseline, current);
-    if (changed.length === 0) return fresh;
+    const { changes, affectedSectionIds } = observeDesignChanges(repo, design, repo.listFiles(design.id), current);
+    if (changes.length === 0) return fresh;
+    const changedFilesSample = changes.slice(0, CHANGED_PATHS_SAMPLE_LIMIT);
     return {
       state: DesignStalenessState.Stale,
       ...baselineSha,
       ...currentSha,
-      changedFilesCount: changed.length,
-      affectedSectionIds: affectedSections(repo, design, baseline, changed),
-      changedPathsSample: changed.slice(0, CHANGED_PATHS_SAMPLE_LIMIT),
+      changedFilesCount: changes.length,
+      affectedSectionIds,
+      changedPathsSample: changedFilesSample.map(({ relPath }) => relPath),
+      changedFilesSample,
     };
   } catch (error) {
     if (directoryUnavailable(error)) return unavailable;

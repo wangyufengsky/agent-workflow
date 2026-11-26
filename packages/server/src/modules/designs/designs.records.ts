@@ -7,6 +7,7 @@ import {
   type DesignReviewState,
   type DesignSectionKind,
   type DesignSectionVersion,
+  type DesignSourceHashes,
   type DesignSourceSnapshot,
   type DesignSymbol,
   type DesignTemplate,
@@ -19,6 +20,7 @@ import {
   designReviewStateSchema,
   designSectionKindSchema,
   designSectionVersionSchema,
+  designSourceHashesSchema,
   designSourceSnapshotSchema,
   designSymbolSchema,
   designTemplateSchema,
@@ -57,7 +59,7 @@ export type ProjectDesign = Omit<
 
 export type DesignSection = Omit<
   SectionRow,
-  'kind' | 'scopePaths' | 'blocks' | 'reviewState' | 'reviewNotes' | 'previous'
+  'kind' | 'scopePaths' | 'blocks' | 'reviewState' | 'reviewNotes' | 'previous' | 'sourceHashes'
 > & {
   kind: DesignSectionKind;
   scopePaths: string[];
@@ -65,13 +67,15 @@ export type DesignSection = Omit<
   reviewState: DesignReviewState;
   reviewNotes: DesignReviewNote[] | null;
   previous: DesignSectionVersion | null;
+  sourceHashes?: DesignSourceHashes | null;
 };
 
 export type DesignFile = Omit<FileRow, 'symbols'> & { symbols: DesignSymbol[] };
 export type DesignDiagramRecord = DesignDiagram & Pick<DiagramRow, 'designId' | 'sectionId' | 'updatedAt'>;
-export type DesignRun = Omit<RunRow, 'targetSectionIds' | 'doneSectionIds'> & {
+export type DesignRun = Omit<RunRow, 'targetSectionIds' | 'doneSectionIds' | 'isIncremental'> & {
   targetSectionIds: string[];
   doneSectionIds: string[];
+  isIncremental?: boolean;
 };
 
 const stringsSchema = z.array(z.string());
@@ -100,7 +104,7 @@ export const fromDesign = (design: ProjectDesign): DesignRow => ({
   templateSnapshot: JSON.stringify(design.templateSnapshot),
 });
 
-export const toSection = (row: SectionRow): DesignSection => ({
+export const toSection = ({ sourceHashes, ...row }: SectionRow): DesignSection => ({
   ...row,
   kind: designSectionKindSchema.parse(row.kind),
   scopePaths: json(stringsSchema, row.scopePaths),
@@ -108,6 +112,7 @@ export const toSection = (row: SectionRow): DesignSection => ({
   reviewState: designReviewStateSchema.parse(row.reviewState),
   reviewNotes: nullableJson(reviewNotesSchema, row.reviewNotes),
   previous: nullableJson(designSectionVersionSchema, row.previous),
+  ...(sourceHashes === null ? {} : { sourceHashes: json(designSourceHashesSchema, sourceHashes) }),
 });
 export const fromSection = (section: DesignSection): SectionRow => ({
   ...section,
@@ -115,6 +120,7 @@ export const fromSection = (section: DesignSection): SectionRow => ({
   blocks: nullableStringify(section.blocks),
   reviewNotes: nullableStringify(section.reviewNotes),
   previous: nullableStringify(section.previous),
+  sourceHashes: nullableStringify(section.sourceHashes ?? null),
 });
 
 export const toFile = (row: FileRow): DesignFile => ({ ...row, symbols: json(symbolsSchema, row.symbols) });
@@ -139,8 +145,9 @@ export const fromDiagram = (diagram: DesignDiagramRecord): DiagramRow => ({
   edges: JSON.stringify(diagram.edges),
 });
 
-export const toRun = (row: RunRow): DesignRun => ({
+export const toRun = ({ isIncremental, ...row }: RunRow): DesignRun => ({
   ...row,
+  ...(isIncremental ? { isIncremental } : {}),
   targetSectionIds: json(stringsSchema, row.targetSectionIds),
   doneSectionIds: json(stringsSchema, row.doneSectionIds),
 });
@@ -148,6 +155,7 @@ export const fromRun = (run: DesignRun): RunRow => ({
   ...run,
   targetSectionIds: JSON.stringify(run.targetSectionIds),
   doneSectionIds: JSON.stringify(run.doneSectionIds),
+  isIncremental: run.isIncremental ?? false,
 });
 
 export const toTemplate = ({ matchHints, defaultSections, ...row }: TemplateRow): DesignTemplate =>

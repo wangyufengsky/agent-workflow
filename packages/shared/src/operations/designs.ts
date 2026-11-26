@@ -8,6 +8,7 @@ import {
   designTemplateRefSchema,
   exportDesignRequestSchema,
   generateDesignRequestSchema,
+  incrementalUpdateDesignRequestSchema,
   listDesignsQuerySchema,
   listDesignsResponseSchema,
   listDesignTemplatesQuerySchema,
@@ -184,6 +185,18 @@ export const generateDesignOp = defineOperationContract({
   output: designSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/designs/:id/generate' },
+  refs: designRef,
+});
+
+export const incrementalUpdateDesignOp = defineOperationContract({
+  ...common,
+  id: 'designs.incrementalUpdate',
+  title: 'op.designs.incrementalUpdate',
+  description: 'Update the selected affected design sections against the source snapshot captured at start',
+  input: incrementalUpdateDesignRequestSchema,
+  output: designSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/designs/:id/incremental-update' },
   refs: designRef,
 });
 

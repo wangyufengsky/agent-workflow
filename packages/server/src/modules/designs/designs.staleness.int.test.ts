@@ -113,6 +113,7 @@ it('新提交修改共享源码时返回两个提交和所有受影响的已生�
     changedFilesCount: 1,
     affectedSectionIds: [module.id, overview.id],
     changedPathsSample: [relPath],
+    changedFilesSample: [{ relPath, kind: 'modified' }],
   });
 });
 
@@ -154,6 +155,11 @@ it('从脏快照恢复已提交内容后按哈希统计增删改，并按目录�
     changedFilesCount: 3,
     affectedSectionIds: [srcSection.id, draftSection.id],
     changedPathsSample: ['src/service.ts', 'src/utility-extra/draft.ts', 'src/utility-extra/old.ts'],
+    changedFilesSample: [
+      { relPath: 'src/service.ts', kind: 'modified' },
+      { relPath: 'src/utility-extra/draft.ts', kind: 'removed' },
+      { relPath: 'src/utility-extra/old.ts', kind: 'added' },
+    ],
   });
 
   await writeFile(join(repo.path, 'scratch.txt'), 'updated and still excluded');

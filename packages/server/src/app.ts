@@ -65,7 +65,6 @@ import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
 import {
-  createDesignSubmissions,
   createDesignsModule,
   createDesignsRepo,
   createReviewKnowledgeReader,
@@ -795,13 +794,6 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     prompts,
   });
   server.addHook('preClose', async () => designs.service.close());
-  const designSubmissions = createDesignSubmissions({
-    repo: designsRepo,
-    attempts: attempts.service,
-    projects: projects.service,
-    unit,
-    clock,
-  });
   const mcp = createMcpModule({
     databaseInvestigations,
     events,
@@ -813,7 +805,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     debug: debug.service,
     knowledge: knowledge.service,
     decks: decks.service,
-    designSubmissions,
+    designSubmissions: designs.submissions,
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
     team: team.service,

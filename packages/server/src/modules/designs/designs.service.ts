@@ -10,6 +10,7 @@ import {
   ErrorCode,
   type ExportDesignRequest,
   type GenerateDesignRequest,
+  type IncrementalUpdateDesignRequest,
   type ReviewDesignRequest,
   type ReviseDesignOutlineRequest,
   type ReviseDesignSectionRequest,
@@ -26,6 +27,7 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { replaceSectionContent } from './designs.content.ts';
 import { exportDesignSite } from './designs.exporter.ts';
+import { restoreDesignUpdateSection } from './designs.incremental.ts';
 import { initialDesignOutline } from './designs.outline.ts';
 import type { createDesignQueries } from './designs.queries.ts';
 import type { createDesignsRepo, DesignSection, ProjectDesign } from './designs.repo.ts';
@@ -84,7 +86,7 @@ export function createDesignsService({
   function exportProjectRoot(design: ProjectDesign): string | null {
     if (design.projectId !== null) return projects.getRecord(design.projectId).repoPath;
     // 删除项目只解除关联，设计尝试仍记录生成内容使用的项目目录。
-    const run = repo.listRuns(design.id).at(-1);
+    const run = repo.listRuns(design.id).findLast(({ isIncremental }) => !isIncremental);
     return run === undefined ? null : attempts.get(run.attemptId).directory;
   }
 
@@ -220,6 +222,11 @@ export function createDesignsService({
       await runs.reviseSection(id, sectionId, options);
       return queries.get(id);
     },
+    async incrementalUpdate({ id, ...options }: IncrementalUpdateDesignRequest) {
+      assertNotExporting(id);
+      await runs.incrementalUpdate(id, options);
+      return queries.get(id);
+    },
     async review({ id, ...options }: ReviewDesignRequest) {
       assertNotExporting(id);
       await runs.review(id, options);
@@ -237,7 +244,10 @@ export function createDesignsService({
       const previous = section.previous;
       if (previous === null)
         throw new AppError(ErrorCode.StateTransitionInvalid, 'Section has no previous version', { sectionId });
-      return change(id, (now) => replaceSectionContent(repo, section, repo.listFiles(id), previous, null, now));
+      return change(id, (now) => {
+        const restored = restoreDesignUpdateSection(repo, section, previous, now);
+        replaceSectionContent(repo, restored, repo.listFiles(id), previous, null, now);
+      });
     },
     async export({ id, targetDir, overwrite }: ExportDesignRequest) {
       const design = designById(id);

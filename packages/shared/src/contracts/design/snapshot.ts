@@ -23,10 +23,19 @@ export const designReviewNoteSchema = z.strictObject({
 });
 export type DesignReviewNote = z.infer<typeof designReviewNoteSchema>;
 
+export const designSourceHashesSchema = z.array(
+  z.strictObject({
+    relPath: z.string().min(1),
+    contentHash: z.string().nullable(),
+  }),
+);
+export type DesignSourceHashes = z.infer<typeof designSourceHashesSchema>;
+
 export const designSectionVersionSchema = z.strictObject({
   summary: z.string(),
   blocks: z.array(designBlockSchema),
   files: z.array(designFileContentSchema),
   diagrams: z.array(designDiagramSchema),
+  sourceHashes: designSourceHashesSchema.optional(),
 });
 export type DesignSectionVersion = z.infer<typeof designSectionVersionSchema>;

@@ -764,10 +764,10 @@ payload / response：
 | 表 | 字段与关系 | 索引 |
 | --- | --- | --- |
 | `project_designs` | 主键 `id`。可空的 `project_id` 引用 `projects`（SET NULL）。保存标题、分析深度、模板键与模板快照 JSON、阅读风格、主题、排除规则 JSON、复审开关、源码扫描快照 JSON、大纲确认时间、最近导出路径和时间、创建及更新时间。 | `(project_id, updated_at, id)`、`(updated_at, id)` |
-| `design_sections` | 主键 `id`，`design_id` 引用设计（CASCADE）。顺序 `seq`、是否勾选 `is_selected`（默认 true）、种类、标题、路径范围 JSON、摘要、正文块 JSON（NULL 表示待生成，submodule 保存子模块、归属文件与带证据的功能解读）、复审状态、复审意见 JSON、上一版内容 JSON、更新时间。 | `(design_id, seq)` |
-| `design_files` | 主键 `id`，`design_id` 引用设计（CASCADE），可空的 `section_id` 引用所属章节（SET NULL）。保存项目相对路径、扫描时的内容哈希、可空的职责说明、符号列表 JSON、更新时间。 | `(design_id, rel_path)` 唯一，另有 `(design_id, section_id)` |
+| `design_sections` | 主键 `id`，`design_id` 引用设计（CASCADE）。顺序 `seq`、是否勾选 `is_selected`（默认 true）、种类、标题、路径范围 JSON、摘要、正文块 JSON（NULL 表示待生成，submodule 保存子模块、归属文件与带证据的功能解读）、复审状态、复审意见 JSON、可空的章节源码哈希覆盖 `source_hashes` JSON（删除或尚不存在的路径记为 null）、上一版内容及原哈希 JSON、更新时间。 | `(design_id, seq)` |
+| `design_files` | 主键 `id`，`design_id` 引用设计（CASCADE），可空的 `section_id` 引用所属章节（SET NULL）。保存项目相对路径、扫描时或相关章节最近一次提交时的内容哈希（部分更新删除时用空串保留原记录）、可空的职责说明、符号列表 JSON、更新时间。 | `(design_id, rel_path)` 唯一，另有 `(design_id, section_id)` |
 | `design_diagrams` | 主键 `id`，`design_id`、`section_id` 分别引用设计及章节（CASCADE）。保存图种类、标题、节点 JSON、边 JSON、更新时间。 | `(design_id, section_id)` |
-| `design_runs` | 主键 `id`，`design_id` 引用设计（CASCADE），`attempt_id` 引用尝试。保存设计内顺序 `seq`、目标及已提交的章节 ID 列表 JSON、可空的指令、创建时间。类型与状态由尝试推导。 | `(design_id, seq)`、`(attempt_id)` |
+| `design_runs` | 主键 `id`，`design_id` 引用设计（CASCADE），`attempt_id` 引用尝试。保存设计内顺序 `seq`、目标及已提交的章节 ID 列表 JSON、可空的指令、是否增量更新 `is_incremental`（默认 false）、创建时间。类型与状态由尝试推导。 | `(design_id, seq)`、`(attempt_id)` |
 | `design_templates` | 主键 `key`。保存内置或自定义种类、名称、描述、识别线索 JSON、默认章节蓝图 JSON、分析侧重提示词、更新时间。内置模板随启动同步。设计持有创建时的快照，可在模板更新或删除后继续使用。 | 主键 |
 
 删除项目后保留设计，所属项目置空。删除设计时先记下关联尝试 ID，事务内删除设计并级联清除子表，再按 ID 删除尝试和会话记录。工作台尝试沿用 [§3](#3-jsonl-会话流) 的 JSONL 机制，存放于 `runs/designs/<attemptId>.jsonl`。

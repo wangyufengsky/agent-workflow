@@ -3,6 +3,7 @@ import {
   type DesignDTO,
   type DesignRunDTO,
   DesignRunKind,
+  type DesignStalenessDTO,
   DesignStalenessState,
   RuntimeStatus,
 } from '@aw/shared';
@@ -14,6 +15,7 @@ import { Icon } from '../../components/icon.tsx';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
 import { RUNTIME_STATUS_LABEL } from '../../copy/runtime.ts';
 import { runtimeQuery } from '../runtime/runtime.queries.ts';
+import { DesignIncrementalDrawer } from './design-incremental-drawer.tsx';
 import { DEFAULT_NAV, DesignOutlineNav, OutlineResizer } from './design-outline-nav.tsx';
 import { DesignOverview } from './design-overview.tsx';
 import { DesignReader } from './design-reader.tsx';
@@ -90,6 +92,7 @@ export function DesignWorkbench({ design, model, repoPath, initialTarget }: Prop
     | { kind: 'restore'; target: EditableTarget }
     | { kind: 'export' }
     | { kind: 'delete' }
+    | { kind: 'incremental'; preview: DesignStalenessDTO; instruction?: string | null }
     | null
   >(null);
   const failures = failedSections(design.runs);
@@ -125,7 +128,9 @@ export function DesignWorkbench({ design, model, repoPath, initialTarget }: Prop
   const panelOpen =
     panel?.runId === candidateId && panel?.active === busy
       ? panel.open
-      : busy || latest?.attempt.status === AttemptStatus.Failed;
+      : busy ||
+        latest?.attempt.status === AttemptStatus.Failed ||
+        (latest?.isIncremental === true && latest.attempt.status === AttemptStatus.Aborted);
   const keepReading = () => {
     if (reading === null) setReading({ target: currentTarget, highlighted: false });
   };
@@ -135,7 +140,9 @@ export function DesignWorkbench({ design, model, repoPath, initialTarget }: Prop
   const continueGeneration = (sectionId?: string) =>
     generate.mutate({ id: design.id, ...(sectionId === undefined ? {} : { sectionId }), model });
   const retry = (run: DesignRunDTO) => {
-    if (run.kind === DesignRunKind.Review) {
+    if (run.isIncremental === true) {
+      if (stale !== undefined) setDialog({ kind: 'incremental', preview: stale, instruction: run.instruction });
+    } else if (run.kind === DesignRunKind.Review) {
       review.mutate({ id: design.id, model });
     } else if (run.kind === DesignRunKind.Revise) {
       const sectionId = run.targetSectionIds[0];
@@ -193,6 +200,16 @@ export function DesignWorkbench({ design, model, repoPath, initialTarget }: Prop
           <p role="status">
             <strong>{C.staleNotice}</strong> {C.staleImpact(stale.changedFilesCount, affectedIds.size)}
           </p>
+          {affectedIds.size > 0 && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={staleness.isFetching}
+              onClick={() => setDialog({ kind: 'incremental', preview: stale })}
+            >
+              {C.incrementalUpdate}
+            </Button>
+          )}
           {firstAffected !== undefined && (
             <Button
               size="sm"
@@ -300,11 +317,20 @@ export function DesignWorkbench({ design, model, repoPath, initialTarget }: Prop
             active={active}
             latest={latest}
             canGenerate={canGenerate}
+            canRetryIncremental={affectedIds.size > 0 && !staleness.isFetching}
             onRetry={retry}
             onClose={() => setPanel({ runId: candidateId, active: busy, open: false })}
           />
         )}
       </div>
+      {dialog?.kind === 'incremental' && (
+        <DesignIncrementalDrawer
+          design={design}
+          preview={dialog.preview}
+          initialInstruction={dialog.instruction ?? ''}
+          close={closeDialog}
+        />
+      )}
       {dialog?.kind === 'delete' && <DeleteDesignDialog design={design} close={closeDialog} />}
       {dialog?.kind === 'export' && <ExportDesignDialog design={design} repoPath={repoPath} close={closeDialog} />}
       {dialog?.kind === 'revise' && (
