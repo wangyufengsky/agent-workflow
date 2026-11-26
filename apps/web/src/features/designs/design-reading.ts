@@ -76,6 +76,18 @@ function blockText(block: DesignBlock): string[] {
       return [block.title ?? '', block.relPath, block.code];
     case 'table':
       return [block.title, block.caption ?? '', ...block.columns, ...block.rows.flat()];
+    case 'transaction':
+      return [
+        block.title,
+        block.code ?? '',
+        block.channel ?? '',
+        block.version ?? '',
+        block.scenario ?? '',
+        ...[...(block.fields ?? []), ...(block.boundaries ?? [])].flatMap(({ name, description }) => [
+          name,
+          description,
+        ]),
+      ];
     case 'submodule':
       return [];
     case 'diagram_ref':

@@ -203,7 +203,7 @@ describe('项目设计的 SQLite 持久化', () => {
     expect(persisted.find(({ id }) => id === 'file-4199')).toEqual(files.at(-1));
   });
 
-  it('原五套模板收敛为架构探索，保留自定义模板和所有旧设计快照', () => {
+  it('升级内置架构和交易模板时保留自定义模板和所有旧设计快照', () => {
     const { db } = database;
     const repo = createDesignsRepo(db);
     const unit = createUnitOfWork(db, createEventBus());
@@ -239,6 +239,7 @@ describe('项目设计的 SQLite 持久化', () => {
     syncBuiltinDesignTemplates(repo, unit, systemClock, seeds);
     expect(repo.listTemplates().map(({ key, kind }) => ({ key, kind }))).toEqual([
       { key: BuiltinDesignTemplateKey.General, kind: DesignTemplateKind.Builtin },
+      { key: BuiltinDesignTemplateKey.TransactionExplorer, kind: DesignTemplateKind.Builtin },
       { key: 'custom-test', kind: DesignTemplateKind.Custom },
     ]);
     expect(repo.findTemplate(BuiltinDesignTemplateKey.General)?.name).toBe('架构探索');

@@ -271,7 +271,7 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await expect(page.getByLabel('目标项目')).toHaveValue(project.id);
   await expect(page.getByText(/识别的技术栈.*React/)).toBeVisible();
   const template = page.getByRole('group', { name: '分析模板' });
-  await expect(template.getByRole('radio')).toHaveCount(1);
+  await expect(template.getByRole('radio', { name: /^交易链路探索/ })).toBeVisible();
   await expect(template.getByRole('radio', { name: /^架构探索/ })).toBeChecked();
   await expect(page.getByLabel('主题', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '扫描项目并拟定大纲' }).click();
@@ -592,7 +592,7 @@ test('架构探索模板区在选项目时保持尺寸，自定义模板可从�
   const custom = page.getByRole('article').filter({ has: page.getByRole('heading', { name: '研发结构简报' }) });
   await custom.getByRole('link', { name: '使用此模板新建' }).click();
   await expect(picker.getByRole('radio', { name: /^研发结构简报/ })).toBeChecked();
-  await expect(picker.getByRole('radio')).toHaveCount(2);
+  await expect(picker.getByRole('radio', { name: /^交易链路探索/ })).toBeVisible();
 });
 
 test('架构探索从项目首页逐级进入子模块、文件和可校验的完整源码', async ({ page, request }) => {
@@ -686,3 +686,125 @@ test('架构探索从项目首页逐级进入子模块、文件和可校验的�
 });
 
 test.afterAll(({ request }) => patchSettings(request, { 'ui.theme': ThemeId.Codex, 'ui.mode': 'simple' }));
+
+test('交易模板按渠道和版本筛选同码交易，在工作台和离线报告查看处理步骤', async ({ page, request, browser }, info) => {
+  const project = await fixtureProject(request);
+  const routes = 'src/refund-routes.ts';
+  writeFileSync(
+    join(project.repoPath, routes),
+    [
+      "import { submitRefund } from './refunds';",
+      'export const refundRoutes = [',
+      "  { code: 'RF01', channel: '柜面', version: 'v1', handle: submitRefund },",
+      "  { code: 'RF01', channel: '移动端', version: 'v2', handle: submitRefund },",
+      '];',
+    ].join('\n'),
+  );
+  git(project.repoPath, 'add', routes);
+  git(project.repoPath, 'commit', '-m', 'Register two refund channels');
+  await page.goto(`/designs/new?projectId=${project.id}`);
+  await page.getByRole('radio', { name: /^交易链路探索/ }).check();
+  await page.getByRole('button', { name: '扫描项目并拟定大纲' }).click();
+  await expect(page.getByRole('heading', { name: '分析大纲' })).toBeVisible();
+  const id = designId(page);
+  const draft = await design(request, id);
+  expect(draft.templateSnapshot.key).toBe('transaction-explorer');
+  const section = draft.sections.find(({ kind }) => kind === DesignSectionKind.Flow);
+  if (!section) throw new Error('Missing transaction chapter');
+  const outline = await request.put(`${API_BASE}/designs/${id}/outline`, {
+    headers: AUTH,
+    data: { sections: [{ id: section.id, title: section.title, kind: section.kind, selected: true, scopePaths: [] }] },
+  });
+  expect(outline.ok(), await outline.text()).toBe(true);
+  const versions = [
+    { channel: '柜面', version: 'v1' },
+    { channel: '移动端', version: 'v2' },
+  ];
+  const graphs = versions.map(({ channel, version }) => ({
+    ...pendingGraph(DesignDiagramKind.BusinessFlow, `${channel}退款处理`),
+    id: version,
+  }));
+  const base = chapter(
+    section.id,
+    '根据退款入口追踪请求校验和退款单构建。',
+    DesignDiagramKind.BusinessFlow,
+    '退款',
+    true,
+  );
+  if (base.type !== 'callTool') throw new Error('Expected submission');
+  await queueDesign(request, project, [
+    {
+      ...base,
+      args: {
+        ...base.args,
+        diagrams: graphs,
+        blocks: versions.map(({ channel, version }, index) => ({
+          type: 'transaction',
+          title: '订单退款',
+          code: 'RF01',
+          channel,
+          version,
+          diagramId: version,
+          fields: [
+            {
+              name: 'order',
+              steps: ['entry', 'builder'],
+              description: '订单号传递给退款单构建函数。',
+              evidence: [{ evidenceClass: 'static', relPath: IMPLEMENTATION, lineStart: 4, lineEnd: 5 }],
+            },
+          ],
+          evidence: [{ evidenceClass: 'static', relPath: routes, lineStart: 3 + index, lineEnd: 3 + index }],
+        })),
+      },
+    },
+  ]);
+  const generated = await request.post(`${API_BASE}/designs/${id}/generate`, { headers: AUTH, data: {} });
+  expect(generated.ok(), await generated.text()).toBe(true);
+  await expect.poll(async () => (await design(request, id)).status).toBe(DesignStatus.Ready);
+  await page.goto(`/designs/${id}`);
+  const exportDir = info.outputPath('交易报告');
+  const exported = await request.post(`${API_BASE}/designs/${id}/export`, {
+    headers: AUTH,
+    data: { targetDir: exportDir },
+  });
+  expect(exported.ok(), await exported.text()).toBe(true);
+  const offline = await browser.newPage({ offline: true });
+  try {
+    await offline.goto(pathToFileURL(join(exportDir, 'index.html')).href);
+    for (const reader of [page, offline]) {
+      const catalog = reader.getByRole('region', { name: '交易目录' });
+      const search = catalog.getByRole('searchbox');
+      await expect(catalog.getByRole('button', { name: /RF01/ })).toHaveCount(2);
+      await search.fill('RF01 移动端 v2');
+      await expect(catalog.getByRole('button', { name: /RF01/ })).toHaveCount(1);
+      await expect(catalog.getByRole('heading', { name: '移动端退款处理' })).toBeVisible();
+      await catalog.getByText('字段流转', { exact: true }).click();
+      await expect(catalog.getByText('订单号传递给退款单构建函数。')).toBeVisible();
+      await search.fill('未知渠道');
+      await expect(catalog.getByText('没有匹配的交易。')).toBeVisible();
+      await search.fill('');
+      await catalog.getByRole('button', { name: /订单退款.*移动端/ }).click();
+      await catalog.getByRole('button', { name: '构建退款单', exact: true }).press('Enter');
+      await expect(catalog.getByRole('button', { name: '构建退款单', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      const step = catalog.getByLabel('处理步骤', { exact: true });
+      await expect(step).toContainText('构建退款单');
+      await step.getByText('查看对应源码或章节').click();
+      await expect(reader.getByRole('heading', { name: FILE_NAME, exact: false }).first()).toBeVisible();
+    }
+    const shots = process.env.AW_TRANSACTION_SCREENSHOTS;
+    if (shots) {
+      mkdirSync(shots, { recursive: true });
+      await offline.setViewportSize({ width: 1320, height: 960 });
+      await offline.goto(pathToFileURL(join(exportDir, 'index.html')).href);
+      for (const colorScheme of ['light', 'dark'] as const) {
+        await offline.emulateMedia({ colorScheme });
+        await offline.screenshot({ path: join(shots, `transaction-${colorScheme}.png`) });
+      }
+    }
+  } finally {
+    await offline.close();
+  }
+});

@@ -142,6 +142,9 @@ export function DesignReader({
           <DesignDiagram
             key={diagram.id}
             diagram={diagram}
+            transaction={section.blocks
+              ?.filter((block) => block.type === 'transaction')
+              .find((block) => block.diagramId === id)}
             targetOf={(node) => graphNodeTarget(design, diagram.sectionId, node)}
             onNavigate={onNavigate}
             source={context.source}

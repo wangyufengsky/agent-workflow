@@ -85,9 +85,12 @@ export function ContentBlock({ block, context }: { block: DesignBlock; context: 
   return (
     <section className={styles.proseBlock} data-callout={block.type === 'callout' ? block.tone : undefined}>
       {block.title !== undefined && <h2>{block.title}</h2>}
-      {block.type === 'markdown' && (
+      {block.type === 'transaction' && (
+        <p>{[block.code, block.channel, block.version, block.scenario].filter(Boolean).join(' · ')}</p>
+      )}
+      {(block.type === 'markdown' || block.type === 'transaction') && (
         <>
-          <Markdown source={block.markdown} components={markdownComponents} />
+          {block.type === 'markdown' && <Markdown source={block.markdown} components={markdownComponents} />}
           {block.evidence !== undefined && block.evidence.length > 0 && (
             <ul aria-label={C.evidence} className={styles.evidence}>
               {block.evidence.map((evidence, index) => (

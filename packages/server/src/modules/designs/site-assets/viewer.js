@@ -9,6 +9,10 @@
   const fileById = new Map(model.files.map((item) => [item.id, item]));
   const fileByPath = new Map(model.files.map((item) => [item.relPath, item]));
   const diagramById = new Map(model.diagrams.map((item) => [item.id, item]));
+  const profiles = model.sections.flatMap((section) =>
+    section.blocks.filter(({ type }) => type === 'transaction').map((profile) => ({ ...profile, section })),
+  );
+  const transactionGraphs = new Map(profiles.map((profile) => [profile.diagramId, profile]));
   const searchIndex = [];
   let activeHash = '';
   let diagramSerial = 0;
@@ -284,7 +288,12 @@
     }
     const area = el('section', undefined, 'content-block');
     if (block.title) area.append(el('h2', block.title));
-    if (block.type === 'markdown') {
+    if (block.type === 'transaction') {
+      area.append(
+        el('p', [block.code, block.channel, block.version, block.scenario].filter(Boolean).join(' · ')),
+        evidenceList(block.evidence),
+      );
+    } else if (block.type === 'markdown') {
       area.append(markdown(block.markdown));
       if (block.evidence && block.evidence.length > 0) area.append(evidenceList(block.evidence));
     } else if (block.type === 'table') {
@@ -430,6 +439,66 @@
     return area;
   }
 
+  function transactionCatalog() {
+    const labels = C.transactions;
+    const area = el('section', undefined, 'transaction-catalog');
+    const grid = el('div', undefined, 'transaction-grid');
+    const directory = el('div');
+    area.setAttribute('aria-label', labels.catalog);
+    directory.append(el('h2', labels.catalog));
+    grid.append(directory);
+    area.append(grid);
+    if (!profiles.length) {
+      directory.append(el('p', labels.empty, 'muted'));
+      return area;
+    }
+    const filter = el('input');
+    filter.type = 'search';
+    filter.placeholder = labels.filter;
+    filter.setAttribute('aria-label', labels.filter);
+    const listing = el('div');
+    const preview = el('div', undefined, 'transaction-canvas');
+    let selected;
+    function fill() {
+      const terms = filter.value.trim().toLocaleLowerCase().split(/\s+/);
+      const visible = profiles.filter(({ title, code, channel, version, scenario }) => {
+        const values = [title, code, channel, version, scenario].join(' ').toLocaleLowerCase();
+        return terms.every((term) => values.includes(term));
+      });
+      const active = visible.find(({ diagramId }) => diagramId === selected) ?? visible[0];
+      preview.replaceChildren();
+      if (!active) {
+        listing.replaceChildren(el('p', labels.noMatch));
+        return;
+      }
+      const list = el('ul', undefined, 'transaction-list');
+      for (const entry of visible) {
+        const select = button('', () => {
+          selected = entry.diagramId;
+          fill();
+          listing.querySelector('[aria-pressed="true"]').focus();
+        });
+        select.setAttribute('aria-pressed', String(active === entry));
+        select.append(el('strong', entry.title));
+        if (entry.code) select.append(el('code', entry.code));
+        select.append(el('small', [entry.channel, entry.version, entry.scenario].filter(Boolean).join(' · ')));
+        const row = el('li');
+        row.append(select);
+        list.append(row);
+      }
+      listing.replaceChildren(list);
+      preview.append(
+        link(labels.chapter, hash('section', active.section.id)),
+        renderDiagram(diagramById.get(active.diagramId), false),
+      );
+    }
+    filter.addEventListener('input', fill);
+    directory.append(filter, listing);
+    grid.append(preview);
+    fill();
+    return area;
+  }
+
   function renderHome() {
     const home = el('article');
     const overview = model.sections.find(({ kind }) => kind === 'overview');
@@ -453,15 +522,17 @@
     }
     const children = structureSections.map(sectionItem);
     const cards = compositionCards(C.projectOutline, model.sections.map(sectionItem));
+    if (model.transactionExplorer) home.append(transactionCatalog());
     if (cards !== null) home.append(cards);
-    home.append(
-      architecture(
-        model.title,
-        C.architecture,
-        children,
-        model.diagrams.filter(({ kind }) => kind === 'architecture'),
-      ),
-    );
+    if (!model.transactionExplorer)
+      home.append(
+        architecture(
+          model.title,
+          C.architecture,
+          children,
+          model.diagrams.filter(({ kind }) => kind === 'architecture'),
+        ),
+      );
     if (overview)
       for (const block of overview.blocks.filter(({ type }) => type !== 'diagram_ref' && type !== 'submodule')) {
         const body = renderBlock(block);
@@ -732,13 +803,14 @@
     return {
       panel,
       clear,
-      toggle(control, evidence) {
+      toggle(control, evidence, label = C.edgeEvidence) {
         const same = active === control;
         clear();
         if (same) return;
         active = control;
         active.setAttribute('aria-pressed', 'true');
-        panel.replaceChildren(el('strong', C.edgeEvidence), evidence.cloneNode(true));
+        panel.setAttribute('aria-label', label);
+        panel.replaceChildren(el('strong', label), evidence.cloneNode(true));
         panel.hidden = false;
       },
     };
@@ -794,7 +866,34 @@
       const node = nodes.get(id);
       if (node === undefined) continue;
       const target = nodeTarget(node);
-      const item = target === undefined ? svg('g') : svg('a', { href: target, 'aria-label': node.label });
+      const inspect = transactionGraphs.has(diagram.id);
+      const item = inspect
+        ? svg('g', {
+            role: 'button',
+            tabindex: 0,
+            'aria-label': node.label,
+            'aria-pressed': 'false',
+            'aria-controls': inspector.panel.id,
+          })
+        : target === undefined
+          ? svg('g')
+          : svg('a', { href: target, 'aria-label': node.label });
+      if (inspect) {
+        const description = el('div');
+        description.append(el('b', node.label));
+        if (node.summary) description.append(el('p', node.summary));
+        if (target) description.append(link(C.transactions.source, target));
+        else if (node.relPath) description.append(pathLink(node.relPath));
+        const activate = () => inspector.toggle(item, description, C.transactions.steps);
+        item.addEventListener('click', activate);
+        item.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            activate();
+          }
+          if (event.key === 'Escape') inspector.clear();
+        });
+      }
       const unavailable = target === undefined && node.targetKind !== undefined;
       item.setAttribute('class', unavailable ? 'graph-node unavailable' : 'graph-node');
       const title = svg('title');
@@ -817,6 +916,22 @@
     return canvas;
   }
 
+  function appendTransactionTraces(article, profile, nodes) {
+    for (const key of ['fields', 'boundaries']) {
+      if (!profile[key]?.length) continue;
+      const details = el('details');
+      details.append(el('summary', C.transactions[key]));
+      const list = el('dl');
+      for (const trace of profile[key]) {
+        const body = el('dd', trace.steps.map((id) => nodes.get(id).label).join(' → '));
+        body.append(el('p', trace.description), evidenceList(trace.evidence));
+        list.append(el('dt', trace.name), body);
+      }
+      details.append(list);
+      article.append(details);
+    }
+  }
+
   function renderDiagram(diagram, standalone) {
     const article = el(standalone ? 'article' : 'section', undefined, 'diagram');
     const heading = el(standalone ? 'h1' : 'h2');
@@ -828,6 +943,8 @@
     const inspector = graphInspector(`graph-evidence-${serial}`);
     const graph = graphSvg(diagram, nodes, diagram.layout.width, diagram.layout.height, controls, serial, inspector);
     article.append(heading, controls, graph, inspector.panel);
+    const profile = transactionGraphs.get(diagram.id);
+    if (profile) appendTransactionTraces(article, profile, nodes);
     const details = el('details');
     details.append(el('summary', copy('edgeList', { count: diagram.edges.length })));
     const list = el('ul', undefined, 'edge-list');

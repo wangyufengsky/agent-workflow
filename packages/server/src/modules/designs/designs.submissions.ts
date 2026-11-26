@@ -132,7 +132,9 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock 
           summary: input.summary,
           files: input.files,
           blocks: input.blocks.map((block) =>
-            block.type === 'diagram_ref' ? { ...block, diagramId: diagramId(block.diagramId) } : block,
+            block.type === 'diagram_ref' || block.type === 'transaction'
+              ? { ...block, diagramId: diagramId(block.diagramId) }
+              : block,
           ),
           diagrams: input.diagrams.map((diagram) => ({ ...diagram, id: diagramId(diagram.id) })),
         };
