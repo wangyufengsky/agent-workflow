@@ -107,7 +107,10 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
+[工作台浅色截图](assets/44-project-design/planning-codex.png) · [工作台深色截图](assets/44-project-design/planning-default.png)
+
 - 默认展示纯程序按目录/模块生成的初始大纲，用户可直接勾选/取消章节、编辑标题与 `scopePaths` 路径范围、调整顺序或新增章节；修改即时保存。
+- 全选草稿可以点「AI 规划并生成」。规划会话依据项目规模、目录分布、分析深度与模板目标提交执行大纲。每章一个生成会话，开启复审时每批最多四章。开始命令在各会话首次派工前执行，结束命令在该会话成功提交后执行，交接等待命令收尾。停止或中断后可按已保存的大纲续作。
 - 可选「让 AI 优化大纲…」：派发一次只读 `design_outline` 尝试，让 AI 结合源码与用户补充要求重排章节和职责划分；未开启时直接用程序大纲，零额外开销。
 - 点「确认大纲，开始生成」后，大纲锁定，进入生成与阅读三栏工作台。
 
@@ -463,7 +466,7 @@
 | `designs.updateTemplate` | `PATCH /designs/templates/:key` `{ name?, description?, defaultSections?, focusPrompt? }` | write | 修改自定义模板（内置模板返回 `DESIGN_TEMPLATE_READONLY`） |
 | `designs.deleteTemplate` | `DELETE /designs/templates/:key` | write | 删除自定义模板（内置模板禁止删除；已有设计保留 `template_snapshot` 不受影响） |
 | `designs.updateOutline` | `PUT /designs/:id/outline` `{ sections: [{ id?, kind, title, scopePaths, selected? }] }` | write | 保存手改大纲与勾选状态；已确认大纲后返回 `STATE_TRANSITION_INVALID` |
-| `designs.reviseOutline` | `POST /designs/:id/outline/revise` `{ instruction?, model? }` | write | 让 AI 优化大纲（`design_outline`） |
+| `designs.reviseOutline` | `POST /designs/:id/outline/revise` `{ instruction?, model?, generateAfterPlanning? }` | write | 让 AI 优化大纲（`design_outline`） |
 | `designs.generate` | `POST /designs/:id/generate` `{ sectionId?, model? }` | write | 首次调用确认大纲（要求至少 1 章 `selected = true`）并开始生成；省略 `sectionId` 时继续全部未完成的已勾选章节，指定 `sectionId` 时仅重试该未完成章节 |
 | `designs.reviseSection` | `POST /designs/:id/sections/:sectionId/revise` `{ instruction, focusPath?, focusSymbol?, focusDiagramId?, model? }` | write | 局部重写指定章节/文件/图（保存上一版到 `previous`） |
 | `designs.restoreSection` | `POST /designs/:id/sections/:sectionId/restore` | write | 恢复该章节上一版；无 `previous` 返回 `STATE_TRANSITION_INVALID` |

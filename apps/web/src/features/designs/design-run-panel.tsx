@@ -1,4 +1,4 @@
-import { AttemptStatus, type DesignDTO, type DesignRunDTO, DesignRunKind } from '@aw/shared';
+import { AttemptStatus, DESIGN_REVIEW_BATCH_SIZE, type DesignDTO, type DesignRunDTO, DesignRunKind } from '@aw/shared';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -32,6 +32,12 @@ export function DesignRunPanel({ design, active, canGenerate, latest, onRetry, o
       <div className={styles.activityBody}>
         <div className={styles.progress}>
           <span>{C.progress(design.doneSections, design.totalSections)}</span>
+          <span className="hint">
+            {C.sessionPlan(
+              design.totalSections,
+              design.aiReviewEnabled ? Math.ceil(design.totalSections / DESIGN_REVIEW_BATCH_SIZE) : 0,
+            )}
+          </span>
           <progress
             value={design.doneSections}
             max={Math.max(1, design.totalSections)}

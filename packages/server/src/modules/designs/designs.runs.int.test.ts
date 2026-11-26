@@ -27,8 +27,9 @@ import {
   ServerEventType,
   stopDesignOp,
   updateDesignOutlineOp,
+  updateSettingsOp,
 } from '@aw/shared';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
@@ -468,4 +469,87 @@ it('应用重启保留已提交的章节，仅在用户点击继续后补跑', a
     [flow.id],
   ]);
   expect(t.fake.prompts).toHaveLength(2);
+});
+
+it.each([1, 5])('按 AI 提交的 %i 章自动派工，每个会话收尾后才交接', async (count) => {
+  const { id } = await createDraft(true);
+  await t.call(updateSettingsOp, {
+    'ai.sessionStartCommand': '/report start',
+    'ai.sessionEndCommand': '/report complete',
+  });
+  const commands: [string, string][] = [];
+  const planningSubmitted = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  vi.spyOn(t.fake, 'runCommand').mockImplementation(async ({ sessionId, text }) => {
+    commands.push([sessionId, text]);
+    if (commands.length === 2) {
+      planningSubmitted.resolve();
+      await release.promise;
+    }
+  });
+  const chapters = Array.from({ length: count }, (_, i) => ({
+    kind: DesignSectionKind.Flow,
+    title: `业务流程 ${i + 1}`,
+    scopePaths: ['src'],
+  }));
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignOutline, { sections: chapters }), DESIGNER);
+  let reviews = 0;
+  const reviewComplete = waitForEvent(
+    t.app.events,
+    ServerEventType.AttemptUpdated,
+    ({ attempt }) =>
+      attempt.kind === AttemptKind.DesignReview &&
+      attempt.status === AttemptStatus.Succeeded &&
+      ++reviews === Math.ceil(count / 4),
+  );
+  try {
+    expect((await t.call(reviseDesignOutlineOp, { id, generateAfterPlanning: true })).status).toBe(200);
+    await planningSubmitted.promise;
+    const draft = await get(id);
+    expect(draft).toMatchObject({ handoffPending: true, totalSections: count, outlineConfirmedAt: null });
+    expect(draft.runs).toHaveLength(1);
+    for (const chapter of draft.sections) {
+      t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(chapter.id, chapter.title)), DESIGNER);
+    }
+    for (let i = 0; i < count; i += 4) {
+      t.fake.enqueue(
+        script().callTool(McpToolName.SubmitDesignReview, {
+          findings: draft.sections.slice(i, i + 4).map(({ id }) => feedback(id)),
+        }),
+        DESIGNER,
+      );
+    }
+  } finally {
+    release.resolve();
+  }
+  await t.app.services.attempts.waitForSessionRelease((await reviewComplete).attempt.id);
+  const reviewed = await get(id);
+  expect(reviewed.sections.map(({ reviewState }) => reviewState)).toEqual(chapters.map(() => DesignReviewState.Passed));
+  expect(reviewed.runs.map(({ kind }) => kind)).toEqual([
+    DesignRunKind.Outline,
+    ...chapters.map(() => DesignRunKind.Generate),
+    ...Array.from({ length: Math.ceil(count / 4) }, () => DesignRunKind.Review),
+  ]);
+  expect(commands).toEqual(
+    t.fake.sessions.flatMap(({ id }) => [
+      [id, '/report start'],
+      [id, '/report complete'],
+    ]),
+  );
+
+  const chapter = reviewed.sections[0];
+  if (!chapter) throw new Error('Expected a generated chapter');
+  t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(chapter.id, '修订')), DESIGNER);
+  const revised = ended(AttemptKind.DesignRevise);
+  expect((await t.call(reviseDesignSectionOp, { id, sectionId: chapter.id, instruction: '核对入口' })).status).toBe(
+    200,
+  );
+  await t.app.services.attempts.waitForSessionRelease((await revised).attempt.id);
+
+  expect(commands).toEqual(
+    t.fake.sessions.flatMap(({ id }) => [
+      [id, '/report start'],
+      [id, '/report complete'],
+    ]),
+  );
 });

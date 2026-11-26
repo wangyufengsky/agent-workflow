@@ -125,7 +125,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
   const [optimizing, setOptimizing] = useState(false);
   const [instruction, setInstruction] = useState('');
   const latest = design.runs.at(-1);
-  const active = design.activeRunId !== null;
+  const active = design.activeRunId !== null || design.handoffPending;
   const readOnly = design.projectId === null;
   const locked = readOnly || active || update.isPending || optimize.isPending || generate.isPending;
   const canGenerate = design.sections.some((section) => section.selected);
@@ -232,6 +232,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
             }}
           />
         )}
+        {!optimizing && optimize.isError && <ErrorState error={optimize.error} />}
         {generate.isError && <ErrorState error={generate.error} />}
         {stop.isError && <ErrorState error={stop.error} />}
         <div className={`row wrap ${styles.formFooter}`}>
@@ -248,13 +249,21 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
           <span className="grow" />
           {!canGenerate && <span className="hint">{C.atLeastOne}</span>}
           <Button
-            variant="primary"
             disabled={locked || !canGenerate || update.isError}
             pending={generate.isPending}
             onClick={() => generate.mutate({ id: design.id, model })}
           >
             {C.generate}
           </Button>
+          {current.every((section) => section.selected) && (
+            <Button
+              variant="primary"
+              disabled={locked || update.isError || design.analyzableCount === 0}
+              onClick={() => optimize.mutate({ id: design.id, model, generateAfterPlanning: true })}
+            >
+              {C.planAndGenerate}
+            </Button>
+          )}
         </div>
       </section>
       {latest !== undefined && (

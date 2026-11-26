@@ -419,6 +419,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   layoutStyle: '阅读风格',
   excludePatterns: '额外排除规则',
   aiReviewEnabled: '生成后运行独立 AI 复审',
+  generateAfterPlanning: 'AI 规划后自动生成',
   defaultSections: '预设章节',
   focusPrompt: '分析侧重',
   baseKey: '复制来源模板',

@@ -147,6 +147,7 @@ export const updateDesignOutlineRequestSchema = byId.extend({
 });
 export type UpdateDesignOutlineRequest = z.infer<typeof updateDesignOutlineRequestSchema>;
 export const reviseDesignOutlineRequestSchema = byId.extend({
+  generateAfterPlanning: z.boolean().optional(),
   instruction: instruction.optional(),
   model: modelChoiceSchema,
 });

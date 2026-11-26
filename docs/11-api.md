@@ -772,7 +772,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |
 | designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
 | designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置架构探索及交易链路探索模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
-| designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；可选 AI 优化只在确认前进行 |
+| designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；AI 规划只在确认前进行。POST 可传 generateAfterPlanning: true，全选草稿规划成功后自动逐章生成。省略时只保存新大纲 |
 | designs.generate | POST /designs/:id/generate | 首次省略 sectionId 确认大纲。未勾选任何章节返回 400 VALIDATION_FAILED。每个章节使用独立会话，依次释放模型槽再续下一章。确认后只补未生成的选中章，带 sectionId 仅重试其中一章。确认前指定章节、重试未选章或已生成章返回 409 STATE_TRANSITION_INVALID |
 | designs.reviseSection / restoreSection | POST /designs/:id/sections/:sectionId/revise 或 /restore | 重写前保存最近一版，恢复一次同时还原正文、文件和图 |
 | designs.review / stop | POST /designs/:id/review 或 /stop | 所有选中章节生成后可启动独立复审；停止可中止活动尝试或取消待交接，保留已提交内容 |

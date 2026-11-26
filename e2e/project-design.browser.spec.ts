@@ -808,3 +808,33 @@ test('交易模板按渠道和版本筛选同码交易，在工作台和离线�
     await offline.close();
   }
 });
+
+test('AI 规划并生成直接从规划转入第一章', async ({ page, request }) => {
+  const project = await fixtureProject(request);
+  await page.goto(`/designs/new?projectId=${project.id}`);
+  await page.getByRole('button', { name: '扫描项目并拟定大纲' }).click();
+  const start = page.getByRole('button', { name: 'AI 规划并生成' });
+  await expect(start).toBeEnabled();
+  const id = designId(page);
+  for (const theme of [ThemeId.Default, ThemeId.Codex]) {
+    await patchSettings(request, { 'ui.theme': theme });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    const dir = join(WALKTHROUGH_DIR, 'project-design');
+    mkdirSync(dir, { recursive: true });
+    await page.screenshot({ path: join(dir, `planning-${theme}.png`), fullPage: true, animations: 'disabled' });
+  }
+  await queueDesign(request, project, [
+    tool(McpToolName.SubmitDesignOutline, {
+      sections: [{ kind: DesignSectionKind.Flow, title: FLOW, scopePaths: [IMPLEMENTATION] }],
+    }),
+  ]);
+  await queueDesign(request, project, [{ type: 'hang' }]);
+  await start.click();
+  await expect.poll(async () => (await design(request, id)).status).toBe(DesignStatus.Generating);
+  const running = await design(request, id);
+  expect(running.runs.map(({ kind }) => kind)).toEqual(['outline', 'generate']);
+  expect(running.sections.map(({ title }) => title)).toEqual([FLOW]);
+  await expect(page.getByRole('button', { name: 'AI 规划并生成' })).toHaveCount(0);
+  const stopped = await request.post(`${API_BASE}/designs/${id}/stop`, { headers: AUTH, data: {} });
+  expect(stopped.ok(), await stopped.text()).toBe(true);
+});

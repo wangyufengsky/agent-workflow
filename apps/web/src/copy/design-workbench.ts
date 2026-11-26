@@ -67,6 +67,7 @@ export const DESIGN_WORKBENCH_COPY = {
   failed: '生成失败',
   noStarted: '还没有生成记录。',
   coverage: (done: number, total: number) => `覆盖 ${done} / ${total} 个文件`,
+  sessionPlan: (chapters: number, reviews: number) => `生成 ${chapters} 个会话 · 复审 ${reviews} 个会话`,
   progress: (done: number, total: number) => `${done} / ${total} 章节`,
   source: (branch: string | null, sha: string | null) => [branch, sha?.slice(0, 8)].filter(Boolean).join(' @ '),
   dirty: '有未提交修改',

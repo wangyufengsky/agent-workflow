@@ -394,7 +394,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
 | `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
-| `ai.sessionStartCommand` / `ai.sessionEndCommand` | `null`（开发会话的开始和结束斜杠命令，留空跳过；助手不能修改） | 专业 |
+| `ai.sessionStartCommand` / `ai.sessionEndCommand` | `null`（开发步骤与项目设计会话的开始和结束斜杠命令，留空跳过；助手不能修改） | 专业 |
 | `scheduler.maxConcurrentAttempts` | `4`（所有使用模型的会话共享的上限，D186：任务、助手、知识问答、PPT、Git 审查、提交信息、需求拆解、成员分析一起算；用满时交互的请求排队，任务最多用上限减一；设置页文案「同时使用模型的会话数」） | 专业（38 C5） |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |

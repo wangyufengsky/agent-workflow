@@ -26,7 +26,7 @@ export const SETTINGS_COPY = {
   sessionStartCommandExample: '/report start',
   sessionEndCommandExample: '/report complete',
   sessionCommandsHint:
-    '可填写 OpenCode 斜杠命令。开发步骤在同一会话内先运行开始命令，成功提交结果后运行结束命令。同一任务等结束命令收尾再开始下一步。两条命令分别使用「尝试时限」，失败时在过程里提示。留空则跳过。',
+    '可填写 OpenCode 斜杠命令。开发步骤和项目设计的每个会话各运行一次开始命令，成功提交后在原会话运行一次结束命令。连续执行时等结束命令收尾再开始下一步。两条命令分别使用「尝试时限」，失败时在过程里提示。留空则跳过。',
   concurrency: '同时使用模型的会话数',
   previewMaxRunning: '同时运行的页面预览数',
   previewIdleMinutes: '页面预览空闲多久后停止（分钟）',
