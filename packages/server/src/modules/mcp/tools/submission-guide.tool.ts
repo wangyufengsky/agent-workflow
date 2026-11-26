@@ -4,6 +4,7 @@ import {
   ATTEMPT_SUBMIT_TOOL,
   type AttemptDTO,
   AttemptKind,
+  designSourceIssueSchema,
   ErrorCode,
   type ErrorInfo,
   FUNCTIONAL_TEST_NODE,
@@ -16,6 +17,7 @@ import {
   submissionGuideInputSchema,
   submissionGuideOutputSchema,
   submitBrowserReportInputSchema,
+  submitDesignSectionInputSchema,
   submitPlanInputSchema,
   submitResultInputSchema,
   submitReviewInputSchema,
@@ -27,8 +29,15 @@ import type { EventBus } from '../../../core/event-bus.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
-const kinds = [AttemptKind.Plan, AttemptKind.Execute, AttemptKind.Review] as const;
+const kinds = [
+  AttemptKind.Plan,
+  AttemptKind.Execute,
+  AttemptKind.Review,
+  AttemptKind.DesignGenerate,
+  AttemptKind.DesignRevise,
+] as const;
 const submissionSchemas = {
+  [McpToolName.SubmitDesignSection]: submitDesignSectionInputSchema,
   [McpToolName.SubmitResult]: submitResultInputSchema,
   [McpToolName.BrowserSubmitReport]: submitBrowserReportInputSchema,
   [McpToolName.SubmitPlan]: submitPlanInputSchema,
@@ -77,6 +86,32 @@ export function createSubmissionGuides(
   function guide(attempt: AttemptDTO, args: Record<string, unknown> = {}): SubmissionGuide {
     const tool = tasks.browserTestSubmit(attempt) ?? ATTEMPT_SUBMIT_TOOL[attempt.kind];
     const saved = last.get(attempt.id);
+    if (tool === McpToolName.SubmitDesignSection) {
+      const location = { relPath: 'example/main.ts', lineStart: 1, lineEnd: 1 };
+      return {
+        tool,
+        skill: SkillName.DesignAnalysis,
+        ...parameters(tool),
+        remove: saved?.rejection.remove ?? [],
+        ...(saved ? { lastRejection: saved.rejection } : {}),
+        example: {
+          sectionId: '<target section ID from this run>',
+          summary: '<your section summary>',
+          blocks: [
+            {
+              type: 'markdown',
+              markdown: 'The example module exports a flag.',
+              evidence: [{ evidenceClass: 'static', ...location }],
+            },
+            { type: 'code', language: 'typescript', ...location, code: 'export const enabled = true;' },
+          ],
+          files: [],
+          diagrams: [],
+        },
+        instructions:
+          'The example uses a fictional file. Keep the complete chapter and correct the listed fields. For each source issue, read the authorized relPath in the project using read or locate the passage with grep. Use 1-based inclusive lines within fileLineCount. Copy the exact text including indentation, without displayed line numbers. If recall returns NOT_FOUND, read the source again. Never guess a range or downgrade evidence just to pass validation.',
+      };
+    }
     const summarySchema = submissionSchemas[tool as SubmissionTool].shape.summary;
     const summary = summarySchema.safeParse(args.summary ?? saved?.summary);
     const exampleSummary = summary.success
@@ -206,6 +241,11 @@ export function createSubmissionGuides(
     }),
     rejected(attempt: AttemptDTO, name: McpToolName, args: Record<string, unknown>, error: ErrorInfo) {
       if (!(name in submissionSchemas) || !kinds.some((kind) => kind === attempt.kind)) return;
+      if (
+        (name === McpToolName.SubmitDesignSection) !==
+        (ATTEMPT_SUBMIT_TOOL[attempt.kind] === McpToolName.SubmitDesignSection)
+      )
+        return;
       if (!correctable.includes(error.code)) return;
       const guidance = guide(attempt, args);
       const remove = Object.keys(args).filter((key) => !guidance.allowed.includes(key));
@@ -222,7 +262,18 @@ export function createSubmissionGuides(
         .array(z.object({ path: z.array(z.union([z.string(), z.number()])) }))
         .safeParse(error.details?.issues);
       const fields = issues.success ? issues.data.map((issue) => issue.path.join('.')) : [];
-      const detail = { tool: name, code: error.code, message: error.message, remove, fields };
+      const sourceIssues =
+        name === McpToolName.SubmitDesignSection
+          ? z.array(designSourceIssueSchema).safeParse(error.details?.issues)
+          : undefined;
+      const detail = {
+        tool: name,
+        code: error.code,
+        message: error.message,
+        remove,
+        fields,
+        ...(sourceIssues?.success ? { sourceIssues: sourceIssues.data } : {}),
+      };
       const summary = submitResultInputSchema.shape.summary.safeParse(args.summary);
       const review = z.object({ scope: taskCodeReviewScopeSchema }).safeParse(args.code_review);
       last.set(attempt.id, {
@@ -235,7 +286,10 @@ export function createSubmissionGuides(
         ...guidance,
         remove,
         lastRejection: detail,
-        next: `Load ${SkillName.SubmitResult} with skill, call ${MCP_TOOL_PREFIX}${McpToolName.GetSubmissionGuide} with {}, then correct and resubmit using the named tool.`,
+        next:
+          name === McpToolName.SubmitDesignSection
+            ? 'Use the guide below and fix details.issues in the complete section. To retrieve this guidance again call get_submission_guide with {}.'
+            : `Load ${guidance.skill} with skill, call ${MCP_TOOL_PREFIX}${McpToolName.GetSubmissionGuide} with {}, then correct and resubmit using the named tool.`,
       };
     },
   };

@@ -15,6 +15,7 @@ import {
   McpToolName,
   ServerEventType,
   SessionAgent,
+  submitDesignSectionInputSchema,
   ThemeId,
 } from '@aw/shared';
 import { expect, it } from 'vitest';
@@ -121,6 +122,9 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
             ATTEMPT_SUBMIT_TOOL[kind],
             McpToolName.ListDesignFiles,
             McpToolName.ReadDesignSection,
+            ...([AttemptKind.DesignGenerate, AttemptKind.DesignRevise].some((k) => k === kind)
+              ? [McpToolName.GetSubmissionGuide]
+              : []),
             McpToolName.ReportProgress,
             McpToolName.Recall,
           ].map((name) => `${MCP_TOOL_PREFIX}${name}`),
@@ -174,6 +178,8 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
     repo.updateDesign(designId, { outlineConfirmedAt: 2 });
 
     const generate = await work(AttemptKind.DesignGenerate, [overview.id, entry.id]);
+    const initialGuide = await generate.submit(McpToolName.GetSubmissionGuide, {});
+    expect(submitDesignSectionInputSchema.safeParse(initialGuide.body.example).success).toBe(true);
     const sectionInput = {
       sectionId: overview.id,
       summary: '初版',
@@ -196,8 +202,56 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
       body: { code: ErrorCode.ValidationFailed, details: { issues: expect.any(Array) } },
     });
     expect(repo.listSections(designId).map(({ blocks }) => blocks)).toEqual([null, null]);
+    const badBlocks = [
+      {
+        type: 'markdown',
+        markdown: '入口',
+        evidence: [{ evidenceClass: 'static', relPath: 'src/main.ts', lineStart: 1, lineEnd: 8 }],
+      },
+      { type: 'code', language: 'typescript', relPath: 'src/main.ts', lineStart: 1, lineEnd: 1, code: 'wrong' },
+    ];
+    const rejection = await generate.submit(McpToolName.SubmitDesignSection, { ...sectionInput, blocks: badBlocks });
+    expect(rejection).toMatchObject({
+      isError: true,
+      body: {
+        code: ErrorCode.ValidationFailed,
+        details: {
+          issues: [
+            { path: ['blocks', 0, 'evidence', 0], relPath: 'src/main.ts', lineStart: 1, lineEnd: 8, fileLineCount: 1 },
+            { path: ['blocks', 1, 'code'], relPath: 'src/main.ts', lineStart: 1, lineEnd: 1, fileLineCount: 1 },
+          ],
+        },
+        guide: {
+          skill: 'aw-design-analysis',
+          tool: McpToolName.SubmitDesignSection,
+          example: { blocks: expect.any(Array) },
+        },
+      },
+    });
+    expect(await generate.submit(McpToolName.GetSubmissionGuide, {})).toMatchObject({
+      isError: false,
+      body: {
+        lastRejection: {
+          fields: ['blocks.0.evidence.0', 'blocks.1.code'],
+          sourceIssues: [
+            { path: ['blocks', 0, 'evidence', 0], fileLineCount: 1, lineEnd: 8 },
+            { path: ['blocks', 1, 'code'], relPath: 'src/main.ts', fileLineCount: 1 },
+          ],
+        },
+      },
+    });
+    expect(repo.listSections(designId).map(({ blocks }) => blocks)).toEqual([null, null]);
     const updated = waitForEvent(t.app.events, ServerEventType.DesignUpdated, (event) => event.designId === designId);
-    expect(await generate.submit(McpToolName.SubmitDesignSection, sectionInput)).toEqual({
+    const correctedBlocks = [
+      { ...badBlocks[0], evidence: [{ evidenceClass: 'static', relPath: 'src/main.ts', lineStart: 1, lineEnd: 1 }] },
+      { ...badBlocks[1], code: 'export const x = 1;' },
+    ];
+    expect(
+      await generate.submit(McpToolName.SubmitDesignSection, {
+        ...sectionInput,
+        blocks: [...sectionInput.blocks, ...correctedBlocks],
+      }),
+    ).toEqual({
       isError: false,
       body: { remainingSectionIds: [entry.id] },
     });
@@ -205,6 +259,7 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
     expect(t.app.services.attempts.get(generate.id).status).toBe(AttemptStatus.Running);
     expect(repo.listSections(designId)[0]?.blocks).toEqual([
       { type: 'diagram_ref', diagramId: repo.listDiagrams(designId)[0]?.id },
+      ...correctedBlocks,
     ]);
     expect(
       await generate.submit(McpToolName.SubmitDesignSection, {

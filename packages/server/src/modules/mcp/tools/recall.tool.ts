@@ -11,7 +11,8 @@ export const recallTool = (attempts: AttemptsService) =>
     input: recallInputSchema,
     output: recallOutputSchema,
     hints: {
-      [ErrorCode.NotFound]: 'Use the messageId and partId of a completed text tool result in the current session.',
+      [ErrorCode.NotFound]:
+        'Use the messageId and partId of a completed text tool result in the current session. If no matching reference is available, use the permitted source-reading tool to re-read the relevant passage.',
     },
     handler: (input, { attempt, signal }) => attempts.recall(attempt, input, signal),
   });

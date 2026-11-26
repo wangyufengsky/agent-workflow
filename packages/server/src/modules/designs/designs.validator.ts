@@ -2,10 +2,12 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import { relative, sep } from 'node:path';
 import {
   AppError,
+  DESIGN_MAX_SOURCE_ISSUES,
   DESIGN_SCAN_MAX_FILE_BYTES,
   DesignDiagramKind,
   type DesignEvidence,
   DesignEvidenceClass,
+  type DesignSourceIssue,
   ErrorCode,
   type SubmitDesignReviewInput,
   type SubmitDesignSectionInput,
@@ -51,6 +53,15 @@ function requireUnique(values: readonly string[], field: Field, key: string) {
 async function sourceChecks(context: Context) {
   const authorized = new Set(context.files.map((file) => file.relPath));
   const root = await realpath(context.root);
+  const issues: DesignSourceIssue[] = [];
+  function checkIssues() {
+    const [first] = issues;
+    if (first) throw new AppError(ErrorCode.ValidationFailed, first.message, { issues });
+  }
+  function report(issue: DesignSourceIssue) {
+    issues.push(issue);
+    if (issues.length === DESIGN_MAX_SOURCE_ISSUES) checkIssues();
+  }
   const contents = new Map<string, string[]>();
   const resolved = new Map<string, string>();
   async function path(relPath: string, field: Field) {
@@ -71,7 +82,17 @@ async function sourceChecks(context: Context) {
       text = linesOf(await readFile(real, 'utf8'));
       contents.set(relPath, text);
     }
-    if (end < start || end > text.length) invalid(field, 'Line range is outside the source file');
+    if (end < start || end > text.length) {
+      report({
+        path: field,
+        message: 'Line range is outside the source file',
+        relPath,
+        lineStart: start,
+        lineEnd: end,
+        fileLineCount: text.length,
+      });
+      return undefined;
+    }
     return text;
   }
   async function evidence(entries: readonly DesignEvidence[], field: Field) {
@@ -80,7 +101,7 @@ async function sourceChecks(context: Context) {
         await lines(entry.relPath, entry.lineStart, entry.lineEnd, [...field, index]);
     }
   }
-  return { path, lines, evidence };
+  return { path, lines, evidence, report, checkIssues };
 }
 
 export async function validateDesignSection(input: SubmitDesignSectionInput, context: Context) {
@@ -126,8 +147,15 @@ export async function validateDesignSection(input: SubmitDesignSectionInput, con
     }
     if (block.type === 'code') {
       const lines = await source.lines(block.relPath, block.lineStart, block.lineEnd, [...field, 'lineEnd']);
-      if (linesOf(block.code).join('\n') !== lines.slice(block.lineStart - 1, block.lineEnd).join('\n'))
-        invalid([...field, 'code'], 'Quote the exact source lines in the specified range');
+      if (lines && linesOf(block.code).join('\n') !== lines.slice(block.lineStart - 1, block.lineEnd).join('\n'))
+        source.report({
+          path: [...field, 'code'],
+          message: 'Quote the exact source lines in the specified range',
+          relPath: block.relPath,
+          lineStart: block.lineStart,
+          lineEnd: block.lineEnd,
+          fileLineCount: lines.length,
+        });
     }
     if (block.type === 'markdown' && block.evidence) await source.evidence(block.evidence, [...field, 'evidence']);
     if (block.type === 'submodule') {
@@ -180,6 +208,7 @@ export async function validateDesignSection(input: SubmitDesignSectionInput, con
       }
     }
   }
+  source.checkIssues();
 }
 
 export async function validateDesignReview(input: SubmitDesignReviewInput, context: Context) {
@@ -201,4 +230,5 @@ export async function validateDesignReview(input: SubmitDesignReviewInput, conte
       }
     }
   }
+  source.checkIssues();
 }
