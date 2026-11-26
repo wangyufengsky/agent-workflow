@@ -87,14 +87,22 @@ async function createFunctionalTestDraft(
   return taskDetailSchema.parse(await created.json());
 }
 
+const authorFixture = { phase: '编写用例', node: FUNCTIONAL_TEST_NODE.Author, source: '编写案例' };
 for (const fixture of [
-  { phase: '编写用例', node: FUNCTIONAL_TEST_NODE.Author, source: '编写案例', withFile: false },
-  { phase: '解析上传用例', node: FUNCTIONAL_TEST_NODE.Import, source: '解析上传案例', withFile: true },
-]) {
-  test(`${fixture.phase}在首条用例保存前显示可展开的实际 AI 步骤`, async ({ page, request }) => {
+  { ...authorFixture, initial: 'draft', suffix: '' },
+  { ...authorFixture, initial: 'preparing', suffix: '（首次读取与 resync 交错）' },
+  {
+    phase: '解析上传用例',
+    node: FUNCTIONAL_TEST_NODE.Import,
+    source: '解析上传案例',
+    initial: 'node-ready',
+    suffix: '',
+  },
+] as const) {
+  test(`${fixture.phase}在首条用例保存前显示可展开的实际 AI 步骤${fixture.suffix}`, async ({ page, request }) => {
     const project = await createProject(request, null);
     const attachmentIds: string[] = [];
-    if (fixture.withFile) {
+    if (fixture.initial === 'node-ready') {
       const attachment = await request.post(`${API_BASE}/attachments`, {
         headers: { ...AUTH, 'Content-Type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: 'orders.md' },
         data: Buffer.from('# ORD-01\nGET /orders 应返回 200'),
@@ -108,10 +116,51 @@ for (const fixture of [
       { type: 'hang' },
     ]);
     try {
-      if (!fixture.withFile) await page.goto(`/tasks/${task.id}`);
+      if (fixture.initial === 'draft') await page.goto(`/tasks/${task.id}`);
       const started = await request.post(`${API_BASE}/tasks/${task.id}/start`, { headers: AUTH });
       await expect(started).toBeOK();
-      if (fixture.withFile) {
+      if (fixture.initial === 'preparing') {
+        const preparing = taskDetailSchema.parse(await started.json());
+        expect(preparing.status).toBe(TaskStatus.Preparing);
+        const taskUrl = `${API_BASE}/tasks/${task.id}`;
+        await expect
+          .poll(async () => {
+            const current = taskDetailSchema.parse(await (await request.get(taskUrl, { headers: AUTH })).json());
+            return current.nodes.find(({ key }) => key === fixture.node)?.status;
+          })
+          .toBe(NodeStatus.Running);
+
+        const readStarted = Promise.withResolvers<void>();
+        const resynced = Promise.withResolvers<void>();
+        await page.exposeFunction('markFunctionalTestResync', () => resynced.resolve());
+        await page.addInitScript(() => {
+          window.EventSource = class extends window.EventSource {
+            constructor(url: string | URL, options?: EventSourceInit) {
+              super(url, options);
+              this.addEventListener('resync', () => {
+                void (
+                  window as typeof window & { markFunctionalTestResync(): Promise<void> }
+                ).markFunctionalTestResync();
+              });
+            }
+          };
+        });
+        await page.route('**/api/v1/events?*', async (route) => {
+          await readStarted.promise;
+          await route.continue();
+        });
+        await page.route(
+          `**/api/v1/tasks/${task.id}`,
+          async (route) => {
+            readStarted.resolve();
+            await resynced.promise;
+            await route.fulfill({ json: preparing });
+          },
+          { times: 1 },
+        );
+        await page.goto(`/tasks/${task.id}`);
+      }
+      if (fixture.initial === 'node-ready') {
         // Reproduce the CI trace: the initial task response predates attempt creation and no SSE update wakes the UI.
         const taskUrl = `${API_BASE}/tasks/${task.id}`;
         const readTask = async () =>
