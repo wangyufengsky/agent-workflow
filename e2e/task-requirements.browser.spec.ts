@@ -40,7 +40,7 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   ]);
 
   await page.goto(`/?projectId=${project.id}`);
-  await pickWorkflow(page, /修 Bug/);
+  await pickWorkflow(page, '修 Bug');
   await page.getByLabel('需求').fill('订单搜索不到');
   await page.getByRole('button', { name: '验收要求' }).click();
   await page.getByLabel('要求 1').fill('按订单号搜索');

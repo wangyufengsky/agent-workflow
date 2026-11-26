@@ -39,7 +39,7 @@ async function fixInReview(
     submitResult(`已修复：${requirement}`),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-  await startTask(page, project, /修 Bug/, requirement);
+  await startTask(page, project, '修 Bug', requirement);
   await expect(page.getByTestId('result-card').getByRole('button', { name: '合并到 main' })).toBeVisible({
     timeout: TASK_RUN_TIMEOUT_MS,
   });
@@ -170,7 +170,7 @@ test('无法运行的命令跳过后，从结果卡读取当次检查证据', as
     submitResult('已修复'),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-  await startTask(page, project, /修 Bug/, '检查不可运行的命令');
+  await startTask(page, project, '修 Bug', '检查不可运行的命令');
   const failure = page.getByTestId('failure-panel');
   await expect(failure.getByRole('button', { name: '跳过这项检查…' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await failure.getByRole('button', { name: '跳过这项检查…' }).click();

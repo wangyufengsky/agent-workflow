@@ -48,7 +48,7 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
   await page.goto(`/?projectId=${project.id}`);
-  await pickWorkflow(page, /修 Bug/);
+  await pickWorkflow(page, '修 Bug');
   await page.getByLabel('需求').fill('订单搜索不到');
   const picker = page.locator('input[type="file"]');
   const attached = page.getByRole('list', { name: '附加的资料' });

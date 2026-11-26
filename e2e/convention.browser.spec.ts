@@ -44,7 +44,7 @@ test('UX-12 选择失败和审查意见，预览并通过任务合并约定', as
     submitResult('完成'),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-  await startTask(page, project, /修 Bug/, '问候语修复');
+  await startTask(page, project, '修 Bug', '问候语修复');
   const result = page.getByTestId('result-card');
   await result.getByRole('button', { name: '创建 PR' }).click({ timeout: TASK_RUN_TIMEOUT_MS });
   await page.getByRole('dialog', { name: '创建 PR' }).getByRole('button', { name: '推送并创建' }).click();

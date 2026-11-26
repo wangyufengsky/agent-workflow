@@ -188,7 +188,7 @@ test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → �
 
   // Asked rather than assumed, so the card shows the default assumption; the task keeps the setting it started with.
   await patchSettings(request, { 'ai.askOnUncertainty': true });
-  await startTask(page, project, /修 Bug/, '订单时间显示错了');
+  await startTask(page, project, '修 Bug', '订单时间显示错了');
   await patchSettings(request, { 'ai.askOnUncertainty': false });
   await expect(page.getByText('需要你处理', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: /需要你处理（\d+）/ }).click();
@@ -228,7 +228,7 @@ test('J3 权限请求 → 允许一次 → 继续；总是允许 → 记到项�
     ]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
-    await startTask(page, project, /修 Bug/, '构建产物残留导致测试失败');
+    await startTask(page, project, '修 Bug', '构建产物残留导致测试失败');
     const permission = page.getByTestId('inbox-permission');
     // The reminder bubble goes away with the request it is about, wherever that was answered (32 §3.5).
     const reminder = page.getByRole('region', { name: '有件事需要你处理' });
