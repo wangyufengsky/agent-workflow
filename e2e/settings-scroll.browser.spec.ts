@@ -10,9 +10,10 @@ test('设置页滚到底再向上滚动，顶栏与侧栏留在视口中且无�
   await page.getByRole('main').hover();
   await page.mouse.wheel(0, 3000);
   // 模型列表、字体等加载会改变页面高度；验证当前滚动终点而非加载前的旧高度。
+  // 高度属性取整，scrollTop 可以是小数。到达底部时允许 1 CSS 像素的舍入差。
   await expect
-    .poll(() => page.getByRole('main').evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
-    .toBe(0);
+    .poll(() => page.getByRole('main').evaluate((el) => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop)))
+    .toBeLessThanOrEqual(1);
   const bottom = await page.getByRole('main').evaluate((el) => el.scrollTop);
   await page.mouse.wheel(0, -240);
   await expect.poll(() => page.getByRole('main').evaluate((el) => el.scrollTop)).toBeLessThan(bottom);
