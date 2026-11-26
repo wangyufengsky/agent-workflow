@@ -118,6 +118,7 @@ export function isDesignAttemptKind(kind: AttemptKind): kind is DesignAttemptKin
 export function designAttemptTools(kind: DesignAttemptKind): readonly McpToolName[] {
   return [
     ATTEMPT_SUBMIT_TOOL[kind],
+    ...(ATTEMPT_SUBMIT_TOOL[kind] === McpToolName.SubmitDesignSection ? [McpToolName.GetSubmissionGuide] : []),
     McpToolName.ListDesignFiles,
     McpToolName.ReadDesignSection,
     McpToolName.ReportProgress,
