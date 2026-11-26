@@ -66,7 +66,7 @@ const FOREIGN_PROBE = 'AW_CHECK_FOREIGN_RECALL';
 const coordinates = /messageId=(msg_\w+) partId=(prt_\w+)/;
 let overflowStage = 0;
 const contextRequests: ChatMessage[][] = [];
-let providerRequests = 0;
+let foregroundRequests = 0;
 const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
 const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
@@ -154,7 +154,11 @@ function scriptedModel(): Server {
         args,
       });
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-      providerRequests++;
+      const summaryRequest = messages.some(
+        (m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'),
+      );
+      // 摘要由独立会话异步生成；停用投影的断言统计前台请求。
+      if (!summaryRequest) foregroundRequests++;
       let replyText = 'done';
       if (prompt.startsWith('{"userRequest":"VERIFY_RESEARCH_PERMISSION')) {
         replyText = JSON.stringify({ decision: 'once', reason: 'Verified repository checksum' });
@@ -162,13 +166,15 @@ function scriptedModel(): Server {
         calls = messages.some((m) => m.role === 'tool')
           ? [operation(McpToolName.SubmitAnswer, { answer: 'Repository checked.', citations: [] })]
           : [{ name: 'bash', args: { command: RESEARCH_CHECKSUM, description: 'Read the repository checksum' } }];
-      } else if (messages.some((m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'))) {
-        workerTools.push(names);
-        workerStarted.resolve();
-        await newReadProduced.promise;
-        replyText = messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))
-          ? 'Verified the early finding in bulk.txt.'
-          : 'Source missing';
+      } else if (summaryRequest) {
+        if (messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))) {
+          workerTools.push(names);
+          workerStarted.resolve();
+          await newReadProduced.promise;
+          replyText = 'Verified the early finding in bulk.txt.';
+        } else {
+          replyText = 'Summarized the supplied work.';
+        }
       } else if (overflowStage === 2 && names.length === 0) {
         overflowStage = 3;
         replyText = `${SUMMARY_PROBE} Continue the task using new evidence.`;
@@ -745,7 +751,7 @@ it.each([
     const disable = scenario === '运行中停用';
     const native = scenario === '新任务关闭';
     contextRequests.length = 0;
-    providerRequests = 0;
+    foregroundRequests = 0;
     await t.call(updateSettingsOp, { 'ai.contextEngine': !native, 'ai.defaultModel': null, 'node.maxAttempts': 3 });
     const spec = providerFor(model);
     const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
@@ -814,7 +820,7 @@ it.each([
           },
         });
         expect(detail.retryFeedback).toContain('Reduce the input before retrying');
-        expect(providerRequests).toBe(3);
+        expect(foregroundRequests).toBe(3);
       }
       if (warning)
         expect(t.logs).toContainEqual(
