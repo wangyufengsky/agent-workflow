@@ -102,6 +102,8 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.SubmitAnswer]: '提交回答',
   [McpToolName.SubmitOutline]: '提交大纲',
   [McpToolName.SubmitSlide]: '提交一页',
+  [McpToolName.ListDesignFiles]: '查找设计文件',
+  [McpToolName.ReadDesignSection]: '读取设计章节',
   [McpToolName.SubmitDesignOutline]: '提交设计大纲',
   [McpToolName.SubmitDesignSection]: '提交设计章节',
   [McpToolName.SubmitDesignReview]: '提交设计复审',

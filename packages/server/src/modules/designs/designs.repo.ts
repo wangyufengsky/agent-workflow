@@ -171,6 +171,23 @@ export function createDesignsRepo(db: DbExecutor) {
         .get();
       return row === undefined ? undefined : toFile(row);
     },
+    fileInventory(designId: string) {
+      return db
+        .select({ relPath: files.relPath, sectionId: files.sectionId })
+        .from(files)
+        .where(eq(files.designId, designId))
+        .orderBy(asc(files.relPath))
+        .all();
+    },
+    sectionFiles(designId: string, sectionId: string): DesignFile[] {
+      return db
+        .select()
+        .from(files)
+        .where(and(eq(files.designId, designId), eq(files.sectionId, sectionId)))
+        .orderBy(asc(files.relPath))
+        .all()
+        .map(toFile);
+    },
     listFiles(designId: string): DesignFile[] {
       return db.select().from(files).where(eq(files.designId, designId)).orderBy(asc(files.relPath)).all().map(toFile);
     },

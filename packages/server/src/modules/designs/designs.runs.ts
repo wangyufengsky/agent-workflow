@@ -20,7 +20,8 @@ import type { AttemptsService } from '../attempts/index.ts';
 import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
-import { planningInventory } from './designs.planning.ts';
+import { designScope, planningInventory } from './designs.planning.ts';
+import { promptSections } from './designs.prompt-section.ts';
 import type { createDesignsRepo, DesignRun, DesignSection, ProjectDesign } from './designs.repo.ts';
 
 type Dependencies = {
@@ -49,7 +50,6 @@ type ReviseSectionInput = ModelInput & {
   focusSymbol?: string | undefined;
   focusDiagramId?: string | undefined;
 };
-type PromptSection = Omit<DesignSection, 'reviewState' | 'reviewNotes' | 'previous' | 'updatedAt' | 'designId'>;
 type GenerationPlan = ReadonlySet<string>;
 type FollowUp =
   | { kind: 'planned' }
@@ -63,29 +63,6 @@ type Work = {
   model: string | null;
   followUp?: FollowUp;
 };
-
-const promptSection = ({
-  id,
-  seq,
-  selected,
-  kind,
-  title,
-  scopePaths,
-  summary,
-  blocks,
-}: DesignSection): PromptSection => ({
-  id,
-  seq,
-  selected,
-  kind,
-  title,
-  scopePaths,
-  summary,
-  blocks,
-});
-
-const scopedTo = (path: string, { scopePaths }: DesignSection) =>
-  scopePaths.length === 0 || scopePaths.some((scope) => path === scope || path.startsWith(`${scope}/`));
 
 function invalidState(message: string): never {
   throw new AppError(ErrorCode.StateTransitionInvalid, message);
@@ -134,31 +111,28 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
     design: ProjectDesign,
     title: PromptName,
     targets: DesignSection[],
-    sections: PromptSection[] = targets.map(promptSection),
+    sections: DesignSection[] = targets,
   ) {
-    const files = repo
-      .listFiles(design.id)
-      .filter(({ relPath }) => targets.length === 0 || targets.some((section) => scopedTo(relPath, section)))
-      .map(({ relPath, sectionId }) => ({ relPath, sectionId }));
+    const inScope = designScope(targets);
+    const files = repo.fileInventory(design.id).filter(({ relPath }) => targets.length === 0 || inScope(relPath));
     const context = {
       title: design.title,
       depth: design.depth,
       analysisFocus: design.templateSnapshot.focusPrompt,
       source: design.sourceSnapshot,
-      sections,
+      sections: promptSections(repo, sections),
       ...(title === PromptName.DesignSection
         ? {
-            outline: repo.listSections(design.id).map(({ id, seq, selected, kind, title, scopePaths }) => ({
+            outline: repo.listSections(design.id).map(({ id, seq, selected, kind, title }) => ({
               id,
               seq,
               selected,
               kind,
               title,
-              scopePaths,
             })),
           }
         : {}),
-      ...(title === PromptName.DesignOutline ? planningInventory(files) : { authorizedFiles: files }),
+      ...planningInventory(files),
     };
     return `${prompts[title]}\n\n本轮分析数据：\n${JSON.stringify(context)}`;
   }
@@ -228,17 +202,12 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
   function reviewWork(design: ProjectDesign, sections: DesignSection[], model: string | null) {
     const targets = sections.slice(0, DESIGN_REVIEW_BATCH_SIZE);
     const remaining = sections.slice(DESIGN_REVIEW_BATCH_SIZE);
-    const ids = new Set(targets.map(({ id }) => id));
-    const files = repo.listFiles(design.id).filter(({ sectionId }) => sectionId !== null && ids.has(sectionId));
-    const diagrams = repo.listDiagrams(design.id).filter(({ sectionId }) => ids.has(sectionId));
     return run(design, {
       kind: AttemptKind.DesignReview,
       ...(remaining.length ? { followUp: { kind: 'review' as const, sectionIds: remaining.map(({ id }) => id) } } : {}),
       targets,
       model,
-      prompt:
-        promptFor(design, PromptName.DesignReview, targets) +
-        `\n已生成的文件与图：${JSON.stringify({ files, diagrams })}`,
+      prompt: promptFor(design, PromptName.DesignReview, targets),
     });
   }
 
@@ -330,7 +299,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
         ...(input.generateAfterPlanning ? { followUp: { kind: 'planned' as const } } : {}),
         targets: [],
         prompt:
-          promptFor(design, PromptName.DesignOutline, [], sections.map(promptSection)) +
+          promptFor(design, PromptName.DesignOutline, [], sections) +
           `\n可提交 1 至 ${DESIGN_MAX_SECTIONS} 个章节，每章由一个独立生成会话执行。\n用户对大纲的补充要求：${JSON.stringify(input.instruction ?? '')}`,
         instruction: input.instruction,
         model: modelFor(input),
@@ -366,11 +335,11 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
       const section = repo.listSections(id).find((item) => item.id === sectionId);
       if (section === undefined) throw new AppError(ErrorCode.DesignSectionNotFound);
       if (!section.selected || section.blocks === null) invalidState('This section has no generated content to revise');
-      const files = repo.listFiles(id);
+      const files = repo.fileInventory(id);
       const diagrams = repo.listDiagrams(id).filter((item) => item.sectionId === section.id);
       if (
         input.focusPath !== undefined &&
-        !files.some(({ relPath }) => relPath === input.focusPath && scopedTo(relPath, section))
+        !files.some(({ relPath }) => relPath === input.focusPath && designScope([section])(relPath))
       )
         invalidState('The focused file is outside the section source inventory');
       if (input.focusDiagramId !== undefined && !diagrams.some(({ id }) => id === input.focusDiagramId))
@@ -379,10 +348,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
       await run(design, {
         kind: AttemptKind.DesignRevise,
         targets: [section],
-        prompt:
-          promptFor(design, PromptName.DesignRevise, [section]) +
-          '\n\n' +
-          JSON.stringify({ focus, files: files.filter((file) => file.sectionId === sectionId), diagrams }),
+        prompt: `${promptFor(design, PromptName.DesignRevise, [section])}\n\n${JSON.stringify({ focus })}`,
         instruction: input.instruction,
         model: modelFor(input),
       });

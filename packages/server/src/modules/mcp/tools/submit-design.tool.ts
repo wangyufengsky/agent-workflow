@@ -1,6 +1,11 @@
 import {
   AttemptKind,
+  DESIGN_ATTEMPT_KINDS,
+  listDesignFilesInputSchema,
+  listDesignFilesOutputSchema,
   McpToolName,
+  readDesignSectionInputSchema,
+  readDesignSectionOutputSchema,
   submitDesignOutlineInputSchema,
   submitDesignOutlineOutputSchema,
   submitDesignReviewInputSchema,
@@ -13,6 +18,24 @@ import { defineMcpTool } from '../mcp.registry.ts';
 
 export function createDesignSubmissionTools(designs: DesignSubmissions) {
   return [
+    defineMcpTool({
+      name: McpToolName.ListDesignFiles,
+      description:
+        'Find scanned files in the current design scope by case-insensitive path substring. Continue with nextOffset for the same query.',
+      allowedKinds: DESIGN_ATTEMPT_KINDS,
+      input: listDesignFilesInputSchema,
+      output: listDesignFilesOutputSchema,
+      handler: (input, { attempt }) => designs.listFiles(attempt, input),
+    }),
+    defineMcpTool({
+      name: McpToolName.ReadDesignSection,
+      description:
+        'Read a saved design section field as paginated JSON text. Use the section ID and field from the prompt, then nextOffset if needed.',
+      allowedKinds: DESIGN_ATTEMPT_KINDS,
+      input: readDesignSectionInputSchema,
+      output: readDesignSectionOutputSchema,
+      handler: (input, { attempt }) => designs.readSection(attempt, input),
+    }),
     defineMcpTool({
       name: McpToolName.SubmitDesignOutline,
       description: 'Submit the complete project design outline and the authorized paths assigned to each section.',
