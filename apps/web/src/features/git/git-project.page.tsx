@@ -21,6 +21,7 @@ import {
   gitBranchesQuery,
   gitDiffFileQuery,
   gitReviewQuery,
+  gitReviewsQuery,
   gitStatusQuery,
   useFetch,
   usePull,
@@ -296,7 +297,9 @@ function Rail({
 
 /** A branch or range review opened on its own (27 §4.2): its findings and the diff they point into. */
 function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: string }) {
+  const navigate = route.useNavigate();
   const review = useQuery(gitReviewQuery(reviewId));
+  const recent = useQuery(gitReviewsQuery(projectId));
   const [focus, setFocus] = useState<{ path: string; line: number | undefined; side: 'new' | 'old' } | undefined>();
   if (review.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (review.isError) return <ErrorState error={review.error} />;
@@ -304,6 +307,15 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
   const place = reviewSearch(r);
   // A worktree or commit review is shown where its diff is (a link to one may still name this view).
   if (place.view !== 'review') return <Navigate to={ROUTES.gitProject} params={{ projectId }} search={place} replace />;
+  const history = (recent.data ?? []).filter(
+    (item) =>
+      item.target === r.target &&
+      (r.target === GitReviewTarget.Branch ? item.label === r.label : item.from === r.from && item.to === r.to),
+  );
+  const reports = history.some(({ id }) => id === r.id)
+    ? history.map((item) => (item.id === r.id ? r : item))
+    : [...history, r];
+  const selectReview = (id: string) => void navigate({ search: { view: 'review', review: id } });
   return (
     <div className={styles.changes}>
       <section className={styles.detail}>
@@ -317,7 +329,9 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
         <ReviewPanel
           projectId={projectId}
           target={reviewTarget(r)}
-          reviews={[r]}
+          reviews={reports}
+          selectedReviewId={r.id}
+          onSelectReview={selectReview}
           onLocate={(f) => setFocus({ path: f.path, line: f.line, side: f.side ?? DiffSide.New })}
         />
       </section>
@@ -348,10 +362,23 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
   const [changePick, setChangePick] = useState<ChangePick | undefined>(undefined);
   const startReview = useStartReview(project.id);
   useRefreshOnFocus(project.id);
-  const go: Go = (next) => void navigate({ search: { ...search, ...next } });
+  const go: Go = (next) =>
+    void navigate({
+      search: {
+        ...search,
+        ...(next.view !== undefined && next.view !== search.view ? { review: undefined } : {}),
+        ...next,
+      },
+    });
   const view: GitView = search.view ?? (status.clean ? 'commits' : 'changes');
+  const hasReviewLink = search.review !== undefined && (view === 'changes' || view === 'commits');
+  const linkedReview = useQuery({ ...gitReviewQuery(search.review ?? ''), enabled: hasReviewLink });
+  const selectedReview = linkedReview.data?.projectId === project.id ? linkedReview.data : undefined;
+  const selectReview = (id: string) => go({ review: id });
   const refName = search.ref ?? status.branch ?? project.defaultBranch;
   const filter = { author: search.author, search: search.q };
+  if (hasReviewLink && linkedReview.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
+  if (hasReviewLink && linkedReview.isError) return <ErrorState error={linkedReview.error} />;
 
   let body: React.ReactNode;
   if (view === 'changes') {
@@ -365,8 +392,9 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
           status={status}
           picked={changePick}
           showReview={search.tab === 'review'}
-          onShowReview={(show) => go({ tab: show ? 'review' : undefined })}
-          onPick={setChangePick}
+          selectedReview={selectedReview}
+          onSelectReview={selectReview}
+          onShowReview={(show) => go({ tab: show ? 'review' : undefined, review: undefined })}
           onPush={(branch) => setDialog({ kind: 'push', branch })}
         />
       </div>
@@ -380,7 +408,7 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
           refName={refName}
           filter={filter}
           selected={search.sha}
-          onSelect={(sha) => go({ sha, parent: undefined, file: undefined, line: undefined })}
+          onSelect={(sha) => go({ sha, parent: undefined, file: undefined, line: undefined, review: undefined })}
         />
         {search.sha === undefined ? (
           <p className={`hint ${styles.tabBody}`}>{C.pickCommit}</p>
@@ -390,6 +418,8 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
             sha={search.sha}
             parent={search.parent}
             tab={search.tab ?? 'files'}
+            selectedReview={selectedReview}
+            onSelectReview={selectReview}
             focus={
               search.path === undefined
                 ? undefined
@@ -397,7 +427,7 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
             }
             onChange={(next) =>
               go({
-                ...('parent' in next ? { parent: next.parent } : {}),
+                ...('parent' in next ? { parent: next.parent, review: undefined } : {}),
                 ...(next.tab === undefined ? {} : { tab: next.tab }),
                 ...('focus' in next ? { path: next.focus?.path, line: next.focus?.line, side: next.focus?.side } : {}),
               })
@@ -448,7 +478,7 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
         search.review === undefined ? (
           <p className="hint">{C.reviewNone}</p>
         ) : (
-          <ReviewView projectId={project.id} reviewId={search.review} />
+          <ReviewView key={search.review} projectId={project.id} reviewId={search.review} />
         );
     }
     body = (

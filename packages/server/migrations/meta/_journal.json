@@ -421,6 +421,13 @@
       "when": 1795621010711,
       "tag": "0059_knowledge_permission_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1795682724649,
+      "tag": "0060_design_git_integration",
+      "breakpoints": true
     }
   ]
 }

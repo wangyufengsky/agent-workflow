@@ -109,6 +109,14 @@ export const GitReviewTarget = {
 export type GitReviewTarget = (typeof GitReviewTarget)[keyof typeof GitReviewTarget];
 export const gitReviewTargetSchema = z.enum(GitReviewTarget);
 
+export const GitReviewEvidenceState = {
+  Available: 'available',
+  Changed: 'changed',
+  Unavailable: 'unavailable',
+} as const;
+export type GitReviewEvidenceState = (typeof GitReviewEvidenceState)[keyof typeof GitReviewEvidenceState];
+export const gitReviewEvidenceStateSchema = z.enum(GitReviewEvidenceState);
+
 export const FindingSeverity = {
   Blocker: 'blocker',
   Major: 'major',
@@ -126,6 +134,33 @@ export const FindingCategory = {
 } as const;
 export type FindingCategory = (typeof FindingCategory)[keyof typeof FindingCategory];
 export const findingCategorySchema = z.enum(FindingCategory);
+
+export const GitFindingStatus = {
+  Open: 'open',
+  Accepted: 'accepted',
+  Dismissed: 'dismissed',
+  Resolved: 'resolved',
+} as const;
+export type GitFindingStatus = (typeof GitFindingStatus)[keyof typeof GitFindingStatus];
+export const gitFindingStatusSchema = z.enum(GitFindingStatus);
+
+export const GitImpactTargetKind = {
+  Section: 'section',
+  Submodule: 'submodule',
+  File: 'file',
+  Symbol: 'symbol',
+  Transaction: 'transaction',
+} as const;
+export type GitImpactTargetKind = (typeof GitImpactTargetKind)[keyof typeof GitImpactTargetKind];
+export const gitImpactTargetKindSchema = z.enum(GitImpactTargetKind);
+
+export const GitImpactClassification = {
+  Direct: 'direct',
+  Indirect: 'indirect',
+  Possible: 'possible',
+} as const;
+export type GitImpactClassification = (typeof GitImpactClassification)[keyof typeof GitImpactClassification];
+export const gitImpactClassificationSchema = z.enum(GitImpactClassification);
 
 /** Which side of a diff a finding's line numbers count on. */
 export const DiffSide = {

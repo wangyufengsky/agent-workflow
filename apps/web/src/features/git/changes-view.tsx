@@ -1,11 +1,4 @@
-import {
-  type DiffFile,
-  DiffFileStatus,
-  DiffSide,
-  type GitFindingDTO,
-  GitReviewTarget,
-  type GitStatusDTO,
-} from '@aw/shared';
+import { type DiffFile, DiffFileStatus, type GitReviewDTO, GitReviewTarget, type GitStatusDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
@@ -258,21 +251,22 @@ export function ChangesMain({
   status,
   picked,
   showReview,
+  selectedReview,
+  onSelectReview,
   onShowReview,
-  onPick,
   onPush,
 }: {
   projectId: string;
   status: GitStatusDTO;
   picked: ChangePick | undefined;
   showReview: boolean;
+  selectedReview: GitReviewDTO | undefined;
+  onSelectReview: (id: string) => void;
   onShowReview: (show: boolean) => void;
-  onPick: (pick: ChangePick) => void;
   onPush: (branch: string) => void;
 }) {
   const changes = useQuery(gitChangesQuery(projectId));
   const reviews = useQuery(gitReviewsQuery(projectId));
-  const [focus, setFocus] = useState<GitFindingDTO | undefined>(undefined);
   const staged = changes.data?.staged ?? [];
   const unstaged = changes.data?.unstaged ?? [];
   const first: ChangePick | undefined =
@@ -283,14 +277,12 @@ export function ChangesMain({
         : undefined;
   const listed = (p: ChangePick) => (p.side === 'staged' ? staged : unstaged).some((f) => f.path === p.path);
   const shown = picked !== undefined && listed(picked) ? picked : first;
-  // Reviews of the uncommitted changes on top of the current commit.
+  const linked = selectedReview?.target === GitReviewTarget.Worktree ? selectedReview : undefined;
+  // 链接可指到先前的工作区基线，当前改动仍保留原审查入口。
   const worktreeReviews = (reviews.data ?? []).filter(
-    (r) => r.target === GitReviewTarget.Worktree && r.from === status.commit,
+    (r) => r.target === GitReviewTarget.Worktree && (r.from === status.commit || r.from === linked?.from),
   );
-  const findingsOf = (path: string) =>
-    (worktreeReviews[0]?.findings ?? [])
-      .filter((f) => f.path === path && f.line !== undefined)
-      .map((f) => ({ line: f.line ?? 0, side: f.side ?? DiffSide.New, severity: f.severity, title: f.title }));
+  if (linked !== undefined && !worktreeReviews.some(({ id }) => id === linked.id)) worktreeReviews.push(linked);
 
   return (
     <div className={styles.changes}>
@@ -318,26 +310,13 @@ export function ChangesMain({
             projectId={projectId}
             target={{ kind: GitReviewTarget.Worktree }}
             reviews={worktreeReviews}
-            onLocate={(f) => {
-              onShowReview(false);
-              setFocus(f);
-              onPick({ path: f.path, side: staged.some((s) => s.path === f.path) ? 'staged' : 'unstaged' });
-            }}
+            selectedReviewId={linked?.id}
+            onSelectReview={onSelectReview}
           />
         ) : shown === undefined ? (
           <p className="hint">{C.noChanges}</p>
         ) : (
-          <FileDiff
-            path={shown.path}
-            query={gitChangeFileQuery(projectId, shown.side)}
-            mode="unified"
-            marks={findingsOf(shown.path)}
-            focus={
-              focus?.path === shown.path && focus.line !== undefined
-                ? { line: focus.line, side: focus.side ?? DiffSide.New }
-                : undefined
-            }
-          />
+          <FileDiff path={shown.path} query={gitChangeFileQuery(projectId, shown.side)} mode="unified" />
         )}
       </section>
       <div>

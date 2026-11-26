@@ -82,6 +82,7 @@ export * from './contracts/mcp/submit-result.ts';
 export * from './contracts/mcp/submit-review.ts';
 export * from './contracts/mcp/submit-slide.ts';
 export * from './deck/status.ts';
+export * from './design/impact-target.ts';
 export * from './design/layout.ts';
 export * from './design/status.ts';
 export * from './design/transaction-diagram.ts';

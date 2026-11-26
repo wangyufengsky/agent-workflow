@@ -34,6 +34,7 @@ type Diagram = Readonly<
   Pick<DesignDiagramRecord, 'id' | 'sectionId' | 'kind' | 'title'> & {
     nodes: ReadonlyMap<string, Readonly<DesignDiagramNode>>;
     edges: ReadonlyMap<string, Readonly<DesignDiagramRecord['edges'][number]>>;
+    nodePaths: ReadonlyMap<string, readonly string[]>;
   }
 >;
 
@@ -149,7 +150,10 @@ function nodePaths(node: DesignDiagramNode, { filesByPath, filesById, symbolPath
   if (node.relPath !== undefined) return [node.relPath];
   const target = node.targetId;
   if (target === undefined) return [];
-  if (node.targetKind === 'symbol') return symbolPaths.get(target) ?? [];
+  if (node.targetKind === 'symbol') {
+    const paths = symbolPaths.get(target);
+    return paths?.size === 1 ? paths : [];
+  }
   if (node.targetKind === 'module' || node.targetKind === 'section') return [];
   const file = filesById.get(target) ?? filesByPath.get(target);
   return file === undefined ? [] : [file.relPath];
@@ -163,8 +167,11 @@ function indexDiagram(
 ): Diagram {
   const { id, sectionId, kind, title } = diagram;
   const paths = new Set<string>();
+  const pathsByNode = new Map<string, string[]>();
   for (const node of diagram.nodes) {
-    for (const path of nodePaths(node, inventory)) {
+    const resolved = [...nodePaths(node, inventory)].map((path) => posix.normalize(path));
+    pathsByNode.set(node.id, resolved);
+    for (const path of resolved) {
       refs.add(path, sectionId).diagramNodeRefs.push({ diagramId: id, nodeId: node.id });
       paths.add(path);
     }
@@ -187,6 +194,7 @@ function indexDiagram(
     title,
     nodes: new Map(diagram.nodes.map((node) => [node.id, node])),
     edges: new Map(diagram.edges.map((edge) => [edge.id, edge])),
+    nodePaths: pathsByNode,
   };
 }
 
@@ -242,33 +250,28 @@ export function buildProjectKnowledgeIndex(
   };
 }
 
-type KnowledgeSelection =
+export type KnowledgeSelection =
   | { match: typeof DesignKnowledgeMatch.Missing; knowledge: null }
   | {
       match: typeof DesignKnowledgeMatch.Exact | typeof DesignKnowledgeMatch.Reference;
       knowledge: ProjectKnowledgeIndex;
     };
 
+type KnowledgeSource = Pick<ReturnType<typeof createDesignsRepo>, 'listSections' | 'listFiles' | 'listDiagrams'>;
+
+export function readProjectKnowledge(repo: KnowledgeSource, design: ProjectDesign): ProjectKnowledgeIndex {
+  const { id } = design;
+  return buildProjectKnowledgeIndex(design, repo.listSections(id), repo.listFiles(id), repo.listDiagrams(id));
+}
+
 export function createProjectKnowledgeReader(
-  repo: Pick<
-    ReturnType<typeof createDesignsRepo>,
-    'findLatestKnowledgeDesign' | 'listSections' | 'listFiles' | 'listDiagrams'
-  >,
+  repo: KnowledgeSource & Pick<ReturnType<typeof createDesignsRepo>, 'findLatestKnowledgeDesign'>,
 ) {
   return (projectId: string, targetSha: string | null): KnowledgeSelection => {
+    const exact = targetSha === null ? undefined : repo.findLatestKnowledgeDesign(projectId, targetSha);
+    if (exact !== undefined) return { match: DesignKnowledgeMatch.Exact, knowledge: readProjectKnowledge(repo, exact) };
     const design = repo.findLatestKnowledgeDesign(projectId);
     if (design === undefined) return { match: DesignKnowledgeMatch.Missing, knowledge: null };
-    const { id, sourceSnapshot } = design;
-    const knowledge = buildProjectKnowledgeIndex(
-      design,
-      repo.listSections(id),
-      repo.listFiles(id),
-      repo.listDiagrams(id),
-    );
-    const match =
-      targetSha !== null && !sourceSnapshot.dirty && sourceSnapshot.commitSha === targetSha
-        ? DesignKnowledgeMatch.Exact
-        : DesignKnowledgeMatch.Reference;
-    return { match, knowledge };
+    return { match: DesignKnowledgeMatch.Reference, knowledge: readProjectKnowledge(repo, design) };
   };
 }

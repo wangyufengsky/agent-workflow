@@ -1,4 +1,4 @@
-import { DiffSide, type GitFindingDTO, GitReviewTarget } from '@aw/shared';
+import { DiffSide, type GitFindingDTO, type GitReviewDTO, GitReviewTarget } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
 import type { DiffFocus } from '../../components/diff/diff-view.tsx';
@@ -42,6 +42,8 @@ export function CommitDetail({
   sha,
   parent,
   tab,
+  selectedReview,
+  onSelectReview,
   focus,
   onChange,
 }: {
@@ -49,6 +51,8 @@ export function CommitDetail({
   sha: string;
   parent: number | undefined;
   tab: DetailTab;
+  selectedReview: GitReviewDTO | undefined;
+  onSelectReview: (id: string) => void;
   focus: { path: string; line: number | undefined; side: 'new' | 'old' } | undefined;
   onChange: (next: {
     parent?: number | undefined;
@@ -66,8 +70,13 @@ export function CommitDetail({
   const parentIndex = parent ?? 1;
   // Reviews of this commit against the parent shown now.
   const ofThisDiff = (reviews.data ?? []).filter((r) => r.target === GitReviewTarget.Commit && r.from === c.base);
-  const latest = ofThisDiff[0];
-  const findings = latest?.findings ?? [];
+  const linked =
+    selectedReview?.target === GitReviewTarget.Commit && selectedReview.from === c.base && selectedReview.to === c.sha
+      ? selectedReview
+      : undefined;
+  if (linked !== undefined && !ofThisDiff.some(({ id }) => id === linked.id)) ofThisDiff.push(linked);
+  const displayedReview = linked ?? ofThisDiff[0];
+  const findings = displayedReview?.findings ?? [];
   const locate = (f: GitFindingDTO) =>
     onChange({ tab: 'files', focus: { path: f.path, line: f.line, side: f.side ?? DiffSide.New } });
   const diffFocus: DiffFocus | undefined =
@@ -167,7 +176,7 @@ export function CommitDetail({
             >
               {C.tabs[t]}
               <span className={styles.tabCount} data-tone={t === 'review' && findings.length > 0 ? 'warn' : undefined}>
-                {t === 'files' ? c.files.length : latest === undefined ? '' : findings.length}
+                {t === 'files' ? c.files.length : displayedReview === undefined ? '' : findings.length}
               </span>
             </button>
           ))}
@@ -202,6 +211,8 @@ export function CommitDetail({
           projectId={projectId}
           target={{ kind: GitReviewTarget.Commit, sha: c.sha, ...(parent === undefined ? {} : { parent }) }}
           reviews={ofThisDiff}
+          selectedReviewId={linked?.id}
+          onSelectReview={onSelectReview}
           onLocate={locate}
         />
       )}

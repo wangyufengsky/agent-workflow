@@ -18,6 +18,13 @@ const review = (overrides: Partial<GitReviewDTO>): GitReviewDTO => ({
   error: null,
   summary: null,
   findings: [],
+  designId: null,
+  designSnapshotSha: null,
+  designMatch: 'missing',
+  impactTruncated: false,
+  uncoveredPaths: [],
+  impacts: [],
+  regressionChecks: [],
   createdAt: 0,
   finishedAt: null,
   ...overrides,
@@ -25,12 +32,16 @@ const review = (overrides: Partial<GitReviewDTO>): GitReviewDTO => ({
 
 describe('审查在工作台中的位置与重新审查的对象（27 §4.2）', () => {
   it('工作区改动的审查在改动视图打开（它没有终点提交，只有那里能显示它的 diff）', () => {
-    expect(reviewSearch(review({ target: 'worktree', to: null }))).toEqual({ view: 'changes', tab: 'review' });
+    expect(reviewSearch(review({ target: 'worktree', to: null }))).toEqual({
+      view: 'changes',
+      tab: 'review',
+      review: 'r1',
+    });
   });
 
   it('合并提交的审查回到同一个父提交：打开时与重新审查时都是', () => {
     const merge = review({ target: 'commit', parent: 2 });
-    expect(reviewSearch(merge)).toEqual({ view: 'commits', sha: 'merge', parent: 2, tab: 'review' });
+    expect(reviewSearch(merge)).toEqual({ view: 'commits', sha: 'merge', parent: 2, tab: 'review', review: 'r1' });
     expect(reviewTarget(merge)).toEqual({ kind: 'commit', sha: 'merge', parent: 2 });
   });
 

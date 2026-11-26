@@ -33,8 +33,13 @@ export function createDesignsModule(deps: {
   return { service, knowledge: createProjectKnowledgeReader(deps.repo), operations: designsOperations(service) };
 }
 
+export { designExclusion } from './designs.exclusions.ts';
 export { exportDesignSite } from './designs.exporter.ts';
-export { createProjectKnowledgeReader, type ProjectKnowledgeIndex } from './designs.knowledge.ts';
+export {
+  buildProjectKnowledgeIndex,
+  createProjectKnowledgeReader,
+  type ProjectKnowledgeIndex,
+} from './designs.knowledge.ts';
 export {
   createDesignsRepo,
   type DesignDiagramRecord,
@@ -43,5 +48,6 @@ export {
   type DesignSection,
   type ProjectDesign,
 } from './designs.repo.ts';
+export { createReviewKnowledgeReader, type ReviewKnowledgeSelection } from './designs.review-knowledge.ts';
 export { createDesignSubmissions, type DesignSubmissions } from './designs.submissions.ts';
 export { syncBuiltinDesignTemplates } from './designs.templates.ts';

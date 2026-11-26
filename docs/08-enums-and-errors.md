@@ -708,6 +708,17 @@ class AppError extends Error {
 
 专业设置 `ai.defaultEffort` 默认为 null，使用模型默认。显式选择保存声明该档位的 `provider/model` 和 OpenCode 的原始 `variant` 字符串。切换默认模型时同步清空旧选择；不属于当前模型的档位在写入前返回 VALIDATION_FAILED。
 
+## Git 审查的业务影响与人工处置（45）
+
+| 枚举 | 值与含义 |
+| --- | --- |
+| `GitFindingStatus` | `open` 待处理、`accepted` 已确认、`dismissed` 已忽略、`resolved` 已解决 |
+| `GitImpactClassification` | `direct` 直接、`indirect` 间接、`possible` 潜在待核实 |
+| `GitImpactTargetKind` | `section` 章节或模块、`submodule` 子模块、`transaction` 交易、`file` 文件、`symbol` 符号 |
+| `GitReviewEvidenceState` | `available` 有对应版本源码、`changed` 工作区内容已变化、`unavailable` 证据无法读取或核对 |
+
+证据沿用 `DesignEvidenceClass`，设计版本匹配沿用 `DesignKnowledgeMatch`。程序初筛上限为 3 层（`DESIGN_IMPACT_MAX_DEPTH`）、60 个节点（`DESIGN_IMPACT_MAX_ITEMS`），注入上下文上限为 16 KiB（`DESIGN_IMPACT_PROMPT_MAX_BYTES`）。一次提交最多包含 60 项业务影响（`GIT_REVIEW_IMPACTS_MAX`）与 30 条回归建议（`GIT_REVIEW_REGRESSION_CHECKS_MAX`）。
+
 ## 项目设计（44）
 
 设计深度为 `quick / standard / deep`，阅读风格为 `doc / arch`。章节类型为

@@ -393,6 +393,15 @@ type HandoffOutput = {
 
 只用于 `git_review` 尝试（Git 工作台的 AI 审查，27 §4.4）。输入：`{ summary: string; findings: Array<{ severity: 'blocker' | 'major' | 'minor'; category: 'correctness' | 'security' | 'performance' | 'maintainability' | 'tests'; path: string; line?: number; end_line?: number; side?: 'new' | 'old'; title: string; description: string; suggestion?: string }> }`（最多 `GIT_REVIEW_FINDINGS_MAX` 个，可以为空）。
 行为：每个问题的文件须在审查开始时记录的改动清单中，行号须在所指版本（`new` 为审查的终点或工作区，`old` 为起点）的文件里；不通过 → `GIT_REVIEW_FINDINGS_INVALID`，`details.problems[]`（08 §5.6，每项带 `index` 与 hint）与 `details.files`；通过 → 写入审查的结论与问题，尝试 `succeeded`，发 `git_review.updated`。
+附加字段均可省略。每项 finding 可用 `affectedImpactIds` 引用同一份报告的影响项。问题 ID 与初始处置状态由服务端生成。
+
+| 字段 | 行为 |
+| --- | --- |
+| `impacts` | 最多 60 项，每项含唯一的 id、targetKind、title、classification、evidenceClass、reason、suggestedChecks，以及可选的 targetId、relPath、evidencePath、lineStart、lineEnd、side。static 必须给出审查对应版本内可读且未排除的文件与有效起止行；inferred 必须说明推断依据。side 默认 new。间接证据可位于未修改的文件。传播关系可选填 `sourcePaths`（本次变更文件，可用旧路径）与 `viaImpactIds`（同一报告的其他前序影响 ID），各最多 60 项。仅经核验的关联才画入传播图 |
+| `regression_checks` | 最多 30 项非空的测试或联调检查。即使 findings 为空也可以提交业务影响与检查清单 |
+
+违规的影响证据或无效关联返回 `VALIDATION_FAILED` 和定位到字段的 `issues`，本次提交不落库，模型可在原会话修正并重提。
+
 输出：`{ accepted: true }`
 错误：`GIT_REVIEW_FINDINGS_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
 

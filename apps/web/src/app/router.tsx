@@ -1,4 +1,4 @@
-import { COMPANION_PATH, ErrorCode, taskDisplayGroupSchema } from '@aw/shared';
+import { COMPANION_PATH, ErrorCode, gitImpactTargetKindSchema, taskDisplayGroupSchema } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Link, Outlet, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
@@ -385,6 +385,8 @@ const designWorkbenchRoute = createRoute({
       .string()
       .regex(/^(?:[^/]+\/.+)?$/)
       .optional(),
+    targetKind: gitImpactTargetKindSchema.optional(),
+    targetId: z.string().optional(),
   }),
   component: DesignWorkbenchPage,
 });

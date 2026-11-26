@@ -1,4 +1,5 @@
 import {
+  type GitFindingStatus,
   type GitReviewTargetInput,
   getGitReviewOp,
   gitBranchesOp,
@@ -30,6 +31,7 @@ import {
   pruneWorktreesOp,
   startGitReviewOp,
   stopGitReviewOp,
+  updateGitFindingStatusOp,
 } from '@aw/shared';
 import {
   infiniteQueryOptions,
@@ -235,5 +237,17 @@ export function useStopReview(projectId: string) {
   return useMutation({
     mutationFn: (reviewId: string) => callOperation(stopGitReviewOp, { reviewId }),
     onSuccess: (review) => refreshGitReview(queryClient, projectId, review.id),
+  });
+}
+
+export function useUpdateGitFindingStatus(projectId: string, reviewId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { findingId: string; status: GitFindingStatus }) =>
+      callOperation(updateGitFindingStatusOp, { reviewId, ...input }),
+    onSuccess: async (review) => {
+      queryClient.setQueryData(queryKeys.gitReview(reviewId), review);
+      await refreshGitReview(queryClient, projectId, reviewId);
+    },
   });
 }

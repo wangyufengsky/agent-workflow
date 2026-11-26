@@ -2,8 +2,8 @@ import { type GitReviewDTO, GitReviewTarget, type GitReviewTargetInput } from '@
 
 /** Search params of the workbench page (`/git/:projectId`) that show a review. */
 export type ReviewSearch =
-  | { view: 'changes'; tab: 'review' }
-  | { view: 'commits'; sha: string; parent?: number; tab: 'review' }
+  | { view: 'changes'; tab: 'review'; review: string }
+  | { view: 'commits'; sha: string; parent?: number; tab: 'review'; review: string }
   | { view: 'review'; review: string };
 
 /**
@@ -13,13 +13,14 @@ export type ReviewSearch =
 export function reviewSearch(review: GitReviewDTO): ReviewSearch {
   switch (review.target) {
     case GitReviewTarget.Worktree:
-      return { view: 'changes', tab: 'review' };
+      return { view: 'changes', tab: 'review', review: review.id };
     case GitReviewTarget.Commit:
       return {
         view: 'commits',
         sha: review.to ?? review.from,
         ...(review.parent === null || review.parent === 1 ? {} : { parent: review.parent }),
         tab: 'review',
+        review: review.id,
       };
     case GitReviewTarget.Branch:
     case GitReviewTarget.Range:

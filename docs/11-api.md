@@ -317,9 +317,16 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（含 `attemptId`，复用尝试详情、会话流 API 与 SSE）（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`）；没有改动 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
 | GET | `/projects/:id/git/reviews?to` | 审查列表，新的在前；`to` 只列该提交的 |
 | GET | `/git/reviews/:reviewId` | 一次审查；`GIT_REVIEW_NOT_FOUND` |
+| PATCH | `/git/reviews/:reviewId/findings/:findingId` | write，传 `{ status }` 更新一条问题的人工处置并返回本次审查。重跑会创建独立审查；找不到问题时返回 404 |
+| GET | `/git/reviews/:reviewId/evidence?path&side` | 仅本地阅读器，read。读取报告引用的 old/new 证据，返回实际版本路径、`state`、文本 `content` 和可用的单文件 `patch`。未改动的间接受影响文件可读对应提交的正文。工作区文件与记录哈希不同返回 changed；老记录无法核对、文件不可读时返回 unavailable |
+| POST | `/git/reviews/:reviewId/export` | write，传 `{targetDir, overwrite?}` 从已成功的报告导出自包含 `index.html`，返回 `{path}`。非空未知目录返回 `DESIGN_EXPORT_DIR_NOT_EMPTY`，用户明确确认覆盖后只替换报告文件。 |
 | POST | `/git/reviews/:reviewId/stop` | 停止进行中的审查，write |
 | GET | `/projects/:id/worktrees` | 所有 worktree（含非本应用创建的，标注 `managed`），关联任务、分支、脏状态、相对项目默认分支的 ahead/behind；目录已不存在的标 `prunable` |
 | POST | `/projects/:id/worktrees/prune` | 删除终态任务遗留的 worktree（保留分支）并 `git worktree prune`；上次退出时中断的移除可在重启后重新清理，返回新的列表 |
+
+`GitReviewDTO` 记录启动时的 `designId`、`designSnapshotSha`、`designMatch`，以及未覆盖的变更路径 `uncoveredPaths`、`impactTruncated`、`impacts`、`regressionChecks`。删除设计只解除设计链接，仍保留当时的匹配度。旧记录按 missing、空影响和空回归清单读取，问题按原顺序补 ID 与 open 状态。
+
+打开已完成的工作区审查详情时，`worktreeChanged` 表示当前 HEAD、变更清单或可读文本内容是否偏离审查启动时的记录。缺少足够基线或目录不可用时省略该字段。历史列表只读已保存的报告。
 
 不存在的 ref 或路径返回 404 `NOT_FOUND`（`details.object`）。
 

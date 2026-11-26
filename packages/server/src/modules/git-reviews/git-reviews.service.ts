@@ -5,8 +5,11 @@ import {
   AppError,
   type AttemptDTO,
   AttemptKind,
+  AttemptStatus,
   type DiffFile,
+  type DiffSide,
   ErrorCode,
+  type GitFindingStatus,
   type GitReviewDTO,
   GitReviewTarget,
   type GitReviewTargetInput,
@@ -19,14 +22,25 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { createDesignsRepo, createReviewKnowledgeReader } from '../designs/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import {
+  readReviewEvidence,
+  recordWorktreeFiles,
+  validateReviewImpacts,
+  worktreeChanged,
+} from './git-reviews.evidence.ts';
+import { exportGitReviewReport } from './git-reviews.exporter.ts';
+import { renderDesignImpact, screenDesignImpact } from './git-reviews.impact.ts';
 import { createGitReviewsRepo, type Review } from './git-reviews.repo.ts';
 import { readCommands, resolveTarget, validateFindings } from './git-reviews.target.ts';
 
 export type GitReviewsServiceDeps = {
   db: Db;
+  designs: Pick<ReturnType<typeof createDesignsRepo>, 'findDesign'>;
+  readKnowledge: ReturnType<typeof createReviewKnowledgeReader>;
   unit: UnitOfWork;
   clock: Clock;
   attempts: AttemptsService;
@@ -48,7 +62,7 @@ const SCOPE: Record<GitReviewTarget, (label: string) => string> = {
 };
 
 const fileLine = (f: DiffFile) =>
-  `- \`${f.path}\` (${f.status}${f.additions === null ? ', binary' : `, +${f.additions} −${f.deletions ?? 0}`})`;
+  `- ${f.oldPath ? `\`${f.oldPath}\` → ` : ''}\`${f.path}\` (${f.status}${f.additions === null ? ', binary' : `, +${f.additions} −${f.deletions ?? 0}`})`;
 
 /** AI reviews in the Git workbench (27 §4, D109): read-only attempts that report structured findings. */
 export function createGitReviewsService(deps: GitReviewsServiceDeps) {
@@ -59,6 +73,10 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
     const review = repo.find(id);
     if (review === undefined) throw new AppError(ErrorCode.GitReviewNotFound, `No review ${id}`, { id });
     return review;
+  }
+
+  function patterns(designId: string | null) {
+    return designId === null ? [] : (deps.designs.findDesign(designId)?.excludePatterns ?? []);
   }
 
   function toDto(review: Review): GitReviewDTO {
@@ -73,7 +91,14 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       to: review.toSha,
       parent: review.parent,
       focus: review.focus,
-      files: review.files,
+      files: review.files.map(({ worktreeHash: _hash, designUncovered: _uncovered, ...file }) => file),
+      uncoveredPaths: [...new Set(review.files.flatMap((file) => file.designUncovered ?? []))],
+      designId: review.designId,
+      designMatch: review.designMatch,
+      designSnapshotSha: review.designSnapshotSha,
+      impactTruncated: review.impactTruncated,
+      impacts: review.impacts,
+      regressionChecks: review.regressionChecks,
       status: attempt.status,
       model: attempt.model,
       error: attempt.error,
@@ -118,6 +143,16 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
         issues: [{ path: ['target'], message: 'no changes' }],
       });
     }
+    const selection = await deps.readKnowledge(project.id, target.to, project.repoPath);
+    const screened = screenDesignImpact(selection, target.files);
+    const { context, truncated } = renderDesignImpact(screened);
+    const snapshotId = selection.knowledge?.designId ?? null;
+    const files =
+      target.to === null
+        ? await recordWorktreeFiles(project.repoPath, target.files, patterns(snapshotId))
+        : target.files;
+    // 工作区取证期间用户可能删除设计，报告仍保留本次实际使用的匹配度和提交。
+    const designId = snapshotId !== null && deps.designs.findDesign(snapshotId) ? snapshotId : null;
     const reviewer = roles.getByKey(BuiltinRoleKey.Reviewer);
     const attemptId = randomUUID();
     const started = attempts.start({
@@ -133,6 +168,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       model: reviewer.model ?? settings.get('ai.defaultModel'),
       prompt: renderTemplate(prompts[PromptName.StartGitReview], {
         projectName: project.name,
+        designImpact: context,
         scope: SCOPE[target.target](target.label),
         readCommands: readCommands(target),
         files: target.files.map(fileLine).join('\n'),
@@ -149,7 +185,15 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       toSha: target.to,
       focus: focus ?? null,
       attemptId,
-      files: target.files,
+      files: files.map((file) => {
+        const paths = file.oldPath ? [file.path, file.oldPath] : [file.path];
+        const uncovered = paths.filter((path) => screened.uncoveredPathSet.has(path));
+        return uncovered.length ? { ...file, designUncovered: uncovered } : file;
+      }),
+      designId,
+      designSnapshotSha: selection.knowledge?.sourceSnapshot.commitSha ?? null,
+      designMatch: selection.match,
+      impactTruncated: truncated,
       createdAt: clock.now(),
     };
     unit.transact(() => {
@@ -172,6 +216,15 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
 
   return {
     get: (id: string): GitReviewDTO => toDto(mustFind(id)),
+    async detail(id: string): Promise<GitReviewDTO> {
+      const review = mustFind(id);
+      const dto = toDto(review);
+      if (review.toSha === null && dto.status === AttemptStatus.Succeeded) {
+        const { repoPath } = projects.getRecord(review.projectId);
+        dto.worktreeChanged = await worktreeChanged(repoPath, review, patterns(review.designId));
+      }
+      return dto;
+    },
     list: (projectId: string, toSha?: string): GitReviewDTO[] => {
       projects.getRecord(projectId);
       return repo.list(projectId, toSha).map(toDto);
@@ -204,11 +257,40 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       if (review === undefined) throw new Error(`Review attempt ${attempt.id} has no review`);
       const { repoPath } = projects.getRecord(review.projectId);
       await validateFindings(repoPath, { from: review.fromSha, to: review.toSha, files: review.files }, input.findings);
+      await validateReviewImpacts(repoPath, review, input, patterns(review.designId));
       unit.transact(() => {
-        repo.setResult(review.id, input.summary, input.findings);
+        repo.setResult(review.id, input.summary, input.findings, input.impacts, input.regression_checks);
         attempts.markSubmitted(attempt.id);
         publish(review);
       });
+    },
+
+    updateFindingStatus(id: string, findingId: string, status: GitFindingStatus) {
+      return unit.transact(() => {
+        mustFind(id);
+        const updated = repo.updateFindingStatus(id, findingId, status);
+        if (!updated) throw new AppError(ErrorCode.NotFound, 'No such finding in this review', { findingId });
+        publish(updated);
+        return toDto(updated);
+      });
+    },
+
+    evidence(id: string, path: string, side: DiffSide) {
+      const review = mustFind(id);
+      return readReviewEvidence(
+        projects.getRecord(review.projectId).repoPath,
+        review,
+        path,
+        side,
+        patterns(review.designId),
+      );
+    },
+
+    export(id: string, targetDir: string, overwrite?: boolean) {
+      const review = toDto(mustFind(id));
+      if (review.status !== AttemptStatus.Succeeded)
+        throw new AppError(ErrorCode.StateTransitionInvalid, 'Only a completed review can be exported');
+      return exportGitReviewReport(review, projects.getRecord(review.projectId), targetDir, overwrite);
     },
 
     /** Deleting a project (by the tasks module): no review may be running. */

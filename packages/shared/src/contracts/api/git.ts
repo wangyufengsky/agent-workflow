@@ -5,14 +5,21 @@ import {
   GIT_REVIEW_FINDING_TITLE_MAX_CHARS,
   GIT_REVIEW_FINDINGS_MAX,
   GIT_REVIEW_FOCUS_MAX_CHARS,
+  GIT_REVIEW_IMPACTS_MAX,
+  GIT_REVIEW_REGRESSION_CHECKS_MAX,
   GIT_REVIEW_SUMMARY_MAX_CHARS,
 } from '../../constants/limits.ts';
+import { designEvidenceClassSchema, designKnowledgeMatchSchema } from '../../enums/design.ts';
 import {
   diffSideSchema,
   findingCategorySchema,
   findingSeveritySchema,
+  gitFindingStatusSchema,
+  gitImpactClassificationSchema,
+  gitImpactTargetKindSchema,
   gitMergeStrategySchema,
   gitOperationSchema,
+  gitReviewEvidenceStateSchema,
   gitReviewTargetSchema,
 } from '../../enums/git.ts';
 import { attemptStatusSchema, taskStatusSchema } from '../../enums/task.ts';
@@ -190,7 +197,7 @@ export const gitPushPreviewSchema = z.object({
 export type GitPushPreviewDTO = z.infer<typeof gitPushPreviewSchema>;
 
 /** A finding of an AI review (27 §4.4). */
-export const gitFindingSchema = z.object({
+export const codeFindingSchema = z.object({
   severity: findingSeveritySchema,
   category: findingCategorySchema,
   path: z.string().min(1),
@@ -201,7 +208,41 @@ export const gitFindingSchema = z.object({
   description: z.string().min(1).max(GIT_REVIEW_FINDING_TEXT_MAX_CHARS),
   suggestion: z.string().min(1).max(GIT_REVIEW_FINDING_TEXT_MAX_CHARS).optional(),
 });
+
+export const gitFindingInputSchema = codeFindingSchema.extend({
+  affectedImpactIds: z.array(z.string().min(1)).max(GIT_REVIEW_IMPACTS_MAX).optional(),
+});
+export type GitFindingInput = z.infer<typeof gitFindingInputSchema>;
+
+export const gitFindingSchema = gitFindingInputSchema.extend({
+  id: z.string().min(1),
+  status: gitFindingStatusSchema,
+});
 export type GitFindingDTO = z.infer<typeof gitFindingSchema>;
+
+const gitReviewCheckSchema = z.string().trim().min(1).max(GIT_REVIEW_FINDING_TEXT_MAX_CHARS);
+
+export const gitImpactItemSchema = z.strictObject({
+  id: z.string().min(1),
+  targetKind: gitImpactTargetKindSchema,
+  targetId: z.string().min(1).optional(),
+  relPath: z.string().min(1).optional(),
+  title: z.string().trim().min(1).max(GIT_REVIEW_FINDING_TITLE_MAX_CHARS),
+  classification: gitImpactClassificationSchema,
+  evidenceClass: designEvidenceClassSchema,
+  reason: gitReviewCheckSchema,
+  evidencePath: z.string().min(1).optional(),
+  lineStart: z.number().int().min(1).optional(),
+  lineEnd: z.number().int().min(1).optional(),
+  side: diffSideSchema.optional(),
+  sourcePaths: z.array(z.string().min(1)).max(GIT_REVIEW_IMPACTS_MAX).optional(),
+  viaImpactIds: z.array(z.string().min(1)).max(GIT_REVIEW_IMPACTS_MAX).optional(),
+  suggestedChecks: z.array(gitReviewCheckSchema).max(GIT_REVIEW_REGRESSION_CHECKS_MAX),
+});
+export type GitImpactItemDTO = z.infer<typeof gitImpactItemSchema>;
+
+export const gitReviewImpactsSchema = z.array(gitImpactItemSchema).max(GIT_REVIEW_IMPACTS_MAX);
+export const gitReviewRegressionChecksSchema = z.array(gitReviewCheckSchema).max(GIT_REVIEW_REGRESSION_CHECKS_MAX);
 
 /** What `gitReviews.start` reviews (27 §4.2). */
 export const gitReviewTargetInputSchema = z.discriminatedUnion('kind', [
@@ -234,15 +275,33 @@ export const gitReviewSchema = z.object({
   error: errorInfoSchema.nullable(),
   summary: z.string().nullable(),
   findings: z.array(gitFindingSchema),
+  designId: z.string().nullable(),
+  designSnapshotSha: z.string().nullable(),
+  designMatch: designKnowledgeMatchSchema,
+  impactTruncated: z.boolean(),
+  worktreeChanged: z.boolean().optional(),
+  uncoveredPaths: z.array(z.string()),
+  impacts: gitReviewImpactsSchema,
+  regressionChecks: gitReviewRegressionChecksSchema,
   createdAt: z.number(),
   finishedAt: z.number().nullable(),
 });
 export type GitReviewDTO = z.infer<typeof gitReviewSchema>;
 
+export const gitReviewEvidenceSchema = z.object({
+  path: z.string(),
+  state: gitReviewEvidenceStateSchema,
+  patch: fileDiffSchema.nullable(),
+  content: z.string().nullable(),
+});
+export type GitReviewEvidenceDTO = z.infer<typeof gitReviewEvidenceSchema>;
+
 /** `submit_findings` (27 §4.4). */
 export const submitFindingsInputSchema = z.object({
   summary: z.string().min(1).max(GIT_REVIEW_SUMMARY_MAX_CHARS).describe('The conclusion, Markdown'),
-  findings: z.array(gitFindingSchema).max(GIT_REVIEW_FINDINGS_MAX),
+  findings: z.array(gitFindingInputSchema).max(GIT_REVIEW_FINDINGS_MAX),
+  impacts: gitReviewImpactsSchema.optional(),
+  regression_checks: gitReviewRegressionChecksSchema.optional(),
 });
 export type SubmitFindingsInput = z.infer<typeof submitFindingsInputSchema>;
 

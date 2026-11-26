@@ -6,7 +6,7 @@ When you review a Git workbench diff:
 
 1. Follow the review instructions in the first message. Use the read tool for untracked files.
 2. Submit each finding with its severity, category, file path, line, short title, description and suggestion.
-3. Finish with `agent-workflow_submit_findings` exactly once. Give a one-paragraph conclusion in `summary` and the findings. Use the repository's language for the summary and findings; use Chinese if unsure.
+3. Finish with `agent-workflow_submit_findings`. Give a one-paragraph conclusion in `summary`, code defects in `findings`, business effects in `impacts`, and actionable checks in `regression_checks`. A review may have business effects even when the findings list is empty. Use the repository's language for the report, or Chinese if unsure.
 
 When you draft a commit message:
 

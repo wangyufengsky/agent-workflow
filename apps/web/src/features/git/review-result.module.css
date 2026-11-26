@@ -1,0 +1,311 @@
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.design {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg);
+}
+
+.design[data-match="exact"] {
+  border-color: var(--ok-line);
+  background: var(--ok-fill);
+}
+
+.design[data-match="reference"] {
+  border-color: var(--warn-line);
+  background: var(--warn-fill);
+}
+
+.design a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+.stack,
+.impactGroup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.target {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+
+.impactGroup h3,
+.impactCard h4 {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.impactCard {
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-3);
+  overflow-wrap: anywhere;
+}
+
+.impactCard[data-active] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.impactCard header,
+.impactCard footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.impactCard footer {
+  padding-top: var(--s-2);
+  border-top: 1px dashed var(--line);
+}
+
+.impactBadge {
+  width: fit-content;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
+  color: var(--accent-ink);
+  background: var(--accent-fill);
+}
+
+.impactBadge[data-classification="direct"] {
+  color: var(--danger);
+  background: var(--danger-fill);
+}
+
+.impactBadge[data-classification="possible"] {
+  color: var(--warn);
+  background: var(--warn-fill);
+}
+
+.impactLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  max-width: 100%;
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-md);
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.impactLink:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  background: transparent;
+}
+
+.impactLink:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.checks,
+.propagation {
+  padding: var(--s-3);
+}
+
+.checks ul,
+.suggestions {
+  margin: 0;
+  padding-inline-start: var(--s-5);
+}
+
+.checks li + li,
+.suggestions li + li {
+  margin-top: var(--s-2);
+}
+
+.reason > :first-child {
+  margin-top: 0;
+}
+
+.reason > :last-child {
+  margin-bottom: 0;
+}
+
+.propagation summary {
+  cursor: pointer;
+}
+
+.propagationGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.propagationLane {
+  display: grid;
+  align-content: start;
+  gap: var(--s-2);
+  padding: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+
+.propagationLane button {
+  padding: var(--s-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.propagationLane button:hover,
+.propagationLane button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-fill);
+}
+
+:global(.dialog):has(.evidencePane) {
+  width: min(62rem, calc(100vw - var(--s-6)));
+  max-width: none;
+}
+
+.evidencePane {
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.evidenceSwitcher {
+  width: fit-content;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.coverage {
+  padding: var(--s-3);
+  border-color: var(--warn-line);
+  background: var(--warn-fill);
+}
+
+.coverage summary {
+  cursor: pointer;
+}
+
+.coverage ul {
+  margin-block: var(--s-2) 0;
+  padding-inline-start: var(--s-5);
+  overflow-wrap: anywhere;
+}
+
+.graphLegend {
+  display: flex;
+  border: 0;
+  padding: 0;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-block: var(--s-2);
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.graphLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.graphLegend span::before {
+  width: var(--s-5);
+  border-top: 2px solid var(--ok);
+  content: "";
+}
+
+.graphLegend [data-evidence="inferred"]::before {
+  border-top: 2px dashed var(--warn);
+}
+
+.graphViewport {
+  overflow: auto;
+  max-width: 100%;
+  max-height: 24rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.graphSurface {
+  position: relative;
+  margin-inline: auto;
+}
+
+.graphEdges {
+  position: absolute;
+  inset: 0;
+}
+
+.graphEdges > path {
+  stroke: var(--ok);
+  stroke-width: 2;
+}
+
+.graphEdges > path[data-evidence="inferred"] {
+  stroke: var(--warn);
+  stroke-dasharray: 5 4;
+}
+
+.graphNode {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  padding-inline: var(--s-2);
+  min-width: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  text-align: left;
+}
+
+.graphNode small {
+  color: var(--sub);
+}
+
+.graphNode strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.graphNode:hover,
+button.graphNode[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-fill);
+}
+
+.graphRelationships {
+  margin-top: var(--s-2);
+  font-size: var(--fs-xs);
+}
+
+.graphRelationships ul {
+  padding-inline-start: var(--s-5);
+}

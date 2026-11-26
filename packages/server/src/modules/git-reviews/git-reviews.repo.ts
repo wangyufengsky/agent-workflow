@@ -1,4 +1,14 @@
-import { type DiffFile, diffFileSchema, type GitFindingDTO, gitFindingSchema } from '@aw/shared';
+import {
+  DesignKnowledgeMatch,
+  diffFileSchema,
+  type GitFindingDTO,
+  type GitFindingInput,
+  GitFindingStatus,
+  type GitImpactItemDTO,
+  gitFindingSchema,
+  gitReviewImpactsSchema,
+  gitReviewRegressionChecksSchema,
+} from '@aw/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
@@ -6,24 +16,61 @@ import { gitReviewsTable } from './git-reviews.table.ts';
 
 type ReviewRow = typeof gitReviewsTable.$inferSelect;
 
-export type Review = Omit<ReviewRow, 'files' | 'findings'> & { files: DiffFile[]; findings: GitFindingDTO[] };
+const filesSchema = z.array(
+  diffFileSchema.extend({ worktreeHash: z.string().optional(), designUncovered: z.array(z.string()).optional() }),
+);
+const findingsSchema = z.array(gitFindingSchema.partial({ id: true, status: true }));
 
-const filesSchema = z.array(diffFileSchema);
-const findingsSchema = z.array(gitFindingSchema);
+export type Review = Omit<
+  ReviewRow,
+  'files' | 'findings' | 'impacts' | 'regressionChecks' | 'designMatch' | 'impactTruncated'
+> & {
+  files: z.infer<typeof filesSchema>;
+  findings: GitFindingDTO[];
+  impacts: GitImpactItemDTO[];
+  regressionChecks: string[];
+  designMatch: DesignKnowledgeMatch;
+  impactTruncated: boolean;
+};
+
+type NewReview = Omit<Review, 'summary' | 'findings' | 'impacts' | 'regressionChecks' | 'finishedAt' | DesignMetadata> &
+  Partial<Pick<Review, DesignMetadata>>;
+type DesignMetadata = 'designId' | 'designSnapshotSha' | 'designMatch' | 'impactTruncated';
+
+const findingId = (index: number): string => `finding-${index + 1}`;
 
 // JSON columns are parsed at the boundary (06 §9).
-const toReview = ({ files, findings, ...row }: ReviewRow): Review => ({
-  ...row,
-  files: filesSchema.parse(JSON.parse(files)),
-  findings: findings === null ? [] : findingsSchema.parse(JSON.parse(findings)),
-});
+function toReview({ files, findings, impacts, regressionChecks, ...row }: ReviewRow): Review {
+  return {
+    ...row,
+    files: filesSchema.parse(JSON.parse(files)),
+    // 旧报告按存储顺序补全问题 ID，人工更新时会一并写回所有 ID。
+    findings:
+      findings === null
+        ? []
+        : findingsSchema.parse(JSON.parse(findings)).map((finding, index) => ({
+            ...finding,
+            id: finding.id ?? findingId(index),
+            status: finding.status ?? GitFindingStatus.Open,
+          })),
+    impacts: impacts === null ? [] : gitReviewImpactsSchema.parse(JSON.parse(impacts)),
+    regressionChecks:
+      regressionChecks === null ? [] : gitReviewRegressionChecksSchema.parse(JSON.parse(regressionChecks)),
+    designMatch: row.designMatch ?? DesignKnowledgeMatch.Missing,
+    impactTruncated: row.impactTruncated ?? false,
+  };
+}
 
 export function createGitReviewsRepo(db: DbExecutor) {
   const r = gitReviewsTable;
   return {
-    insert(review: Omit<Review, 'summary' | 'findings' | 'finishedAt'>): void {
+    insert({ designMatch, ...review }: NewReview): void {
       db.insert(r)
-        .values({ ...review, files: JSON.stringify(review.files) })
+        .values({
+          ...review,
+          designMatch: designMatch === undefined || designMatch === DesignKnowledgeMatch.Missing ? null : designMatch,
+          files: JSON.stringify(review.files),
+        })
         .run();
     },
     find(id: string): Review | undefined {
@@ -44,11 +91,40 @@ export function createGitReviewsRepo(db: DbExecutor) {
         .all()
         .map(toReview);
     },
-    setResult(id: string, summary: string, findings: readonly GitFindingDTO[]): void {
+    setResult(
+      id: string,
+      summary: string,
+      findings: readonly GitFindingInput[],
+      impacts?: readonly GitImpactItemDTO[],
+      regressionChecks?: readonly string[],
+    ): void {
+      const newFindings = findings.map((finding, index) => ({
+        ...finding,
+        id: findingId(index),
+        status: GitFindingStatus.Open,
+      }));
       db.update(r)
-        .set({ summary, findings: JSON.stringify(findings) })
+        .set({
+          summary,
+          findings: JSON.stringify(newFindings),
+          impacts: impacts === undefined ? null : JSON.stringify(impacts),
+          regressionChecks: regressionChecks === undefined ? null : JSON.stringify(regressionChecks),
+        })
         .where(eq(r.id, id))
         .run();
+    },
+    updateFindingStatus(id: string, findingId: string, status: GitFindingStatus): Review | undefined {
+      const row = db.select().from(r).where(eq(r.id, id)).get();
+      if (row === undefined) return undefined;
+      const review = toReview(row);
+      const finding = review.findings.find((item) => item.id === findingId);
+      if (finding === undefined) return undefined;
+      finding.status = status;
+      db.update(r)
+        .set({ findings: JSON.stringify(review.findings) })
+        .where(eq(r.id, id))
+        .run();
+      return review;
     },
     finish(id: string, finishedAt: number): void {
       db.update(r).set({ finishedAt }).where(eq(r.id, id)).run();

@@ -34,6 +34,23 @@ export type { DesignDiagramRecord, DesignFile, DesignRun, DesignSection, Project
 /** 按批分开参数，避免大型仓库一次写入超过 SQLite 参数上限。事务由 service 持有。 */
 const FILES_PER_BATCH = 1000;
 
+function knowledgeDesigns(db: DbExecutor, projectId: string, targetSha?: string) {
+  const completed = db
+    .select({ id: sections.id })
+    .from(sections)
+    .where(and(eq(sections.designId, designs.id), eq(sections.selected, true), isNotNull(sections.blocks)));
+  const baseline =
+    targetSha === undefined
+      ? undefined
+      : sql`json_extract(${designs.sourceSnapshot}, '$.commitSha') = ${targetSha}
+          and json_extract(${designs.sourceSnapshot}, '$.dirty') = 0`;
+  return db
+    .select()
+    .from(designs)
+    .where(and(eq(designs.projectId, projectId), exists(completed), baseline))
+    .orderBy(desc(designs.updatedAt), desc(designs.id));
+}
+
 export function createDesignsRepo(db: DbExecutor) {
   return {
     insertDesign(design: ProjectDesign): void {
@@ -43,19 +60,12 @@ export function createDesignsRepo(db: DbExecutor) {
       const row = db.select().from(designs).where(eq(designs.id, id)).get();
       return row === undefined ? undefined : toDesign(row);
     },
-    findLatestKnowledgeDesign(projectId: string): ProjectDesign | undefined {
-      const completed = db
-        .select({ id: sections.id })
-        .from(sections)
-        .where(and(eq(sections.designId, designs.id), eq(sections.selected, true), isNotNull(sections.blocks)));
-      const row = db
-        .select()
-        .from(designs)
-        .where(and(eq(designs.projectId, projectId), exists(completed)))
-        .orderBy(desc(designs.updatedAt), desc(designs.id))
-        .limit(1)
-        .get();
+    findLatestKnowledgeDesign(projectId: string, targetSha?: string): ProjectDesign | undefined {
+      const row = knowledgeDesigns(db, projectId, targetSha).limit(1).get();
       return row === undefined ? undefined : toDesign(row);
+    },
+    listKnowledgeDesigns(projectId: string): ProjectDesign[] {
+      return knowledgeDesigns(db, projectId).all().map(toDesign);
     },
     page(
       filter: { projectId?: string | undefined; query?: string | undefined },
@@ -204,6 +214,13 @@ export function createDesignsRepo(db: DbExecutor) {
     },
     listFiles(designId: string): DesignFile[] {
       return db.select().from(files).where(eq(files.designId, designId)).orderBy(asc(files.relPath)).all().map(toFile);
+    },
+    listFileHashes(designId: string) {
+      return db
+        .select({ relPath: files.relPath, contentHash: files.contentHash })
+        .from(files)
+        .where(eq(files.designId, designId))
+        .all();
     },
     updateFile(file: DesignFile): void {
       const { id, designId, relPath: _relPath, contentHash: _hash, ...row } = fromFile(file);
