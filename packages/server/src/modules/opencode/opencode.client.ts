@@ -13,6 +13,7 @@ import {
   type PermissionDecision,
   type PermissionRule,
 } from '@aw/shared';
+import { modelInputBudget } from '@aw/shared/context';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
 import {
@@ -93,6 +94,7 @@ export type OpencodeClient = {
   nativeToolBytes(directory: string, model: ModelRef): Promise<number>;
   sessionMessages(input: SessionRequest): Promise<import('@aw/shared/context').Messages>;
   summarizeSession(input: SessionRequest & { model: ModelRef }): Promise<void>;
+  agentRules(directory: string, agent: string, signal?: AbortSignal): Promise<PermissionRule[] | undefined>;
   sessionRules(input: SessionRequest): Promise<PermissionRule[]>;
   setPermissions(input: SessionRequest & { permission: PermissionRule[] }): Promise<void>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
@@ -145,6 +147,7 @@ export type OpencodeModel = {
   modelId: string;
   name: string;
   contextLimit: number | null;
+  inputBudget?: number;
   supportsImage?: boolean;
   variants?: string[];
 };
@@ -219,14 +222,18 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       request('config.get', () => sdk.config.get(at, options)),
     ]);
     const available = providers.providers.flatMap((p) =>
-      Object.values(p.models).map((m) => ({
-        providerId: p.id,
-        modelId: m.id,
-        name: m.name,
-        contextLimit: m.limit.context > 0 ? m.limit.context : null,
-        supportsImage: m.capabilities.input.image,
-        variants: Object.keys(m.variants ?? {}),
-      })),
+      Object.values(p.models).map((m) => {
+        const inputBudget = modelInputBudget(m.limit);
+        return {
+          providerId: p.id,
+          modelId: m.id,
+          name: m.name,
+          contextLimit: m.limit.context > 0 ? m.limit.context : null,
+          ...(inputBudget !== null && { inputBudget }),
+          supportsImage: m.capabilities.input.image,
+          variants: Object.keys(m.variants ?? {}),
+        };
+      }),
     );
     return config.model === undefined ? { available } : { available, defaultModel: config.model };
   }
@@ -331,6 +338,12 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         )
       )
         throw new AppError(ErrorCode.AttemptContextBudget, 'Native compaction did not produce a completed summary');
+    },
+    async agentRules(directory, agent, signal) {
+      const { data } = await request('app.agents', () =>
+        runtime.sdk().app.agents({ directory }, requestOptions(signal)),
+      );
+      return data.find((a) => a.name === agent)?.permission;
     },
     async sessionRules({ sessionId, directory, signal }) {
       const { data } = await request('session.get', () =>

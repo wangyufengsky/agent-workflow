@@ -902,7 +902,17 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     recall(c: Conversation, input: RecallInput, signal?: AbortSignal) {
       if (!c.opencodeSessionId || sessions.get(c.opencodeSessionId) !== c.id || !c.isolated)
         throw new AppError(ErrorCode.NotFound, 'No current assistant session for recall');
-      return recallPage(opencode, c.opencodeSessionId, filesDir(c.id), input, signal);
+      return recallPage(
+        opencode,
+        {
+          sessionId: c.opencodeSessionId,
+          directory: filesDir(c.id),
+          kind: 'assistant',
+          agent: OPENCODE_ASSISTANT_AGENT,
+        },
+        input,
+        signal,
+      );
     },
     contextSource(id: string) {
       const c = get(id);

@@ -6,7 +6,8 @@ import {
   BROWSER_TEST_TOOLS,
   type BrowserTestSubmitTool,
   DATABASE_ANALYST_TOOLS,
-  DESIGN_MCP_TOOLS,
+  type DesignAttemptKind,
+  designAttemptTools,
   FUNCTIONAL_TEST_NODE,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
   type FunctionalTestNode,
@@ -106,7 +107,6 @@ const DESIGNER_PERMISSION = {
   grep: 'allow',
   bash: 'ask',
   [EXEC_TOOLS]: 'deny',
-  ...Object.fromEntries(DESIGN_MCP_TOOLS.map((tool) => [`${MCP_TOOL_PREFIX}${tool}`, 'allow' as const])),
 } as const;
 
 /**
@@ -344,6 +344,7 @@ export function sessionPermissionRules(
     checkCommands = [],
     web = false,
     browserTestSubmit,
+    designKind,
     functionalTestNode,
     offline = false,
     allowedBash = [],
@@ -351,6 +352,7 @@ export function sessionPermissionRules(
     checkCommands?: readonly string[] | undefined;
     web?: boolean | undefined;
     browserTestSubmit?: BrowserTestSubmitTool | undefined;
+    designKind?: DesignAttemptKind | undefined;
     functionalTestNode?: FunctionalTestNode | undefined;
     offline?: boolean | undefined;
     allowedBash?: readonly string[] | undefined;
@@ -404,7 +406,13 @@ export function sessionPermissionRules(
       })),
     ];
   }
-  if (base === SessionAgent.Designer) return readonlyBashRules();
+  if (base === SessionAgent.Designer) {
+    const tools = designKind === undefined ? [] : designAttemptTools(designKind);
+    return [
+      ...readonlyBashRules(),
+      ...tools.map((tool) => ({ permission: `${MCP_TOOL_PREFIX}${tool}`, action: 'allow' as const, pattern: '*' })),
+    ];
+  }
   if (base === SessionAgent.Delegate)
     return Object.entries(DELEGATE_PERMISSION).map(([permission, action]) => ({ permission, action, pattern: '*' }));
   if (base === SessionAgent.Executor) {

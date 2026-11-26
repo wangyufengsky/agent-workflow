@@ -3,10 +3,12 @@ import {
   bytes,
   calibrate,
   DEFAULT_BYTES_PER_TOKEN,
+  excessHistoryBytes,
   freezePrefix,
   historySize,
-  projectionReceipt,
+  modelInputBudget,
   projectWindow,
+  requestRecallTool,
   type Sample,
   SOFT_BUDGET_RATIO,
   type Summary,
@@ -31,6 +33,7 @@ type RequestEstimate = {
   model: string;
   lastReply?: string;
   sentBytes?: number;
+  requestBudget?: { limit: number | null; overheadBytes: number };
   previousBill?: Sample;
   cacheRead: number;
   freeze?: () => ReturnType<typeof freezePrefix>;
@@ -89,11 +92,7 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         estimates.delete(sessionId);
         return;
       }
-      const { folded, projected: candidate } = owner.enabled
-        ? projectWindow(messages, owner.summary, owner.recallTool)
-        : { folded: messages, projected: messages };
       const before = historySize(messages);
-      const after = historySize(candidate);
       const toolBytes = owner.toolBytes ?? 0;
       const model = `${user.model.providerID}/${user.model.modelID}`;
       const prior = estimates.get(sessionId);
@@ -130,7 +129,47 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
           lastReply = reply.id;
         }
       }
-      const receipt = projectionReceipt(messages, folded, candidate, owner.summary);
+      const formatBytes = 'format' in user && user.format ? bytes(user.format) : 0;
+      // V1 的 messages.transform 先于 system.transform / chat.params。连续步骤使用同一模型实测的
+      // 系统提示、工具与输入额度；恢复旧历史或切换模型时，从该目录的模型目录重新取上限。
+      const recallTool = owner.enabled ? requestRecallTool(owner.recallTool, user.tools) : undefined;
+      let requestBudget =
+        previous?.userId === user.id && previous.agent === user.agent ? previous.requestBudget : undefined;
+      if (!requestBudget && recallTool && (before.toolOutput > 0 || owner.summary)) {
+        const query = { directory: ctx.directory };
+        const [catalog, tools] = await Promise.all([
+          ctx.client.config.providers({ query, throwOnError: true }),
+          ctx.client.tool.list({
+            query: { ...query, provider: user.model.providerID, model: user.model.modelID },
+            throwOnError: true,
+          }),
+        ]);
+        const spec = catalog.data.providers.find((provider) => provider.id === user.model.providerID)?.models[
+          user.model.modelID
+        ];
+        if (spec)
+          requestBudget = {
+            limit: modelInputBudget(spec.limit),
+            overheadBytes: bytes(user.system ?? '') + bytes(tools.data),
+          };
+      }
+      const excess = requestBudget
+        ? excessHistoryBytes(
+            before,
+            requestBudget.limit,
+            requestBudget.overheadBytes + toolBytes + formatBytes,
+            externalTokens,
+            ratio,
+          )
+        : 0;
+      const {
+        projected: candidate,
+        receipt,
+        summarySource,
+      } = projectWindow(messages, excess, recallTool, owner.summary);
+      // 下一钩子才决定是否启动无工具的摘要 Worker；即使主请求原地折叠，Worker 仍读原文。
+      const source = summarySource === messages && candidate !== messages ? messages.slice() : summarySource;
+      const after = candidate === messages ? before : historySize(candidate);
       estimates.set(sessionId, {
         receipt,
         ownerId: owner.ownerId,
@@ -147,8 +186,8 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         cacheRead,
         ...(lastReply && { lastReply }),
         ...(previousBill && { previousBill }),
-        ...(owner.enabled && {
-          freeze: () => freezePrefix(candidate, candidate === folded ? undefined : owner.summary?.uptoMessageId),
+        ...(recallTool && {
+          freeze: () => freezePrefix(source, receipt.anchor ?? undefined),
         }),
       });
       if (candidate !== messages && after.text < before.text) {
@@ -170,18 +209,16 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         throwOnError: true,
       });
       const formatBytes = 'format' in message && message.format ? bytes(message.format) : 0;
-      const overhead = estimate.system + estimate.toolBytes + bytes(tools.data) + formatBytes;
+      const nativeBytes = bytes(tools.data);
+      const overhead = estimate.system + estimate.toolBytes + nativeBytes + formatBytes;
       // UTF-8 字节近似，输入上限与上下文减去本次输出预留二者取小。
-      const { context, output } = model.limit;
-      const input =
-        'input' in model.limit && typeof model.limit.input === 'number' && model.limit.input > 0
-          ? model.limit.input
-          : context;
-      const limit = context > 0 ? Math.max(0, Math.min(input, context - (params.maxOutputTokens ?? output))) : null;
+      const outputReserve = params.maxOutputTokens ?? model.limit.output;
+      const limit = modelInputBudget(model.limit, outputReserve);
+      estimate.requestBudget = { limit, overheadBytes: estimate.system + nativeBytes };
       const ratio = estimate.ratio;
       const tokens = (value: number) => Math.ceil(value / ratio);
       const systemTokens = tokens(estimate.system + formatBytes);
-      const toolTokens = tokens(estimate.toolBytes + bytes(tools.data));
+      const toolTokens = tokens(estimate.toolBytes + nativeBytes);
       const total = (size: Size) =>
         systemTokens +
         toolTokens +
@@ -201,7 +238,7 @@ export function contextHooks(ctx: PluginInput, api: string, token: string): Hook
         summaryTokens: tokens(estimate.after.summary),
         mediaTokens: estimate.after.media,
         externalTokens: estimate.externalTokens,
-        outputReserve: params.maxOutputTokens ?? output,
+        outputReserve,
         bytesPerToken: ratio,
         calibrated: estimate.calibrated,
         cacheRead: estimate.cacheRead,

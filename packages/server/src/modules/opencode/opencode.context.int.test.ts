@@ -4,6 +4,7 @@ import {
   AttemptKind,
   createConversationOp,
   deleteConversationOp,
+  ErrorCode,
   getAssistantContextOp,
   getAttemptContextOp,
   MCP_SESSION_ARG,
@@ -152,6 +153,18 @@ it.each(['attempt', 'assistant'] as const)(
           })
         ).body,
       ).toMatchObject({ content: 'evi', nextOffset: 9 });
+      // 原生会话可保留升级前的工具规则。同一组后置规则决定能否投影和实际回查。
+      const storedRules = await t.fake.sessionRules({ sessionId, directory });
+      const allDenied = { permission: '*', pattern: '*', action: 'deny' } as const;
+      const allowRecall = { permission: recallTool, pattern: '*', action: 'allow' } as const;
+      await t.fake.setPermissions({ sessionId, directory, permission: [allowRecall, allDenied] });
+      expect(await scope(t, directory, sessionId)).not.toHaveProperty('recallTool');
+      expect(
+        await callTool(mcp, 'recall', { [MCP_SESSION_ARG]: sessionId, messageId: 'msg_source', partId: 'prt_source' }),
+      ).toMatchObject({ isError: true, body: { code: ErrorCode.McpToolNotAllowed } });
+      await t.fake.setPermissions({ sessionId, directory, permission: [allDenied, allowRecall] });
+      expect(await scope(t, directory, sessionId)).toHaveProperty('recallTool', recallTool);
+      await t.fake.setPermissions({ sessionId, directory, permission: storedRules });
       t.fake.promptDocument = async (input) => {
         expect(input.system).toContain(recallTool);
         if (!input.signal) throw Error('Missing worker signal');

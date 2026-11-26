@@ -5,7 +5,6 @@ import {
   MCP_ASSISTANT_SERVER_NAME,
   MCP_SERVER_NAME,
   MCP_TOOL_PREFIX,
-  McpToolName,
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   RoleBaseAgent,
@@ -50,8 +49,6 @@ describe('@opencode 客户端与配置注入', () => {
         task: 'deny',
         external_directory: 'deny',
         [`${MCP_TOOL_PREFIX}*`]: 'deny',
-        [`${MCP_TOOL_PREFIX}${McpToolName.SubmitDesignSection}`]: 'allow',
-        [`${MCP_TOOL_PREFIX}${McpToolName.ReportProgress}`]: 'allow',
       },
     });
     // So does the PPT writer (23 §7.1).
@@ -138,7 +135,7 @@ describe('@opencode 客户端与配置注入', () => {
         sized: {
           name: 'Sized',
           variants: { deep: { reasoningEffort: 'high' }, unused: { disabled: true } },
-          limit: { context: 32_768, output: 4096 },
+          limit: { context: 32_768, input: 12_000, output: 4096 },
         },
       },
     };
@@ -155,6 +152,7 @@ describe('@opencode 客户端与配置注入', () => {
         modelId: 'sized',
         name: 'Sized',
         contextLimit: 32_768,
+        inputBudget: 12_000,
         supportsImage: false,
         variants: ['deep'],
       },

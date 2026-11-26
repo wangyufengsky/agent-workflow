@@ -1,10 +1,14 @@
 import type { ProjectionReceipt } from '../contracts/api/context.ts';
-import { historyBytes, SUMMARY_LABEL } from './budget.ts';
+import { bytes, historySize, SUMMARY_LABEL } from './budget.ts';
 import { hasModelContent, type Messages } from './messages.ts';
 
 type Part = Messages[number]['parts'][number];
 
-export function referenceText(part: Part, messageId: string, recallTool = 'agent-workflow_recall'): string | undefined {
+export function requestRecallTool(tool: string | undefined, tools: Record<string, boolean> | undefined) {
+  return tool && tools?.[tool] !== false ? tool : undefined;
+}
+
+function readPath(part: Part, messageId: string): string | undefined {
   if (
     part.type !== 'tool' ||
     part.tool !== 'read' ||
@@ -35,20 +39,23 @@ export function referenceText(part: Part, messageId: string, recallTool = 'agent
     /(?:^|[/\\])(?:agents\.md|claude\.md|context\.md|copilot-instructions\.md)$/i.test(display.path)
   )
     return undefined;
-  return `[AW read messageId=${messageId} partId=${part.id} path=${display.path} → ${recallTool}]`;
+  return display.path;
 }
 
-function reference(part: Part, messageId: string, recallTool?: string): Part {
-  const output = referenceText(part, messageId, recallTool);
-  return output && part.type === 'tool' && part.state.status === 'completed' && output.length < part.state.output.length
-    ? { ...part, state: { ...part.state, output } }
-    : part;
+export function referenceText(part: Part, messageId: string, recallTool: string | undefined): string | undefined {
+  const path = readPath(part, messageId);
+  return path && recallTool
+    ? `[AW read messageId=${messageId} partId=${part.id} path=${path} → ${recallTool}]`
+    : undefined;
 }
-/** 只替换结果正文，保留原消息顺序、调用参数与 callID。最新工具批次包括同消息的所有兄弟调用。 */
-export function projectHistory(messages: Messages, recallTool?: string): Messages {
+
+/** 从旧到新只释放超出预算的字节，保留最新工具批次及其中的兄弟调用。 */
+export function projectHistory(messages: Messages, recallTool: string | undefined, excessBytes: number): Messages {
+  if (!recallTool || excessBytes <= 0) return messages;
   const latest = messages.findLastIndex((m) => m.parts.some((p) => p.type === 'tool'));
   return messages.map((m, i) => {
     if (
+      excessBytes <= 0 ||
       i >= latest ||
       m.info.role !== 'assistant' ||
       m.info.summary ||
@@ -63,7 +70,16 @@ export function projectHistory(messages: Messages, recallTool?: string): Message
       )
     )
       return m;
-    return { ...m, parts: m.parts.map((p) => reference(p, m.info.id, recallTool)) };
+    const parts = m.parts.map((p) => {
+      if (excessBytes <= 0 || p.type !== 'tool' || p.state.status !== 'completed') return p;
+      const output = referenceText(p, m.info.id, recallTool);
+      if (output === undefined) return p;
+      const saved = bytes(p.state.output) - bytes(output);
+      if (saved <= 0) return p;
+      excessBytes -= saved;
+      return { ...p, state: { ...p.state, output } };
+    });
+    return { ...m, parts };
   });
 }
 
@@ -96,7 +112,7 @@ export function eligible({ info, parts }: Messages[number]): boolean {
           !p.state.attachments?.length &&
           p.state.time.compacted === undefined &&
           !p.state.output.includes('<system-reminder>') &&
-          (p.tool !== 'read' || referenceText(p, info.id) !== undefined)
+          (p.tool !== 'read' || readPath(p, info.id) !== undefined)
         );
       default:
         return false;
@@ -166,21 +182,29 @@ export function freezePrefix(messages: Messages, previousEnd?: string) {
     : undefined;
 }
 
-export function projectWindow(messages: Messages, summary?: Summary, recallTool?: string) {
-  const folded = projectHistory(messages, recallTool);
-  const candidate = applySummary(folded, summary);
-  return {
-    folded,
-    projected: candidate !== folded && historyBytes(candidate) < historyBytes(folded) ? candidate : folded,
-  };
+export function projectWindow(
+  messages: Messages,
+  excessBytes: number,
+  recallTool: string | undefined,
+  summary?: Summary,
+) {
+  // 摘要也可能包含回查坐标，仅在通道可用时投影。
+  const candidate = recallTool && excessBytes > 0 && summary ? applySummary(messages, summary) : messages;
+  const saved = candidate === messages ? 0 : historySize(messages).text - historySize(candidate).text;
+  const base = saved > 0 ? candidate : messages;
+  const projected = projectHistory(base, recallTool, excessBytes - Math.max(0, saved));
+  const receipt = projectionReceipt(messages, base, projected, base === messages ? undefined : summary);
+  return { projected, receipt, summarySource: base };
 }
 
 export {
   bytes,
   calibrate,
   DEFAULT_BYTES_PER_TOKEN,
+  excessHistoryBytes,
   historyBytes,
   historySize,
+  modelInputBudget,
   type Sample,
   SOFT_BUDGET_RATIO,
   SUMMARY_LABEL,
@@ -188,23 +212,19 @@ export {
 
 export { activeWindow, hasModelContent, MESSAGE_ABORTED_ERROR, type Messages } from './messages.ts';
 
-export function projectionReceipt(
+function projectionReceipt(
   messages: Messages,
-  folded: Messages,
+  base: Messages,
   candidate: Messages,
   summary?: Summary,
 ): ProjectionReceipt {
   const ids = new Set(candidate.map((m) => m.info.id));
   const sent = candidate.filter(hasModelContent).map((m) => m.info.id);
-  const anchor = candidate === folded ? null : (summary?.uptoMessageId ?? null);
+  const anchor = summary?.uptoMessageId ?? null;
   const latestTool = messages.findLast((m) => m.parts.some((p) => p.type === 'tool'))?.info.id;
   return {
     sent,
-    folded: folded.flatMap((m, i) =>
-      m.parts
-        .filter((p, j) => p !== messages[i]?.parts[j] && ids.has(m.info.id) && m.info.id !== anchor)
-        .map((p) => p.id),
-    ),
+    folded: candidate.flatMap((m, i) => m.parts.filter((p, j) => p !== base[i]?.parts[j]).map((p) => p.id)),
     summarized: messages.filter((m) => !ids.has(m.info.id)).map((m) => m.info.id),
     anchor,
     summaryText: anchor ? (summary?.summaryText ?? null) : null,

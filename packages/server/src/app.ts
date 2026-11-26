@@ -17,8 +17,10 @@ import {
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
+  McpToolName,
   type ModelEffort,
   modelEfforts,
+  OPENCODE_ASSISTANT_AGENT,
   RuntimeStatus,
   ServerEventType,
   TASK_STATUSES,
@@ -89,6 +91,7 @@ import { createNetworkModule, validateNetworkSettings } from './modules/network/
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import { createOffice } from './modules/office/index.ts';
 import {
+  type ContextOwner,
   createBudgetSnapshots,
   createContextInspector,
   createContextSummaries,
@@ -100,6 +103,7 @@ import {
   type OpencodeRuntime,
   opencodeLaunchEnv,
   registerContextRoutes,
+  visibleRecallTool,
 } from './modules/opencode/index.ts';
 import { createPermissionReviewer } from './modules/permissions/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
@@ -852,6 +856,16 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     mcpSizes.set(key, size);
     return size;
   }
+  async function currentRecallTool(owner: ContextOwner, sessionId: string, directory: string, messageAgent?: string) {
+    const permitted =
+      owner.kind === 'attempt'
+        ? mcp.registry.permits(McpToolName.Recall, attempts.service.get(owner.id))
+        : assistant.registry.permits(McpToolName.Recall);
+    if (!permitted) return undefined;
+    const agent =
+      messageAgent ?? (owner.kind === 'attempt' ? attempts.service.liveAgentOf(owner.id) : OPENCODE_ASSISTANT_AGENT);
+    return visibleRecallTool(opencode, { kind: owner.kind, sessionId, directory, agent });
+  }
   const inspectContext = createContextInspector(
     opencode,
     snapshots,
@@ -859,6 +873,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     prompts,
     mcpToolBytes,
     (directory) => contextEnabled() && directoryManaged(directory),
+    currentRecallTool,
   );
   const stopWatchingContext = opencode.subscribe((event) => {
     if (event.type === OpencodeEventType.Compacted || event.type === OpencodeEventType.Deleted)
@@ -868,6 +883,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     stopWatchingContext();
   });
   registerContextRoutes(server, {
+    recallTool: currentRecallTool,
     manage: (owner, sessionId, model) =>
       owner.kind === 'attempt'
         ? attempts.service.manageContext(sessionId, model)

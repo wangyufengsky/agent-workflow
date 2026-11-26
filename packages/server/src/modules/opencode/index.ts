@@ -17,6 +17,7 @@ export {
   sessionPermissionRules,
 } from './opencode.config.ts';
 export { createBudgetSnapshots, registerContextRoutes } from './opencode.context.ts';
+export type { ContextOwner } from './opencode.context-owner.ts';
 export { createContextInspector } from './opencode.detail.ts';
 export {
   createSessionDispatcher,
@@ -35,6 +36,6 @@ export {
   ToolCallStatus,
 } from './opencode.events.ts';
 export { createMessageId } from './opencode.message-id.ts';
-export { recallPage } from './opencode.recall.ts';
+export { recallPage, visibleRecallTool } from './opencode.recall.ts';
 export { createOpencodeRuntime, type OpencodeRuntime, type OpencodeRuntimeDeps } from './opencode.runtime.ts';
 export { createContextSummaries } from './opencode.summaries.ts';
