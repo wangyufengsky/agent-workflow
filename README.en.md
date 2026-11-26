@@ -33,6 +33,14 @@ Each task gets its own branch and Git worktree. Tasks can run in parallel withou
 
 The app and its task data run locally. **Local-first does not mean offline inference:** model calls send relevant context to your configured provider. Optional hosting and network features contact their respective services.
 
+## Project design in Git reviews and version comparisons (v1.8.0)
+
+- **Check whether a design is stale.** Open the design workbench to see how many files changed in the working directory and which chapters they affect. This check runs locally with zero model calls.
+- **Review the business impact of a commit.** The Git workbench uses files, call relationships, and transaction flows from the design to identify potentially affected modules. The AI reviewer then checks those candidates against the target revision’s source and diff. Four tabs cover the overview, business impact, code findings, and regression checks.
+- **Compare two revisions directly.** With `compare`, read the two selected commits’ source side by side and inspect changes to modules and transaction flows. The report shows how closely each design snapshot matches its endpoint. Existing `range` reviews still start at the merge base.
+- **Update selected chapters.** Confirm the affected chapters you want to update. The workbench freezes the source when the update starts and saves each chapter’s previous version. The global baseline advances only after all affected chapters update successfully. A partial or interrupted run keeps completed work and flags the remaining chapters on the next check.
+- **Share reports offline.** Export a commit review or a two-revision comparison as self-contained HTML that opens offline and requires no CDN.
+
 ## What can it do?
 
 | Area | Capabilities |
