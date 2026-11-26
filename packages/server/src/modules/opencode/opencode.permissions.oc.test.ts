@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath } from 'node:url';
 import {
   AttemptKind,
   AttemptStatus,
@@ -30,6 +31,8 @@ import {
   PermissionMode,
   RoleBaseAgent,
   resolveInboxOp,
+  reviseDesignOutlineOp,
+  reviseDesignSectionOp,
   ServerEventType,
   TranscriptSystemEvent,
   updateDesignOutlineOp,
@@ -63,7 +66,7 @@ const FOREIGN_PROBE = 'AW_CHECK_FOREIGN_RECALL';
 const coordinates = /messageId=(msg_\w+) partId=(prt_\w+)/;
 let overflowStage = 0;
 const contextRequests: ChatMessage[][] = [];
-let providerRequests = 0;
+let foregroundRequests = 0;
 const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
 const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
@@ -71,6 +74,8 @@ const RESEARCH_PERMISSION_PROBE = 'VERIFY_RESEARCH_PERMISSION';
 const RESEARCH_CHECKSUM = 'cksum README.md';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
+const DESIGN_MCP_PROBE = 'VERIFY_DESIGN_ACCOUNTING';
+const accountingToolMenus: string[][] = [];
 const PROBE_SESSION_COMMAND = 'VERIFY_SESSION_COMMAND_BOUNDARIES';
 const transportTrace: Array<{ command: string; args: string; sessionId: string } | 'task'> = [];
 const PROBE_CHILD = 'FIND_COMMITTED_PROBE';
@@ -149,7 +154,11 @@ function scriptedModel(): Server {
         args,
       });
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-      providerRequests++;
+      const summaryRequest = messages.some(
+        (m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'),
+      );
+      // 摘要由独立会话异步生成；停用投影的断言统计前台请求。
+      if (!summaryRequest) foregroundRequests++;
       let replyText = 'done';
       if (prompt.startsWith('{"userRequest":"VERIFY_RESEARCH_PERMISSION')) {
         replyText = JSON.stringify({ decision: 'once', reason: 'Verified repository checksum' });
@@ -157,13 +166,15 @@ function scriptedModel(): Server {
         calls = messages.some((m) => m.role === 'tool')
           ? [operation(McpToolName.SubmitAnswer, { answer: 'Repository checked.', citations: [] })]
           : [{ name: 'bash', args: { command: RESEARCH_CHECKSUM, description: 'Read the repository checksum' } }];
-      } else if (messages.some((m) => m.role === 'system' && textOf(m).includes('Summarize the supplied prior work'))) {
-        workerTools.push(names);
-        workerStarted.resolve();
-        await newReadProduced.promise;
-        replyText = messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))
-          ? 'Verified the early finding in bulk.txt.'
-          : 'Source missing';
+      } else if (summaryRequest) {
+        if (messages.some((m) => m.role === 'user' && textOf(m).includes('EARLY_FINDING'))) {
+          workerTools.push(names);
+          workerStarted.resolve();
+          await newReadProduced.promise;
+          replyText = 'Verified the early finding in bulk.txt.';
+        } else {
+          replyText = 'Summarized the supplied work.';
+        }
       } else if (overflowStage === 2 && names.length === 0) {
         overflowStage = 3;
         replyText = `${SUMMARY_PROBE} Continue the task using new evidence.`;
@@ -266,6 +277,37 @@ function scriptedModel(): Server {
           last?.role === 'tool'
             ? [operation(McpToolName.SubmitResult, { summary: 'Received the managed delegation', notes: textOf(last) })]
             : [operation(McpToolName.DelegateReadonly, { questions: [PROBE_CHILD] })];
+      } else if (prompt.startsWith(DESIGN_MCP_PROBE)) {
+        accountingToolMenus.push(names);
+        const start = prompt.includes('start');
+        const name = start ? 'aicoding_story_start' : 'aicoding_story_complete';
+        if (names.includes(name))
+          calls = [{ name, args: start ? { ipmpSystemCode: 'fixture', storyCode: 'sample' } : {} }];
+      } else if (prompt.includes('本轮分析数据：') && hasProbe(DESIGN_MCP_PROBE)) {
+        const json = prompt.split('本轮分析数据：\n')[1]?.split('\n')[0] ?? '';
+        const context = JSON.parse(json) as { sections: { id: string }[] };
+        const sectionId = context.sections[0]?.id;
+        if (names.includes(MCP_TOOL_PREFIX + McpToolName.SubmitDesignOutline)) {
+          calls = [
+            operation(McpToolName.SubmitDesignOutline, {
+              sections: [{ kind: 'module', title: '样例', scopePaths: ['README.md'] }],
+            }),
+          ];
+        } else if (names.includes(MCP_TOOL_PREFIX + McpToolName.SubmitDesignReview)) {
+          calls = [
+            operation(McpToolName.SubmitDesignReview, { findings: [{ sectionId, reviewState: 'passed', notes: [] }] }),
+          ];
+        } else {
+          calls = [
+            operation(McpToolName.SubmitDesignSection, {
+              sectionId,
+              summary: '样例',
+              blocks: [{ type: 'markdown', markdown: '样例' }],
+              diagrams: [],
+              files: [],
+            }),
+          ];
+        }
       } else if (prompt.includes(PROBE_SESSION_COMMAND)) {
         transportTrace.push('task');
         calls = [operation(McpToolName.SubmitResult, { summary: 'Task received after the start command' })];
@@ -709,7 +751,7 @@ it.each([
     const disable = scenario === '运行中停用';
     const native = scenario === '新任务关闭';
     contextRequests.length = 0;
-    providerRequests = 0;
+    foregroundRequests = 0;
     await t.call(updateSettingsOp, { 'ai.contextEngine': !native, 'ai.defaultModel': null, 'node.maxAttempts': 3 });
     const spec = providerFor(model);
     const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
@@ -778,7 +820,7 @@ it.each([
           },
         });
         expect(detail.retryFeedback).toContain('Reduce the input before retrying');
-        expect(providerRequests).toBe(3);
+        expect(foregroundRequests).toBe(3);
       }
       if (warning)
         expect(t.logs).toContainEqual(
@@ -1022,3 +1064,121 @@ it('M3 真实溢出压缩恢复后，主请求在途时生成无工具摘要，�
     await t.call(updateSettingsOp, { 'ai.contextEngine': false });
   }
 }, 40000);
+
+it('@opencode 设计的规划、生成、复审和重写分别通过用户的 MCP 实际开始与结束一次', async () => {
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'opencode.json': JSON.stringify({
+        mcp: {
+          aicoding: {
+            type: 'local',
+            command: [
+              process.execPath,
+              fileURLToPath(new URL('../../../test/fixtures/design-accounting-mcp.mjs', import.meta.url)),
+            ],
+          },
+        },
+        permission: { aicoding_blocked: 'deny' },
+        command: { aicoding: { template: DESIGN_MCP_PROBE + ' $ARGUMENTS' } },
+      }),
+    },
+  });
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': PROVIDER + '/' + MODEL,
+    'ai.sessionStartCommand': '/aicoding start fixture sample',
+    'ai.sessionEndCommand': '/aicoding complete',
+  });
+  const { body: design } = await t.call(createDesignOp, { projectId: project.id, aiReviewEnabled: true });
+  const completed = (kind: AttemptKind) =>
+    waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt }) => attempt.kind === kind && attempt.endedAt !== null,
+      45_000,
+    );
+  try {
+    const review = completed(AttemptKind.DesignReview);
+    const [, { attempt }] = await Promise.all([
+      t.call(reviseDesignOutlineOp, { id: design.id, generateAfterPlanning: true }),
+      review,
+    ]);
+    await t.app.services.attempts.waitForSessionRelease(attempt.id);
+    const { body: ready } = await t.call(getDesignOp, { id: design.id });
+    const section = ready.sections[0];
+    if (!section) throw new Error('Missing planned section');
+    const revision = completed(AttemptKind.DesignRevise);
+    const [, revised] = await Promise.all([
+      t.call(reviseDesignSectionOp, { id: design.id, sectionId: section.id, instruction: '核对' }),
+      revision,
+    ]);
+    await t.app.services.attempts.waitForSessionRelease(revised.attempt.id);
+    const { body: result } = await t.call(getDesignOp, { id: design.id });
+    expect(result.runs.map((r) => r.kind)).toEqual(['outline', 'generate', 'review', 'revise']);
+    const sessionIds = new Set<string>();
+    let receipt = 0;
+    for (const run of result.runs) {
+      expect(run.attempt.status).toBe(AttemptStatus.Succeeded);
+      const sessionId = t.app.services.attempts.get(run.attempt.id).opencodeSessionId;
+      if (!sessionId) throw new Error('Missing design session');
+      sessionIds.add(sessionId);
+      const messages = await t.app.services.opencode.sessionMessages({ sessionId, directory: project.repoPath });
+      const outputs = messages.flatMap((m) =>
+        m.parts.flatMap((p) =>
+          p.type === 'tool' && p.tool.startsWith('aicoding_') && p.state.status === 'completed'
+            ? [JSON.parse(p.state.output)]
+            : [],
+        ),
+      );
+      expect(outputs).toEqual([
+        { name: 'story_start', ipmpSystemCode: 'fixture', storyCode: 'sample', receipt: ++receipt },
+        { name: 'story_complete', receipt: ++receipt },
+      ]);
+    }
+    expect(sessionIds.size).toBe(4);
+    expect(accountingToolMenus).toHaveLength(8);
+    for (const names of accountingToolMenus) {
+      expect(names).toContain('aicoding_lookup');
+      for (const hidden of [
+        'aicoding_blocked',
+        'apply_patch',
+        'edit',
+        'write',
+        'task',
+        MCP_TOOL_PREFIX + McpToolName.SubmitResult,
+      ])
+        expect(names).not.toContain(hidden);
+    }
+
+    // 普通开发节点在自己的工作树使用同一项目 MCP 配置。
+    const done = nodeReaches(t, 'build_page', NodeStatus.Done, 45_000);
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'frontend',
+      requirement: PROBE_SESSION_COMMAND,
+    });
+    try {
+      const { node } = await done;
+      await t.app.services.attempts.waitForEndCommands(task.id);
+      const { body: detail } = await t.call(getNodeOp, { id: task.id, nodeId: node.id });
+      const summary = detail.attempts[0];
+      if (!summary) throw new Error('Missing execution attempt');
+      const entries = t.app.services.attempts.transcript(summary.id, 0).entries;
+      expect(
+        entries.flatMap((e) =>
+          e.kind === 'tool_result' && e.data.tool.startsWith('aicoding_') && e.data.output
+            ? [JSON.parse(e.data.output).name]
+            : [],
+        ),
+      ).toEqual(['story_start', 'story_complete']);
+      for (const names of accountingToolMenus.slice(8)) {
+        expect(names).toContain('aicoding_lookup');
+        expect(names).not.toContain('aicoding_blocked');
+      }
+    } finally {
+      await t.call(cancelTaskOp, { id: task.id });
+    }
+  } finally {
+    await t.call(updateSettingsOp, { 'ai.sessionStartCommand': null, 'ai.sessionEndCommand': null });
+  }
+}, 90_000);

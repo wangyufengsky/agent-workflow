@@ -6,6 +6,7 @@ import {
   ErrorCode,
   type ExternalMcpStatus,
   type ModelEffort,
+  OPENCODE_AGENT_NAME,
   OPENCODE_APPROVER_AGENT,
   OPENCODE_DATABASE_INVESTIGATOR_AGENT,
   OPENCODE_DOCUMENT_AGENT,
@@ -16,6 +17,7 @@ import {
 import { modelInputBudget } from '@aw/shared/context';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
+import { designNativeRestrictions } from './opencode.config.ts';
 import {
   describeOpencodeError,
   type OpencodeError,
@@ -267,6 +269,12 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       ) {
         // 独立会话绑定原图，覆盖用户全局配置中的自动分享。
         await writeFile(join(directory, 'opencode.json'), JSON.stringify({ share: 'disabled', autoshare: false }));
+      }
+      if (agent === OPENCODE_AGENT_NAME.designer) {
+        const { data: nativeIds } = await request('tool.ids', () =>
+          runtime.sdk().tool.ids({ directory }, requestOptions(signal)),
+        );
+        permission = [...designNativeRestrictions(nativeIds), ...permission];
       }
       const { data } = await request('session.create', () =>
         runtime.sdk().session.create({ directory, title, agent, permission }, requestOptions(signal)),

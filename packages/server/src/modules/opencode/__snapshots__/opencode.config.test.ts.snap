@@ -10037,7 +10037,6 @@ exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 br
       "description": "agent-workflow designer",
       "mode": "primary",
       "permission": {
-        "*": "deny",
         "agent-workflow-app_*": "deny",
         "agent-workflow_*": "deny",
         "agent-workflow_browser_submit_report": "deny",
