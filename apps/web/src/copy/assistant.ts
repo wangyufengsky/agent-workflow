@@ -218,7 +218,7 @@ export const ASSISTANT_SETTINGS_COPY = {
   none: '还没有总是允许的操作。在助手的确认卡片上选「确认并总是允许」即可加入。',
   revoke: '撤销',
   externalMcp: '你自己的 MCP 工具',
-  externalMcpHint: '在 opencode 的配置里添加的 MCP 服务器（如日历、文档），助手可以直接使用。',
+  externalMcpHint: '助手、普通开发节点和项目设计会话可按 OpenCode 权限设置调用这些 MCP 服务器。',
   externalMcpNone: '还没有添加。',
   externalMcpStatus: {
     [ExternalMcpStatus.Connected]: '已连接',

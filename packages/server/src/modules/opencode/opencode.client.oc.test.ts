@@ -42,7 +42,6 @@ describe('@opencode 客户端与配置注入', () => {
     expect(data.agent?.[OPENCODE_AGENT_NAME.designer]).toMatchObject({
       mode: 'primary',
       permission: {
-        '*': 'deny',
         edit: 'deny',
         webfetch: 'deny',
         websearch: 'deny',

@@ -100,7 +100,6 @@ const READ_ONLY_WRITER = {
 } as const;
 
 const DESIGNER_PERMISSION = {
-  '*': 'deny',
   ...READ_ONLY_WRITER,
   read: 'allow',
   glob: 'allow',
@@ -108,6 +107,24 @@ const DESIGNER_PERMISSION = {
   bash: 'ask',
   [EXEC_TOOLS]: 'deny',
 } as const;
+
+// MCP 工具沿用 OpenCode 的用户配置。原生注册表还包含本地插件工具，设计会话只保留
+// 源码分析所需工具与兼容插件注册的 AICoding 开始、完成工具。
+const designNativeTools = new Set([
+  'read',
+  'glob',
+  'grep',
+  'bash',
+  'skill',
+  'aicoding_story_start',
+  'aicoding_story_complete',
+]);
+
+export function designNativeRestrictions(nativeIds: readonly string[]): PermissionRule[] {
+  return nativeIds
+    .filter((id) => !designNativeTools.has(id))
+    .map((permission) => ({ permission, pattern: '*', action: 'deny' }));
+}
 
 /**
  * Agent permissions that never change with settings (12 §2). The native question tool is denied: questions go

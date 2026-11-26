@@ -411,7 +411,6 @@
   "description": "agent-workflow project design analyst",
   "prompt": "<protocol-design.md>",
   "permission": {
-    "*": "deny",
     "read": "allow",
     "grep": "allow",
     "glob": "allow",
@@ -428,6 +427,7 @@
 }
 ```
 
+- 设置中「自己的 MCP 工具」列出的外部服务和普通开发节点一样，按当前项目合并后的 OpenCode 配置与权限使用。设计会话创建时从原生工具注册表收紧本地操作，保留源码读取、受控 bash、指定 Skill，也兼容插件原生注册的 `aicoding_story_start` 与 `aicoding_story_complete`。配置 `/aicoding start …` 和 `/aicoding complete` 后，每个成功提交的设计会话在原会话内分别调用开始和完成命令。
 - 会话级 bash 规则为 `readonlyBashRules()`；白名单外的命令走既有权限询问（「需要你处理」）。
 - 会话工作目录为项目根目录（只读）；`opencode.dispatch.ts` 的 `SessionPurpose` 新增 `Design`。
 - `SessionAgent` 新增 `designer`（`OPENCODE_AGENT_NAME.designer = 'aw-designer'`）；`AttemptKind` 新增 `design_outline`、`design_generate`、`design_revise`、`design_review`。
