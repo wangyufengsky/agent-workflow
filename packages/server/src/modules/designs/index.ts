@@ -6,6 +6,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { createProjectKnowledgeReader } from './designs.knowledge.ts';
 import { designsOperations } from './designs.operations.ts';
 import { createDesignQueries } from './designs.queries.ts';
 import type { createDesignsRepo } from './designs.repo.ts';
@@ -29,10 +30,11 @@ export function createDesignsModule(deps: {
   const runs = createDesignRuns(deps);
   const queries = createDesignQueries({ ...deps, runs });
   const service = createDesignsService({ ...deps, queries, runs });
-  return { service, operations: designsOperations(service) };
+  return { service, knowledge: createProjectKnowledgeReader(deps.repo), operations: designsOperations(service) };
 }
 
 export { exportDesignSite } from './designs.exporter.ts';
+export { createProjectKnowledgeReader, type ProjectKnowledgeIndex } from './designs.knowledge.ts';
 export {
   createDesignsRepo,
   type DesignDiagramRecord,

@@ -1,0 +1,1314 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="default">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>项目设计与 Git 审查融合 · 前端交互设计稿（Agent Workflow）</title>
+<!-- docs/45-design-git-integration.md 前端交互原型：自包含单文件，直接双击打开。支持 ?view=review|compare|incremental|offline&theme=default|claude|codex -->
+<style>
+/* ---------- 1. 主题令牌（直接对齐 apps/web/src/theme/themes/） ---------- */
+:root[data-theme="default"] {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --bg-sunken: #070707;
+  --surface: #111214;
+  --panel: #151517;
+  --raised: #1c1c1f;
+  --overlay: #232327;
+  --sidebar: #121316;
+  --fill-1: rgba(255,255,255,.025);
+  --fill-2: rgba(255,255,255,.045);
+  --fill-3: rgba(255,255,255,.07);
+  --fill-4: rgba(255,255,255,.1);
+  --line: rgba(255,255,255,.08);
+  --line-2: rgba(255,255,255,.14);
+  --line-3: rgba(255,255,255,.22);
+  --ink: #f5f6f7;
+  --ink-2: #d9dce1;
+  --sub: #a1a6ae;
+  --muted: #8c9199;
+  --faint: #5d6168;
+  --accent: #a9bcff;
+  --accent-ink: #c9d5ff;
+  --accent-fill: rgba(169,188,255,.12);
+  --accent-line: rgba(169,188,255,.38);
+  --brand: #4865f2;
+  --brand-fill: rgba(77,107,254,.16);
+  --primary-bg: #ffffff;
+  --primary-ink: #0a0a0a;
+  --primary-hover: #e5e7eb;
+  --ok: #73c799;
+  --ok-fill: rgba(115,199,153,.12);
+  --ok-line: rgba(115,199,153,.38);
+  --warn: #f2c46d;
+  --warn-fill: rgba(242,196,109,.12);
+  --warn-line: rgba(242,196,109,.38);
+  --danger: #ff8d96;
+  --danger-fill: rgba(255,141,150,.11);
+  --danger-line: rgba(255,141,150,.38);
+  --wait: #c9b5ef;
+  --wait-fill: rgba(201,181,239,.12);
+  --wait-line: rgba(201,181,239,.35);
+  --done: #79cbcd;
+  --done-fill: rgba(121,203,205,.12);
+  --done-line: rgba(121,203,205,.35);
+  --node-bg: #191b20;
+  --code-bg: #101216;
+  --code-ink: #e5e9f0;
+  --diff-add-bg: rgba(115,199,153,.11);
+  --diff-del-bg: rgba(255,141,150,.11);
+  --edge: rgba(255,255,255,.26);
+  --shadow-pop: 0 18px 50px rgba(0,0,0,.58), 0 0 0 1px rgba(255,255,255,.07);
+  --scrim: rgba(0,0,0,.56);
+}
+
+:root[data-theme="claude"] {
+  color-scheme: light;
+  --bg: #f8f7f3;
+  --bg-sunken: #f1efe9;
+  --surface: #f3f1eb;
+  --panel: #fffefa;
+  --raised: #fffefa;
+  --overlay: #ffffff;
+  --sidebar: #eeede8;
+  --fill-1: rgba(48,45,40,.025);
+  --fill-2: rgba(48,45,40,.045);
+  --fill-3: rgba(48,45,40,.07);
+  --fill-4: rgba(48,45,40,.1);
+  --line: #e5e1d9;
+  --line-2: #dcd7ce;
+  --line-3: #c8c0b2;
+  --ink: #2b2925;
+  --ink-2: #3a3731;
+  --sub: #655f55;
+  --muted: #686157;
+  --faint: #a39b8e;
+  --accent: #89583f;
+  --accent-ink: #6b432f;
+  --accent-fill: rgba(137,88,63,.1);
+  --accent-line: rgba(137,88,63,.36);
+  --brand: #89583f;
+  --brand-fill: rgba(137,88,63,.12);
+  --primary-bg: #302d28;
+  --primary-ink: #ffffff;
+  --primary-hover: #1d1b18;
+  --ok: #2e6b3e;
+  --ok-fill: rgba(46,107,62,.1);
+  --ok-line: rgba(46,107,62,.34);
+  --warn: #8f4b13;
+  --warn-fill: rgba(143,75,19,.1);
+  --warn-line: rgba(143,75,19,.34);
+  --danger: #a04c40;
+  --danger-fill: rgba(160,76,64,.1);
+  --danger-line: rgba(160,76,64,.36);
+  --wait: #6c568e;
+  --wait-fill: rgba(108,86,142,.1);
+  --wait-line: rgba(108,86,142,.34);
+  --done: #1b626c;
+  --done-fill: rgba(27,98,108,.1);
+  --done-line: rgba(27,98,108,.34);
+  --node-bg: #fffefa;
+  --code-bg: #f4f2ec;
+  --code-ink: #2b2925;
+  --diff-add-bg: rgba(46,107,62,.09);
+  --diff-del-bg: rgba(160,76,64,.09);
+  --edge: rgba(48,45,40,.28);
+  --shadow-pop: 0 16px 40px rgba(48,45,40,.14), 0 0 0 1px rgba(48,45,40,.08);
+  --scrim: rgba(43,41,37,.28);
+}
+
+:root[data-theme="codex"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-sunken: #f9f9f9;
+  --surface: #f7f7f7;
+  --panel: #ffffff;
+  --raised: #ffffff;
+  --overlay: #ffffff;
+  --sidebar: #f9f9f9;
+  --fill-1: rgba(13,13,13,.025);
+  --fill-2: rgba(13,13,13,.045);
+  --fill-3: rgba(13,13,13,.07);
+  --fill-4: rgba(13,13,13,.1);
+  --line: #ececec;
+  --line-2: #dfdfdf;
+  --line-3: #c4c4c4;
+  --ink: #0d0d0d;
+  --ink-2: #262626;
+  --sub: #5d5d5d;
+  --muted: #616161;
+  --faint: #a3a3a3;
+  --accent: #0169cc;
+  --accent-ink: #00519f;
+  --accent-fill: rgba(1,105,204,.09);
+  --accent-line: rgba(1,105,204,.34);
+  --brand: #0d0d0d;
+  --brand-fill: rgba(13,13,13,.08);
+  --primary-bg: #0d0d0d;
+  --primary-ink: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ok: #0f7a3b;
+  --ok-fill: rgba(15,122,59,.09);
+  --ok-line: rgba(15,122,59,.34);
+  --warn: #8a5800;
+  --warn-fill: rgba(138,88,0,.09);
+  --warn-line: rgba(138,88,0,.34);
+  --danger: #c4242e;
+  --danger-fill: rgba(196,36,46,.09);
+  --danger-line: rgba(196,36,46,.34);
+  --wait: #6d45c4;
+  --wait-fill: rgba(109,69,196,.09);
+  --wait-line: rgba(109,69,196,.34);
+  --done: #136f79;
+  --done-fill: rgba(19,111,121,.09);
+  --done-line: rgba(19,111,121,.34);
+  --node-bg: #ffffff;
+  --code-bg: #f5f6f8;
+  --code-ink: #16181d;
+  --diff-add-bg: rgba(15,122,59,.08);
+  --diff-del-bg: rgba(196,36,46,.08);
+  --edge: rgba(13,13,13,.24);
+  --shadow-pop: 0 12px 32px rgba(13,13,13,.1), 0 0 0 1px rgba(13,13,13,.08);
+  --scrim: rgba(13,13,13,.24);
+}
+
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --fs-xs: 11.5px;
+  --fs-sm: 12.5px;
+  --fs-md: 13.5px;
+  --fs-lg: 15.5px;
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-pill: 999px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 var(--fs-md)/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+button, input, select { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+h1, h2, h3, h4, p { margin: 0; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* ---------- 2. 顶部原型切换栏 ---------- */
+.proto-bar {
+  height: 40px;
+  flex: none;
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  gap: 12px;
+  font-size: var(--fs-sm);
+}
+.proto-left { display: flex; align-items: center; gap: 10px; }
+.proto-brand { font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+.proto-tag {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent-line);
+}
+.proto-tabs { display: flex; gap: 4px; background: var(--fill-2); padding: 3px; border-radius: var(--r-sm); }
+.proto-tab {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  transition: .12s ease;
+}
+.proto-tab:hover { color: var(--ink); }
+.proto-tab.active { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.proto-right { display: flex; align-items: center; gap: 6px; }
+.theme-pill {
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  color: var(--sub);
+  border: 1px solid transparent;
+}
+.theme-pill.active { background: var(--fill-3); color: var(--ink); border-color: var(--line-2); }
+
+/* ---------- 3. 应用外壳 ---------- */
+.app-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.app-nav {
+  width: 196px;
+  flex: none;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.nav-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--brand), var(--accent));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.nav-group-label {
+  font-size: 11px;
+  color: var(--faint);
+  padding: 0 8px 4px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  color: var(--sub);
+  font-size: 13px;
+}
+.nav-item.active { background: var(--fill-3); color: var(--ink); font-weight: 500; }
+.nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); margin-left: auto; }
+
+.main-area {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ---------- 4. 通用组件 ---------- */
+.topbar {
+  height: 50px;
+  flex: none;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.title-lg { font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.sub-text { color: var(--sub); font-size: var(--fs-sm); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--ink);
+  transition: .12s ease;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--raised); border-color: var(--line-3); }
+.btn-primary { background: var(--primary-bg); color: var(--primary-ink); border-color: transparent; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--sub); }
+.btn-ghost:hover { background: var(--fill-2); color: var(--ink); }
+.btn-sm { padding: 3px 8px; font-size: var(--fs-xs); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 500;
+  border: 1px solid var(--line-2);
+  background: var(--fill-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.badge-ok { background: var(--ok-fill); color: var(--ok); border-color: var(--ok-line); }
+.badge-warn { background: var(--warn-fill); color: var(--warn); border-color: var(--warn-line); }
+.badge-danger { background: var(--danger-fill); color: var(--danger); border-color: var(--danger-line); }
+.badge-accent { background: var(--accent-fill); color: var(--accent-ink); border-color: var(--accent-line); }
+.badge-wait { background: var(--wait-fill); color: var(--wait); border-color: var(--wait-line); }
+.badge-done { background: var(--done-fill); color: var(--done); border-color: var(--done-line); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 16px;
+  background: var(--surface);
+  flex: none;
+}
+.view-tab {
+  padding: 9px 12px;
+  font-size: var(--fs-sm);
+  color: var(--sub);
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.view-tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--accent); }
+.count-chip {
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--fill-3);
+  color: var(--sub);
+}
+.view-tab.active .count-chip { background: var(--accent-fill); color: var(--accent-ink); }
+
+/* ---------- 5. 视图 1：Git 提交审查三栏 ---------- */
+.git-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 248px 1fr 480px;
+}
+.pane {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+}
+.pane:last-child { border-right: 0; }
+.pane-head {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  flex: none;
+}
+.pane-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.commit-row {
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.commit-row.active { background: var(--fill-3); border-color: var(--line-2); }
+.commit-subj { font-size: 12.5px; font-weight: 500; color: var(--ink); line-height: 1.35; }
+.commit-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); }
+
+.file-pill {
+  padding: 6px 9px;
+  border-radius: var(--r-xs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--fill-1);
+  border: 1px solid var(--line);
+}
+.file-pill.active { border-color: var(--accent-line); background: var(--accent-fill); }
+
+/* Diff 面板 */
+.diff-box {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+.diff-file-head {
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font);
+  font-size: 12.5px;
+}
+.diff-line { display: grid; grid-template-columns: 42px 42px 20px 1fr; padding: 0 10px; white-space: pre; }
+.diff-line.add { background: var(--diff-add-bg); }
+.diff-line.del { background: var(--diff-del-bg); }
+.diff-line.hl { outline: 1px solid var(--warn-line); background: var(--warn-fill); }
+.ln { color: var(--faint); text-align: right; padding-right: 8px; user-select: none; }
+.sig { text-align: center; font-weight: 700; }
+.diff-line.add .sig { color: var(--ok); }
+.diff-line.del .sig { color: var(--danger); }
+
+/* 知识状态条 */
+.knowledge-strip {
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--fill-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.knowledge-strip.warn { background: var(--warn-fill); border-color: var(--warn-line); }
+.knowledge-strip.ok { background: var(--ok-fill); border-color: var(--ok-line); }
+
+/* 影响项卡片 & 缺陷卡片 */
+.item-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.item-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.item-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+.item-desc { font-size: 12.5px; color: var(--sub); line-height: 1.5; }
+.item-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 4px; border-top: 1px dashed var(--line); }
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--accent-ink);
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--accent-fill);
+}
+.link-btn:hover { text-decoration: underline; }
+
+.status-select {
+  font-size: 11.5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--fill-2);
+  border: 1px solid var(--line-2);
+  color: var(--ink-2);
+}
+
+/* 迷你影响图 SVG */
+.graph-box {
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px;
+}
+.graph-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--sub);
+  margin-bottom: 6px;
+}
+
+/* ---------- 6. 视图 2：双版本端点对比 ---------- */
+.compare-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.compare-banner {
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.endpoint-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+}
+.compare-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+}
+.diff-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+.diff-tag.add { background: var(--ok-fill); color: var(--ok); border: 1px solid var(--ok-line); }
+.diff-tag.mod { background: var(--warn-fill); color: var(--warn); border: 1px solid var(--warn-line); }
+.diff-tag.del { background: var(--danger-fill); color: var(--danger); border: 1px solid var(--danger-line); }
+.diff-tag.unc { background: var(--wait-fill); color: var(--wait); border: 1px solid var(--wait-line); }
+
+.split-code {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ---------- 7. 视图 3：项目设计增量更新 ---------- */
+.design-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px 1fr 390px;
+}
+.stale-banner {
+  padding: 10px 18px;
+  background: var(--warn-fill);
+  border-bottom: 1px solid var(--warn-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+}
+.drawer-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--line-2);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-shadow: -8px 0 28px rgba(0,0,0,.18);
+}
+.sec-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--fill-1);
+}
+.sec-check.checked { border-color: var(--accent-line); background: var(--accent-fill); }
+
+/* ---------- 8. 视图 4：离线 HTML 报告预览 ---------- */
+.offline-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 28px;
+  background: var(--bg-sunken);
+}
+.offline-sheet {
+  max-width: 1020px;
+  margin: 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-pop);
+}
+.offline-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.offline-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.kpi {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  border: 1px solid var(--line);
+}
+.kpi b { display: block; font-size: 20px; line-height: 1.2; margin-top: 2px; }
+.kpi span { font-size: 11.5px; color: var(--sub); }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<!-- 原型控制条（实际应用中不存在） -->
+<div class="proto-bar">
+  <div class="proto-left">
+    <span class="proto-brand">docs/45 界面交互设计稿</span>
+    <span class="proto-tag">纯前端高保真原型</span>
+    <div class="proto-tabs" id="viewTabs">
+      <button class="proto-tab active" data-view="review">1. Git 提交审查（含影响分析）</button>
+      <button class="proto-tab" data-view="compare">2. 双版本端点对比（compare）</button>
+      <button class="proto-tab" data-view="incremental">3. 项目设计增量更新</button>
+      <button class="proto-tab" data-view="offline">4. 离线 HTML 报告</button>
+    </div>
+  </div>
+  <div class="proto-right">
+    <span class="sub-text" style="font-size:11.5px">主题：</span>
+    <button class="theme-pill active" data-theme-btn="default">深色 Default</button>
+    <button class="theme-pill" data-theme-btn="claude">暖浅 Claude</button>
+    <button class="theme-pill" data-theme-btn="codex">纯白 Codex</button>
+  </div>
+</div>
+
+<!-- ==================== 视图 1：Git 提交审查增强 ==================== -->
+<div class="app-shell" id="view-review">
+  <aside class="app-nav">
+    <div class="nav-logo"><span class="nav-mark">AW</span>Agent Workflow</div>
+    <div>
+      <div class="nav-group-label">工作区</div>
+      <div class="nav-item">主页</div>
+      <div class="nav-item">任务</div>
+      <div class="nav-item">项目</div>
+    </div>
+    <div>
+      <div class="nav-group-label">专业工具</div>
+      <div class="nav-item active">Git 工作台 <span class="nav-dot"></span></div>
+      <div class="nav-item">项目设计</div>
+      <div class="nav-item">PPT</div>
+      <div class="nav-item">知识问答</div>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="title-lg">billing-core</span>
+        <span class="badge mono">main @ e4f2a9c</span>
+        <span class="sub-text">提交审查 · 对比父提交 <span class="mono">9a3b102..e4f2a9c</span></span>
+      </div>
+      <div class="topbar-right">
+        <span class="sub-text" style="font-size:11.5px">演示知识状态：</span>
+        <select id="matchMode" class="status-select">
+          <option value="exact" selected>exact · 精确匹配快照</option>
+          <option value="reference">reference · 参考线索（旧快照）</option>
+          <option value="missing">missing · 无项目设计（降级）</option>
+        </select>
+        <button class="btn btn-sm" onclick="switchView('compare')">双版本对比…</button>
+        <button class="btn btn-sm" onclick="switchView('offline')">导出离线 HTML</button>
+        <button class="btn btn-primary btn-sm">据此修复 (1)</button>
+      </div>
+    </header>
+
+    <div class="git-grid">
+      <!-- 左栏：提交与变更文件 -->
+      <section class="pane">
+        <div class="pane-head">
+          <span>提交历史</span>
+          <span class="badge">3 个文件</span>
+        </div>
+        <div class="pane-scroll">
+          <div class="commit-row active">
+            <div class="commit-subj">feat(fee): unify tiered discount rounding for settlement</div>
+            <div class="commit-meta"><span class="mono">e4f2a9c</span><span>今天 14:22</span></div>
+          </div>
+          <div class="commit-row">
+            <div class="commit-subj">fix(refund): guard duplicate reversal token</div>
+            <div class="commit-meta"><span class="mono">9a3b102</span><span>昨天 19:08</span></div>
+          </div>
+          <div class="commit-row">
+            <div class="commit-subj">refactor(ledger): extract tax rate resolver</div>
+            <div class="commit-meta"><span class="mono">71c0b88</span><span>11-24</span></div>
+          </div>
+
+          <div style="margin-top:8px;font-size:11.5px;color:var(--sub);font-weight:600">本次变更文件</div>
+          <div class="file-pill active"><span class="mono">src/fee/calcFee.ts</span><span style="color:var(--ok)">+18 -7</span></div>
+          <div class="file-pill"><span class="mono">src/fee/rounding.ts</span><span style="color:var(--ok)">+12 -2</span></div>
+          <div class="file-pill"><span class="mono">src/settle/batch.ts</span><span style="color:var(--ok)">+6 -3</span></div>
+        </div>
+      </section>
+
+      <!-- 中栏：源码 Diff（锚定本次审查区间） -->
+      <section class="pane">
+        <div class="pane-head">
+          <span class="mono">src/fee/calcFee.ts</span>
+          <span class="badge">Diff: 9a3b102 → e4f2a9c</span>
+        </div>
+        <div class="pane-scroll">
+          <div class="diff-box">
+            <div class="diff-file-head">
+              <span><b>calculateSettlementFee</b> · 行 41–56</span>
+              <span class="badge badge-warn">关联 1 个代码问题 · 2 条业务影响</span>
+            </div>
+            <div class="diff-line"><span class="ln">41</span><span class="ln">41</span><span class="sig"> </span><span>export function calculateSettlementFee(amount: bigint, tier: FeeTier) {</span></div>
+            <div class="diff-line"><span class="ln">42</span><span class="ln">42</span><span class="sig"> </span><span>  const raw = amount * BigInt(tier.bps);</span></div>
+            <div class="diff-line del"><span class="ln">43</span><span class="ln"></span><span class="sig">-</span><span>  return roundHalfUp(raw, 10_000n);</span></div>
+            <div class="diff-line add hl"><span class="ln"></span><span class="ln">43</span><span class="sig">+</span><span>  const discounted = raw - tier.rebateBps * amount;</span></div>
+            <div class="diff-line add hl"><span class="ln"></span><span class="ln">44</span><span class="sig">+</span><span>  return roundBankers(discounted, 10_000n);</span></div>
+            <div class="diff-line"><span class="ln">44</span><span class="ln">45</span><span class="sig"> </span><span>}</span></div>
+          </div>
+
+          <!-- 交互式影响传播简图 -->
+          <div class="graph-box" id="impactGraphCard">
+            <div class="graph-caption">
+              <span><b>影响传播链路</b>（深度上限 3 · 已命中 4 个节点 · 未截断）</span>
+              <span class="badge badge-accent">来自项目设计 · 交易链路探索</span>
+            </div>
+            <svg viewBox="0 0 668 164" width="100%" height="156" aria-label="影响传播链路图">
+              <defs>
+                <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--edge)"/>
+                </marker>
+              </defs>
+              <!-- Edges -->
+              <path d="M 192 82 L 244 82" stroke="var(--ok)" stroke-width="1.6" marker-end="url(#arr)"/>
+              <path d="M 406 72 C 436 72, 436 40, 466 40" stroke="var(--ok)" stroke-width="1.6" fill="none" marker-end="url(#arr)"/>
+              <path d="M 406 92 C 436 92, 436 124, 466 124" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#arr)"/>
+
+              <!-- Node 1: Changed Symbol -->
+              <rect x="8" y="54" width="184" height="56" rx="8" fill="var(--danger-fill)" stroke="var(--danger-line)"/>
+              <text x="20" y="75" fill="var(--danger)" font-size="10.5" font-weight="600">直接变更 · 符号</text>
+              <text x="20" y="95" fill="var(--ink)" font-size="11.5" font-family="var(--font-mono)">calculateSettlementFee</text>
+
+              <!-- Node 2: Direct Module -->
+              <rect x="248" y="54" width="158" height="56" rx="8" fill="var(--node-bg)" stroke="var(--accent-line)"/>
+              <text x="260" y="75" fill="var(--accent-ink)" font-size="10.5" font-weight="600">直接影响 · 子模块</text>
+              <text x="260" y="95" fill="var(--ink)" font-size="12">日终清分计费模块</text>
+
+              <!-- Node 3: Indirect Transaction (Static) -->
+              <rect x="470" y="14" width="190" height="54" rx="8" fill="var(--node-bg)" stroke="var(--ok-line)"/>
+              <text x="482" y="34" fill="var(--ok)" font-size="10.5" font-weight="600">间接影响 · 交易 [静态确认]</text>
+              <text x="482" y="53" fill="var(--ink)" font-size="12">T301 商户收单清算</text>
+
+              <!-- Node 4: Possible Transaction (Inferred) -->
+              <rect x="470" y="96" width="190" height="54" rx="8" fill="var(--node-bg)" stroke="var(--warn-line)"/>
+              <text x="482" y="116" fill="var(--warn)" font-size="10.5" font-weight="600">潜在影响 · 交易 [AI 推断]</text>
+              <text x="482" y="135" fill="var(--ink)" font-size="12">T309 跨行退货冲正</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右栏：增强审查面板（4 页签） -->
+      <section class="pane">
+        <div class="view-tabs" id="reviewSubTabs">
+          <button class="view-tab" data-rtab="overview">总览</button>
+          <button class="view-tab active" data-rtab="impacts">业务影响 <span class="count-chip">3</span></button>
+          <button class="view-tab" data-rtab="findings">代码问题 <span class="count-chip">2</span></button>
+          <button class="view-tab" data-rtab="regression">回归建议 <span class="count-chip">3</span></button>
+        </div>
+
+        <div class="pane-scroll">
+          <!-- 动态知识匹配提示条 -->
+          <div class="knowledge-strip ok" id="knowledgeBanner">
+            <div>
+              <b>关联设计：</b>billing-core 交易链路设计
+              <span class="badge badge-ok" style="margin-left:4px">exact · e4f2a9c</span>
+            </div>
+            <button class="link-btn" onclick="switchView('incremental')">打开项目设计 →</button>
+          </div>
+
+          <!-- 页签：业务影响 -->
+          <div id="rtab-impacts" style="display:flex;flex-direction:column;gap:10px">
+            <div class="item-card">
+              <div class="item-head">
+                <span class="badge badge-danger">直接影响</span>
+                <span class="badge badge-ok">静态确认</span>
+                <span class="item-title">日终清分计费模块 · calculateSettlementFee</span>
+              </div>
+              <p class="item-desc">舍入策略由 <code>roundHalfUp</code> 改为银行家舍入 <code>roundBankers</code>，且新增 <code>rebateBps</code> 折扣扣减，直接改变手续费计算结果。</p>
+              <div class="item-foot">
+                <button class="link-btn">定位 Diff · src/fee/calcFee.ts:43-44</button>
+                <button class="link-btn" onclick="switchView('incremental')">跳设计节点 · 计费子模块 →</button>
+              </div>
+            </div>
+
+            <div class="item-card">
+              <div class="item-head">
+                <span class="badge badge-accent">间接影响</span>
+                <span class="badge badge-ok">静态确认</span>
+                <span class="item-title">交易 T301 · 商户收单清算（渠道: 网联 / v2）</span>
+              </div>
+              <p class="item-desc">经 <code>src/settle/batch.ts:88</code> 静态调用 <code>calculateSettlementFee</code>；半数边界金额（*.005）结算分录将出现 1 分差异，需与对账单口径对齐。</p>
+              <div class="item-foot">
+                <button class="link-btn">源码证据 · src/settle/batch.ts:88</button>
+                <button class="link-btn" onclick="switchView('incremental')">跳交易档案 T301 →</button>
+              </div>
+            </div>
+
+            <div class="item-card">
+              <div class="item-head">
+                <span class="badge badge-warn">潜在待核实</span>
+                <span class="badge badge-wait">AI 推断</span>
+                <span class="item-title">交易 T309 · 跨行退货冲正</span>
+              </div>
+              <p class="item-desc">推断依据：冲正流程按原始费率配置重算退还手续费，若原交易按旧 <code>roundHalfUp</code> 落账而退货按新 <code>roundBankers</code> 重算，可能触发 1 分尾差告警。</p>
+              <div class="item-foot">
+                <span class="sub-text" style="font-size:11.5px">建议：核对退货重算是否读取原单快照费用</span>
+                <button class="link-btn" onclick="switchView('incremental')">跳交易档案 T309 →</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 页签：代码问题 -->
+          <div id="rtab-findings" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+            <div class="item-card">
+              <div class="item-head">
+                <input type="checkbox" checked aria-label="选中修复">
+                <span class="badge badge-danger">阻塞</span>
+                <span class="badge">正确性</span>
+                <span class="item-title">未校验 rebateBps > bps 导致负数手续费</span>
+              </div>
+              <p class="item-desc"><code>tier.rebateBps * amount</code> 大于 <code>raw</code> 时 <code>discounted</code> 为负，下游分录写入将违反非负约束。</p>
+              <div class="item-foot">
+                <button class="link-btn">src/fee/calcFee.ts:43</button>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="badge badge-accent">关联影响: T301</span>
+                  <select class="status-select">
+                    <option selected>待处理 (open)</option>
+                    <option>已确认 (accepted)</option>
+                    <option>已忽略 (dismissed)</option>
+                    <option>已解决 (resolved)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="item-card">
+              <div class="item-head">
+                <input type="checkbox" aria-label="选中修复">
+                <span class="badge badge-warn">次要</span>
+                <span class="badge">测试</span>
+                <span class="item-title">缺少银行家舍入偶数/奇数边界单测</span>
+              </div>
+              <p class="item-desc">建议在 <code>calcFee.test.ts</code> 补充 2.5 → 2、3.5 → 4 与零折扣用例。</p>
+              <div class="item-foot">
+                <button class="link-btn">src/fee/rounding.ts:19</button>
+                <select class="status-select">
+                  <option>待处理 (open)</option>
+                  <option selected>已确认 (accepted)</option>
+                  <option>已忽略 (dismissed)</option>
+                  <option>已解决 (resolved)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 页签：总览 -->
+          <div id="rtab-overview" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+            <div class="card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span class="badge badge-warn">发现 1 个阻塞问题 · 3 项业务影响</span>
+                <span class="sub-text mono">9a3b102..e4f2a9c</span>
+              </div>
+              <p class="item-desc">本次提交统一了阶梯折扣与银行家舍入逻辑。代码层面存在一处折扣超额导致负数的边界缺陷；业务影响波及收单清算（T301）与退货冲正（T309），合并前建议先修复边界校验并完成尾差回归。</p>
+            </div>
+          </div>
+
+          <!-- 页签：回归建议 -->
+          <div id="rtab-regression" class="hidden" style="display:flex;flex-direction:column;gap:8px">
+            <div class="item-card"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox"><span><b>T301 收单清算对账回归</b>：构造金额 *.005 / *.015 样本，核对清算分录与网联对账单无 1 分尾差。</span></label></div>
+            <div class="item-card"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox"><span><b>T309 跨行退货冲正</b>：验证历史旧单发起部分退货时，是否沿用原单记录手续费而非新算法重算。</span></label></div>
+            <div class="item-card"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox"><span><b>折扣超额边界</b>：配置 <code>rebateBps &gt; bps</code> 时确认手续费兜底为 0 或显式报错。</span></label></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 视图 2：双版本端点对比（compare） ==================== -->
+<div class="app-shell hidden" id="view-compare">
+  <aside class="app-nav">
+    <div class="nav-logo"><span class="nav-mark">AW</span>Agent Workflow</div>
+    <div>
+      <div class="nav-group-label">专业工具</div>
+      <div class="nav-item active">Git 工作台</div>
+      <div class="nav-item">项目设计</div>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="title-lg">billing-core · 双版本端点对比</span>
+        <span class="badge badge-accent">compare · 直连双端点（非 merge-base）</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm" onclick="switchView('review')">返回提交审查</button>
+        <button class="btn btn-primary btn-sm" onclick="switchView('offline')">导出离线对比 HTML</button>
+      </div>
+    </header>
+
+    <div class="compare-wrap">
+      <div class="compare-banner">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div class="endpoint-pair">
+            <span class="sub-text">旧版</span>
+            <b class="mono">v1.7.4 (9a3b102)</b>
+            <span class="badge badge-ok">设计 exact</span>
+          </div>
+          <span class="sub-text">↔</span>
+          <div class="endpoint-pair">
+            <span class="sub-text">新版</span>
+            <b class="mono">v1.7.51 (e4f2a9c)</b>
+            <span class="badge badge-ok">设计 exact</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <span class="diff-tag add">＋ 新增 2</span>
+          <span class="diff-tag mod">～ 修改 4</span>
+          <span class="diff-tag del">－ 删除 1</span>
+          <span class="diff-tag unc">？ 待确认 1</span>
+        </div>
+      </div>
+
+      <div class="compare-body">
+        <!-- 左：结构化设计差异树 -->
+        <section class="pane">
+          <div class="pane-head">
+            <span>架构与交易差异</span>
+            <span class="sub-text">按稳定 ID 对齐</span>
+          </div>
+          <div class="pane-scroll">
+            <div style="font-size:11.5px;color:var(--sub);font-weight:600">架构模块（3）</div>
+            <div class="item-card" style="border-color:var(--accent-line);background:var(--accent-fill)">
+              <div class="item-head"><span class="diff-tag mod">～ 修改</span><span class="item-title">日终清分计费模块</span></div>
+              <div class="item-desc">计费舍入算法切换 + 引入返佣扣减参数</div>
+            </div>
+            <div class="item-card">
+              <div class="item-head"><span class="diff-tag add">＋ 新增</span><span class="item-title">阶梯返佣策略模块</span></div>
+              <div class="item-desc">新增 <code>src/fee/rebatePolicy.ts</code> 供清算批处理读取</div>
+            </div>
+            <div class="item-card">
+              <div class="item-head"><span class="diff-tag unc">？ 待确认</span><span class="item-title">taxResolver → feeTaxAdapter</span></div>
+              <div class="item-desc">疑似重命名（相似度 78%），建议结合 <code>git diff -M</code> 人工确认</div>
+            </div>
+
+            <div style="font-size:11.5px;color:var(--sub);font-weight:600;margin-top:6px">交易链路（2）</div>
+            <div class="item-card">
+              <div class="item-head"><span class="diff-tag mod">～ 修改</span><span class="item-title">T301 商户收单清算</span></div>
+              <div class="item-desc">步骤 3「手续费核算」新增返佣分支与尾差校验</div>
+            </div>
+            <div class="item-card">
+              <div class="item-head"><span class="diff-tag del">－ 删除</span><span class="item-title">T204 人工费率补差（已下线）</span></div>
+              <div class="item-desc">路由入口与处理类均已移除</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右：双端只读源码对照（严格按 fromSha / toSha 读取） -->
+        <section class="pane">
+          <div class="pane-head">
+            <span>双版本源码对照 · <span class="mono">src/fee/calcFee.ts</span></span>
+            <span class="badge badge-done">严格只读 git show · 不读取当前 HEAD</span>
+          </div>
+          <div class="pane-scroll">
+            <div class="split-code">
+              <div class="diff-box">
+                <div class="diff-file-head"><span>旧版 <b class="mono">9a3b102</b></span><span class="diff-tag del">－ 旧实现</span></div>
+                <div class="diff-line"><span class="ln">41</span><span class="ln"></span><span class="sig"> </span><span>export function calculateSettlementFee(amount, tier) {</span></div>
+                <div class="diff-line"><span class="ln">42</span><span class="ln"></span><span class="sig"> </span><span>  const raw = amount * BigInt(tier.bps);</span></div>
+                <div class="diff-line del"><span class="ln">43</span><span class="ln"></span><span class="sig">-</span><span>  return roundHalfUp(raw, 10_000n);</span></div>
+                <div class="diff-line"><span class="ln">44</span><span class="ln"></span><span class="sig"> </span><span>}</span></div>
+              </div>
+              <div class="diff-box">
+                <div class="diff-file-head"><span>新版 <b class="mono">e4f2a9c</b></span><span class="diff-tag add">＋ 新实现</span></div>
+                <div class="diff-line"><span class="ln"></span><span class="ln">41</span><span class="sig"> </span><span>export function calculateSettlementFee(amount, tier) {</span></div>
+                <div class="diff-line"><span class="ln"></span><span class="ln">42</span><span class="sig"> </span><span>  const raw = amount * BigInt(tier.bps);</span></div>
+                <div class="diff-line add"><span class="ln"></span><span class="ln">43</span><span class="sig">+</span><span>  const discounted = raw - tier.rebateBps * amount;</span></div>
+                <div class="diff-line add"><span class="ln"></span><span class="ln">44</span><span class="sig">+</span><span>  return roundBankers(discounted, 10_000n);</span></div>
+                <div class="diff-line"><span class="ln"></span><span class="ln">45</span><span class="sig"> </span><span>}</span></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h4 style="font-size:13px;margin-bottom:6px">版本变化业务摘要</h4>
+              <p class="item-desc">从 <code>v1.7.4</code> 到 <code>v1.7.51</code>，清分计费完成返佣逻辑统一并下线人工补差交易 T204。核心回归点集中在 T301 收单清算尾差与 T309 跨行退货历史单重算。</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 视图 3：项目设计增量更新 ==================== -->
+<div class="app-shell hidden" id="view-incremental">
+  <aside class="app-nav">
+    <div class="nav-logo"><span class="nav-mark">AW</span>Agent Workflow</div>
+    <div>
+      <div class="nav-group-label">专业工具</div>
+      <div class="nav-item">Git 工作台</div>
+      <div class="nav-item active">项目设计 <span class="nav-dot"></span></div>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="title-lg">billing-core 交易链路设计</span>
+        <span class="badge mono">快照 9a3b102</span>
+        <span class="badge badge-warn">已过期 · 3 个文件变化</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-sm" onclick="switchView('review')">去 Git 审查</button>
+        <button class="btn btn-sm">导出离线 HTML</button>
+      </div>
+    </header>
+
+    <!-- 轻量过期检测提示条（零 AI） -->
+    <div class="stale-banner">
+      <div>
+        <b>检测到工作区内容变动（零 AI 哈希比对）：</b>相对快照 <span class="mono">9a3b102</span> 有 <b>3</b> 个文件修改，影响 <b>2</b> 个章节。不会自动调用 AI。
+      </div>
+      <button class="btn btn-primary btn-sm">按变更增量更新</button>
+    </div>
+
+    <div class="design-grid">
+      <!-- 左栏：章节目录 -->
+      <section class="pane">
+        <div class="pane-head"><span>设计目录</span><span class="sub-text">6 章</span></div>
+        <div class="pane-scroll">
+          <div class="file-pill"><span>✓ 1. 项目总览</span><span class="sub-text">未变</span></div>
+          <div class="file-pill"><span>✓ 2. 系统架构</span><span class="sub-text">未变</span></div>
+          <div class="file-pill active"><span>● 3. 清分计费模块</span><span class="badge badge-warn">受影响</span></div>
+          <div class="file-pill"><span>● 4. 交易链路 T301</span><span class="badge badge-warn">受影响</span></div>
+          <div class="file-pill"><span>✓ 5. 对账与归档</span><span class="sub-text">未变</span></div>
+          <div class="file-pill"><span>✓ 6. 异常处理规范</span><span class="sub-text">未变</span></div>
+        </div>
+      </section>
+
+      <!-- 中栏：现有章节阅读态（保留原内容不闪烁） -->
+      <section class="pane">
+        <div class="pane-head">
+          <span>3. 清分计费模块</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm">让 AI 重写</button>
+            <button class="btn btn-sm">恢复上一版</button>
+          </div>
+        </div>
+        <div class="pane-scroll">
+          <div class="card">
+            <h3 style="font-size:14px;margin-bottom:6px">模块职责（快照 9a3b102）</h3>
+            <p class="item-desc">负责商户收单清算与批量计费。当前文档基于旧版 <code>roundHalfUp</code> 逻辑生成，待右侧增量更新完成后将自动保留本版到 <code>previous</code>。</p>
+          </div>
+          <div class="card">
+            <h4 style="font-size:13px;margin-bottom:8px">关联文件变更明细</h4>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="file-pill"><span class="mono">src/fee/calcFee.ts</span><span class="diff-tag mod">～ 哈希变化</span></div>
+              <div class="file-pill"><span class="mono">src/fee/rounding.ts</span><span class="diff-tag mod">～ 哈希变化</span></div>
+              <div class="file-pill"><span class="mono">src/settle/batch.ts</span><span class="diff-tag mod">～ 哈希变化</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右栏：增量更新确认抽屉 -->
+      <aside class="drawer-panel">
+        <div class="pane-head">
+          <span>按变更增量更新</span>
+          <span class="badge badge-ok">已冻结目标 e4f2a9c</span>
+        </div>
+        <div class="pane-scroll">
+          <p class="item-desc">启动时已冻结当前工作区目标基线 <span class="mono">e4f2a9c</span>（干净工作区），更新期间即使 <code>HEAD</code> 再次提交也不会混淆基线。</p>
+
+          <div style="font-size:12px;font-weight:600;margin-top:4px">勾选本次要重跑的受影响章节（2 / 2）</div>
+          <label class="sec-check checked">
+            <input type="checkbox" class="inc-check" checked>
+            <div>
+              <div style="font-size:12.5px;font-weight:600">3. 清分计费模块</div>
+              <div class="sub-text" style="font-size:11.5px">命中 2 个变更文件：calcFee.ts、rounding.ts</div>
+            </div>
+          </label>
+          <label class="sec-check checked">
+            <input type="checkbox" class="inc-check" checked>
+            <div>
+              <div style="font-size:12.5px;font-weight:600">4. 交易链路 T301</div>
+              <div class="sub-text" style="font-size:11.5px">命中 1 个变更文件：batch.ts</div>
+            </div>
+          </label>
+
+          <!-- 动态基线推进说明（随勾选联动） -->
+          <div class="knowledge-strip ok" id="baselineRuleBox" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <b>基线推进策略：全量推进</b>
+            <span>全部受影响章节均已勾选；全部成功后，全局快照将推进至 <span class="mono">e4f2a9c</span>。历史 Git 审查报告保持原快照不变。</span>
+          </div>
+
+          <div style="margin-top:auto;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+            <span class="sub-text" style="font-size:11.5px">每章覆盖前自动存 <code>previous</code></span>
+            <button class="btn btn-primary">开始增量更新 (2 章)</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 视图 4：离线 HTML 报告预览 ==================== -->
+<div class="app-shell hidden" id="view-offline">
+  <div class="offline-wrap">
+    <div class="offline-sheet">
+      <div class="offline-head">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="badge badge-done">离线自包含 HTML · file:// 可读 · 零 CDN</span>
+            <span class="badge badge-ok">设计快照 exact · e4f2a9c</span>
+          </div>
+          <h2 style="font-size:18px">billing-core · 提交审查与业务影响报告</h2>
+          <p class="sub-text" style="margin-top:4px">范围：<span class="mono">9a3b102..e4f2a9c</span> · 生成时间：2026-11-26 15:30 · 历史快照不可变归档</p>
+        </div>
+        <button class="btn btn-sm" onclick="switchView('review')">返回工作台</button>
+      </div>
+
+      <div class="offline-grid">
+        <div class="kpi"><span>阻塞 / 重要代码问题</span><b style="color:var(--danger)">1</b></div>
+        <div class="kpi"><span>次要代码问题</span><b style="color:var(--warn)">1</b></div>
+        <div class="kpi"><span>直接 / 间接业务影响</span><b style="color:var(--accent-ink)">2</b></div>
+        <div class="kpi"><span>潜在待核实（AI 推断）</span><b style="color:var(--wait)">1</b></div>
+      </div>
+
+      <div style="padding:18px 22px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="item-card">
+          <div class="item-head"><span class="badge badge-danger">阻塞问题</span><span class="item-title">未校验 rebateBps &gt; bps 导致负数手续费</span></div>
+          <p class="item-desc">位置：<code>src/fee/calcFee.ts:43</code> · 状态：待处理（open）· 已脱敏源码片段随报告内嵌。</p>
+        </div>
+        <div class="item-card">
+          <div class="item-head"><span class="badge badge-accent">业务影响</span><span class="item-title">T301 商户收单清算 · T309 跨行退货冲正</span></div>
+          <p class="item-desc">T301 为静态确认调用链；T309 为 AI 推断潜在尾差风险，已列出 3 项可执行回归检查清单。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const views = ['review', 'compare', 'incremental', 'offline'];
+function switchView(v) {
+  if (!views.includes(v)) v = 'review';
+  views.forEach((id) => {
+    document.getElementById('view-' + id).classList.toggle('hidden', id !== v);
+  });
+  document.querySelectorAll('#viewTabs .proto-tab').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === v);
+  });
+}
+document.querySelectorAll('#viewTabs .proto-tab').forEach((b) => {
+  b.addEventListener('click', () => switchView(b.dataset.view));
+});
+
+function switchTheme(t) {
+  if (!['default', 'claude', 'codex'].includes(t)) t = 'default';
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll('[data-theme-btn]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeBtn === t);
+  });
+}
+document.querySelectorAll('[data-theme-btn]').forEach((b) => {
+  b.addEventListener('click', () => switchTheme(b.dataset.themeBtn));
+});
+
+// 视图 1：审查子页签切换
+document.querySelectorAll('#reviewSubTabs .view-tab').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.rtab;
+    document.querySelectorAll('#reviewSubTabs .view-tab').forEach((b) => b.classList.toggle('active', b === btn));
+    ['overview', 'impacts', 'findings', 'regression'].forEach((id) => {
+      document.getElementById('rtab-' + id).classList.toggle('hidden', id !== target);
+    });
+  });
+});
+
+// 视图 1：演示 exact / reference / missing 三种设计匹配态
+document.getElementById('matchMode').addEventListener('change', (e) => {
+  const mode = e.target.value;
+  const banner = document.getElementById('knowledgeBanner');
+  const graph = document.getElementById('impactGraphCard');
+  if (mode === 'exact') {
+    banner.className = 'knowledge-strip ok';
+    banner.innerHTML = '<div><b>关联设计：</b>billing-core 交易链路设计 <span class="badge badge-ok" style="margin-left:4px">exact · e4f2a9c</span></div><button class="link-btn" onclick="switchView(\'incremental\')">打开项目设计 →</button>';
+    graph.classList.remove('hidden');
+  } else if (mode === 'reference') {
+    banner.className = 'knowledge-strip warn';
+    banner.innerHTML = '<div><b>参考设计：</b>快照 <span class="mono">9a3b102</span>（非当前目标版本，仅作线索，结论已回源核验）<span class="badge badge-warn" style="margin-left:4px">reference</span></div><button class="link-btn" onclick="switchView(\'incremental\')">去增量更新 →</button>';
+    graph.classList.remove('hidden');
+  } else {
+    banner.className = 'knowledge-strip';
+    banner.innerHTML = '<div><b>未建立项目设计：</b>当前仅基于源码 Diff 完成传统审查，无跨模块/交易影响图谱。</div><button class="link-btn" onclick="switchView(\'incremental\')">去新建项目设计 →</button>';
+    graph.classList.add('hidden');
+  }
+});
+
+// 视图 3：部分勾选章节时联动保守基线提示
+document.querySelectorAll('.inc-check').forEach((cb) => {
+  cb.addEventListener('change', () => {
+    cb.closest('.sec-check').classList.toggle('checked', cb.checked);
+    const all = [...document.querySelectorAll('.inc-check')];
+    const checked = all.filter((c) => c.checked).length;
+    const box = document.getElementById('baselineRuleBox');
+    if (checked === all.length) {
+      box.className = 'knowledge-strip ok';
+      box.innerHTML = '<b>基线推进策略：全量推进</b><span>全部受影响章节均已勾选；全部成功后，全局快照将推进至 <span class="mono">e4f2a9c</span>。历史 Git 审查报告保持原快照不变。</span>';
+    } else {
+      box.className = 'knowledge-strip warn';
+      box.innerHTML = '<b>基线推进策略：保守保持（部分勾选）</b><span>仅勾选 ' + checked + ' / ' + all.length + ' 章；成功后已选章节正常落库，但<b>不推进全局基线</b>，下次检测仍会提醒剩余未更新章节。</span>';
+    }
+  });
+});
+
+// 支持 URL 参数 ?view=...&theme=...
+const qs = new URLSearchParams(location.search);
+if (qs.get('view')) switchView(qs.get('view'));
+if (qs.get('theme')) switchTheme(qs.get('theme'));
+</script>
+</body>
+</html>

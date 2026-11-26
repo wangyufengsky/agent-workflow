@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -369,7 +369,7 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await verifyOffline(browser, target);
 });
 
-async function themeFixture(request: APIRequestContext) {
+async function themeFixture(request: APIRequestContext, sections = OUTLINE) {
   const project = await fixtureProject(request);
   const created = await request.post(`${API_BASE}/designs`, {
     headers: AUTH,
@@ -379,7 +379,7 @@ async function themeFixture(request: APIRequestContext) {
   const { id }: DesignDTO = await created.json();
   const outline = await request.put(`${API_BASE}/designs/${id}/outline`, {
     headers: AUTH,
-    data: { sections: OUTLINE.map((section) => ({ ...section, selected: section.title !== OMIT })) },
+    data: { sections: sections.map((section) => ({ ...section, selected: section.title !== OMIT })) },
   });
   expect(outline.ok(), await outline.text()).toBe(true);
   const ids = chapterIds(await outline.json());
@@ -387,13 +387,72 @@ async function themeFixture(request: APIRequestContext) {
   const generated = await request.post(`${API_BASE}/designs/${id}/generate`, { headers: AUTH, data: {} });
   expect(generated.ok(), await generated.text()).toBe(true);
   await expect.poll(async () => (await design(request, id)).status).toBe(DesignStatus.Ready);
-  return id;
+  return { id, project };
 }
+
+test('设计工作台标记变动影响，定位章节时不会启动 AI', async ({ page, request }, info) => {
+  const { id, project } = await themeFixture(
+    request,
+    OUTLINE.map((section) =>
+      section.title === OVERVIEW || section.title === OMIT ? { ...section, scopePaths: [IMPLEMENTATION] } : section,
+    ),
+  );
+  const initialRuns = (await design(request, id)).runs.map(({ id }) => id);
+  const url = `/designs/${id}`;
+  const refresh = async () => {
+    const detected = page.waitForResponse(
+      (response) => response.url() === `${API_BASE}${url}/staleness` && response.ok(),
+    );
+    await page.goto(url);
+    await detected;
+  };
+  await patchSettings(request, { 'ui.theme': ThemeId.Default, 'ui.mode': 'pro' });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  const locate = page.getByRole('button', { name: '定位首个受影响章节' });
+  const directory = page.getByRole('navigation', { name: '章节目录' });
+  const reader = page.getByRole('region', { name: '设计正文' });
+  await refresh();
+  await expect(page.getByText(/已过期 ·/)).toHaveCount(0);
+
+  const changedFile = join(project.repoPath, 'src/new-refund.ts');
+  writeFileSync(changedFile, 'export const refundChannel = "app";\n');
+  for (const theme of [ThemeId.Default, ThemeId.Codex]) {
+    await patchSettings(request, { 'ui.theme': theme });
+    await refresh();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(page.getByText('已过期 · 1 个文件变化')).toBeVisible();
+    await expect(page.getByText(/零 AI 哈希比对/)).toBeVisible();
+    await expect(page.getByText(/可能影响 2 个章节。不会自动调用 AI。/)).toBeVisible();
+    await expect(directory.getByText('受影响', { exact: true })).toHaveCount(2);
+    await expect(directory.getByRole('button', { name: CALLS, exact: true }).getByText('受影响')).toBeVisible();
+    await expect(directory.getByRole('button', { name: FLOW, exact: true }).getByText('受影响')).toBeVisible();
+    await locate.click();
+    await expect(reader.getByRole('heading', { name: CALLS, exact: true })).toBeVisible();
+    await expect(reader).toBeFocused();
+    const report = await inspectPage(page);
+    expect(report.contrast).toEqual([]);
+    expect(report.overflow).toEqual([]);
+    await page.screenshot({ path: info.outputPath(`design-staleness-${theme}.png`), animations: 'disabled' });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await refresh();
+  await locate.click();
+  await expect(reader.getByRole('heading', { name: CALLS, exact: true })).toBeInViewport();
+
+  unlinkSync(changedFile);
+  writeFileSync(join(project.repoPath, 'new-root.ts'), 'export const repoVersion = 2;\n');
+  await refresh();
+  await expect(page.getByText(/可能影响 0 个章节。不会自动调用 AI。/)).toBeVisible();
+  await expect(locate).toHaveCount(0);
+  await expect(directory.getByText('受影响', { exact: true })).toHaveCount(0);
+  expect((await design(request, id)).runs.map(({ id }) => id)).toEqual(initialRuns);
+});
 
 test.describe('项目设计阅读页主题走查', () => {
   let id: string;
   test.beforeAll(async ({ request }) => {
-    id = await themeFixture(request);
+    ({ id } = await themeFixture(request));
   });
   for (const theme of THEME_IDS) {
     test(`${theme} 的阅读、图谱与局部滚动无溢出`, async ({ page, request }) => {
@@ -430,7 +489,7 @@ test.describe('项目设计阅读页主题走查', () => {
 });
 
 test('工作台原位改名、架构阅读顺序与图边交互', async ({ page, request }) => {
-  const id = await themeFixture(request);
+  const { id } = await themeFixture(request);
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`/designs/${id}`);
 

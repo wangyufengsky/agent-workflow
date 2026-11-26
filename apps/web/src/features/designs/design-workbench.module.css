@@ -17,6 +17,19 @@
   border-bottom: 1px solid var(--line-2);
 }
 
+.staleNotice {
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0.75rem 1.5rem;
+}
+.staleNotice > svg {
+  flex: none;
+}
+.staleNotice p {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
 .identity {
   min-width: 0;
 }
@@ -210,6 +223,12 @@
 }
 .chapter {
   font-weight: 550;
+}
+.tree .affectedChapter {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--ink);
+  border-color: var(--warn-line);
 }
 .chapterDot {
   align-self: flex-start;
@@ -610,6 +629,9 @@ button.figureLabel:hover {
   }
   .header {
     padding-inline: 14px;
+  }
+  .staleNotice {
+    margin-inline: 0.875rem;
   }
   .panes,
   .panes[data-nav],

@@ -98,6 +98,7 @@ function DesignTitle({ design, disabled }: { design: DesignDTO; disabled: boolea
 
 export function DesignToolbar({
   design,
+  changedFilesCount,
   busy,
   canGenerate,
   follow,
@@ -115,6 +116,7 @@ export function DesignToolbar({
   runtimeLabel,
 }: {
   design: DesignDTO;
+  changedFilesCount: number | undefined;
   busy: boolean;
   canGenerate: boolean;
   follow: boolean;
@@ -155,6 +157,9 @@ export function DesignToolbar({
             tone={design.handoffPending ? StatusTone.Run : statusTone(design.status)}
             label={design.handoffPending ? C.handoffPending : DESIGN_STATUS_LABEL[design.status]}
           />
+          {changedFilesCount !== undefined && (
+            <StatusBadge tone={StatusTone.Warn} label={C.staleBadge(changedFilesCount)} />
+          )}
         </div>
         <div className={styles.meta}>
           <span className="mono" title={design.sourceSnapshot.dirty ? C.dirty : undefined}>

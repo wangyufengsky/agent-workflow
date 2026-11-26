@@ -12,6 +12,21 @@ export const DesignStatus = {
 export type DesignStatus = (typeof DesignStatus)[keyof typeof DesignStatus];
 export const designStatusSchema = z.enum(DesignStatus);
 
+export const DesignKnowledgeMatch = {
+  Exact: 'exact',
+  Reference: 'reference',
+  Missing: 'missing',
+} as const;
+export type DesignKnowledgeMatch = (typeof DesignKnowledgeMatch)[keyof typeof DesignKnowledgeMatch];
+
+export const DesignStalenessState = {
+  Fresh: 'fresh',
+  Stale: 'stale',
+  Unknown: 'unknown',
+} as const;
+export type DesignStalenessState = (typeof DesignStalenessState)[keyof typeof DesignStalenessState];
+export const designStalenessStateSchema = z.enum(DesignStalenessState);
+
 export const DesignDepth = {
   Quick: 'quick',
   Standard: 'standard',

@@ -42,6 +42,7 @@ type NavProps = {
   target: ReadingTarget;
   active: DesignRunDTO | undefined;
   failedIds: ReadonlySet<string>;
+  affectedIds: ReadonlySet<string>;
   onNavigate: (target: ReadingTarget, fromSearch?: boolean) => void;
   onCollapse: () => void;
 };
@@ -105,6 +106,7 @@ export function DesignOutlineNav({
   target,
   active,
   failedIds,
+  affectedIds,
   onNavigate,
   onCollapse,
 }: NavProps) {
@@ -189,6 +191,7 @@ export function DesignOutlineNav({
               const modules = submodulesOf(section);
               const looseFiles = files.filter((file) => fileSubmodule(file, section) === undefined);
               const status = sectionStatus(section, workingId, failedIds);
+              const isAffected = affectedIds.has(section.id);
               const sectionTarget = { kind: 'section', sectionId: section.id } as const;
               return (
                 <div key={section.id} className={styles.treeSection}>
@@ -196,7 +199,7 @@ export function DesignOutlineNav({
                     type="button"
                     className={styles.chapter}
                     aria-label={section.title}
-                    aria-description={status.label}
+                    aria-description={isAffected ? `${status.label} · ${C.affected}` : status.label}
                     aria-current={current === targetKey(sectionTarget) ? 'page' : undefined}
                     onClick={go(sectionTarget)}
                   >
@@ -208,6 +211,7 @@ export function DesignOutlineNav({
                       title={status.label}
                     />
                     <span>{section.title}</span>
+                    {isAffected && <span className={`badge st-warn ${styles.affectedChapter}`}>{C.affected}</span>}
                   </button>
                   {modules.map((module) => {
                     const next = { kind: 'submodule', sectionId: section.id, submoduleId: module.id } as const;
@@ -294,7 +298,7 @@ export function DesignOutlineNav({
       {catalog ? (
         <>
           {catalog}
-          <details className={styles.chapterCatalog}>
+          <details className={styles.chapterCatalog} open={affectedIds.size > 0}>
             <summary className={styles.chapterCatalogTitle}>{C.outline}</summary>
             {chapterTree}
           </details>

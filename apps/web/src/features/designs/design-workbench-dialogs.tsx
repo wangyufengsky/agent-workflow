@@ -202,8 +202,8 @@ export function ExportDesignDialog({
 }
 
 export function DeleteDesignDialog({ design, close }: { design: DesignDTO; close: () => void }) {
-  const mutation = useDeleteDesign();
   const navigate = useNavigate();
+  const mutation = useDeleteDesign(() => navigate({ to: ROUTES.designs }));
   return (
     <Dialog
       open
@@ -217,15 +217,7 @@ export function DeleteDesignDialog({ design, close }: { design: DesignDTO; close
           <Button onClick={close} disabled={mutation.isPending}>
             {COMMON_COPY.cancel}
           </Button>
-          <Button
-            variant="danger"
-            pending={mutation.isPending}
-            onClick={() =>
-              mutation.mutate(design.id, {
-                onSuccess: () => navigate({ to: ROUTES.designs }),
-              })
-            }
-          >
+          <Button variant="danger" pending={mutation.isPending} onClick={() => mutation.mutate(design.id)}>
             {C.remove}
           </Button>
         </>

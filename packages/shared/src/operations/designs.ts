@@ -4,6 +4,7 @@ import {
   createDesignTemplateRequestSchema,
   designSchema,
   designSectionRefSchema,
+  designStalenessSchema,
   designTemplateRefSchema,
   exportDesignRequestSchema,
   generateDesignRequestSchema,
@@ -49,6 +50,18 @@ export const getDesignOp = defineOperationContract({
   output: designSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/designs/:id' },
+  refs: designRef,
+});
+
+export const getDesignStalenessOp = defineOperationContract({
+  ...common,
+  id: 'designs.staleness',
+  title: 'op.designs.staleness',
+  description: 'Check whether project files have changed since this design was scanned',
+  input: byId,
+  output: designStalenessSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/designs/:id/staleness' },
   refs: designRef,
 });
 

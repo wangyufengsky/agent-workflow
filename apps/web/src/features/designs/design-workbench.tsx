@@ -1,8 +1,16 @@
-import { AttemptStatus, type DesignDTO, type DesignRunDTO, DesignRunKind, RuntimeStatus } from '@aw/shared';
+import {
+  AttemptStatus,
+  type DesignDTO,
+  type DesignRunDTO,
+  DesignRunKind,
+  DesignStalenessState,
+  RuntimeStatus,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Icon } from '../../components/icon.tsx';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
 import { RUNTIME_STATUS_LABEL } from '../../copy/runtime.ts';
 import { runtimeQuery } from '../runtime/runtime.queries.ts';
@@ -27,11 +35,11 @@ import {
   RestoreDesignDialog,
   ReviseDesignDialog,
 } from './design-workbench-dialogs.tsx';
-import { useGenerateDesign, useReviewDesign, useStopDesign } from './designs.queries.ts';
+import { designStalenessQuery, useGenerateDesign, useReviewDesign, useStopDesign } from './designs.queries.ts';
 
 type Props = { design: DesignDTO; model: string | null; repoPath: string | null };
 type EditableTarget = Exclude<ReadingTarget, { kind: 'overview' }>;
-type Reading = { target: ReadingTarget; highlighted: boolean };
+type Reading = { target: ReadingTarget; highlighted: boolean; focus?: boolean };
 type OpenPanel = { runId: string | undefined; active: boolean; open: boolean };
 
 function failedSections(runs: readonly DesignRunDTO[]): Set<string> {
@@ -79,6 +87,21 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
   >(null);
   const failures = failedSections(design.runs);
   const pending = generate.isPending || review.isPending || stop.isPending;
+  const shouldCheckStaleness = !busy && !pending && design.projectId !== null;
+  const staleness = useQuery({ ...designStalenessQuery(design.id), enabled: shouldCheckStaleness });
+  const stale =
+    shouldCheckStaleness && staleness.isSuccess && staleness.data.state === DesignStalenessState.Stale
+      ? staleness.data
+      : undefined;
+  const affectedIds = new Set(stale?.affectedSectionIds);
+  const firstAffected = selected.find(({ id }) => affectedIds.has(id));
+  const reader = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (reading?.focus && reader.current !== null) {
+      reader.current.focus({ preventScroll: true });
+      reader.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [reading]);
   const runtimeLabel =
     runtime.data?.status === undefined || runtime.data.status === RuntimeStatus.Ready
       ? undefined
@@ -100,7 +123,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
     if (reading === null) setReading({ target: currentTarget, highlighted: false });
   };
   const navigate = (target: ReadingTarget, highlighted = false) => setReading({ target, highlighted });
-  const error = generate.error ?? review.error ?? stop.error;
+  const error = generate.error ?? review.error ?? stop.error ?? (shouldCheckStaleness ? staleness.error : null);
   const closeDialog = () => setDialog(null);
   const continueGeneration = (sectionId?: string) =>
     generate.mutate({ id: design.id, ...(sectionId === undefined ? {} : { sectionId }), model });
@@ -135,6 +158,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
     <div className={styles.workbench}>
       <DesignToolbar
         design={design}
+        changedFilesCount={stale?.changedFilesCount}
         busy={busy}
         canGenerate={canGenerate}
         follow={reading === null}
@@ -156,6 +180,24 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
         stopPending={stop.isPending}
         runtimeLabel={runtimeLabel}
       />
+      {stale !== undefined && (
+        <div className={`banner warn ${styles.staleNotice}`}>
+          <Icon name="alert" />
+          <p role="status">
+            <strong>{C.staleNotice}</strong> {C.staleImpact(stale.changedFilesCount, affectedIds.size)}
+          </p>
+          {firstAffected !== undefined && (
+            <Button
+              size="sm"
+              onClick={() =>
+                setReading({ target: { kind: 'section', sectionId: firstAffected.id }, highlighted: true, focus: true })
+              }
+            >
+              {C.locateAffected}
+            </Button>
+          )}
+        </div>
+      )}
       {error !== null && <ErrorState error={error} />}
       {design.projectId === null && <p className={styles.readOnly}>{C.readOnly}</p>}
       <div
@@ -176,6 +218,7 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
             target={currentTarget}
             active={active}
             failedIds={failures}
+            affectedIds={affectedIds}
             onCollapse={() => setNavOpen(false)}
             onNavigate={navigate}
           />
@@ -207,6 +250,8 @@ export function DesignWorkbench({ design, model, repoPath }: Props) {
             aria-label={C.reader}
             data-follow={reading === null}
             key={targetKey(currentTarget)}
+            ref={reader}
+            tabIndex={-1}
             // 跟随切章会换一个从顶部开始的滚动区，非零滚动才是当前章的阅读操作。
             onScroll={(event) => {
               if (event.currentTarget.scrollTop > 0) keepReading();
