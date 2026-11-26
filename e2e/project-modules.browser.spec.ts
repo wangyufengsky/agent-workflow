@@ -190,7 +190,7 @@ test('真实服务试启动、记录、停机及模块默认配置', async ({ pa
   }
 });
 
-test('服务组合展示来源与依赖，切换服务日志并带入功能测试草稿', async ({ page, request }) => {
+test('服务组合展示来源与依赖，切换服务日志并带入功能测试草稿', async ({ page, request }, testInfo) => {
   const screenshots = process.env.AW_PROJECT_COMPOUND_SCREENSHOTS;
   if (screenshots !== undefined) await page.setViewportSize({ width: 1280, height: 1420 });
   const project = await createProject(request, null);
@@ -258,6 +258,8 @@ test('服务组合展示来源与依赖，切换服务日志并带入功能测�
   if (Number(/version "(\d+)/.exec(jdk.stderr ?? '')?.[1]) >= 11) {
     await details.getByRole('button', { name: '试启动组合' }).click();
     try {
+      // 先等真实服务依次通过就绪探测，再开始独立验证日志显示。
+      await expect(details.getByText(/试启动.*已就绪/)).toBeVisible({ timeout: testInfo.timeout });
       const diagnostics = details.getByRole('region', { name: '服务运行诊断' });
       await expect(diagnostics.getByText(/Billing listening on/)).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
       const requested = diagnostics.getByRole('region', { name: '声明的启动配置' });
