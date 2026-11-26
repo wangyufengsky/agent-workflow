@@ -1,6 +1,6 @@
 # 46 · 项目设计知识与助手、全模块联动方案
 
-> 状态：**实施中**。前置能力（[45-design-git-integration.md](45-design-git-integration.md) Phase 1–4）已在 `v1.8.0` 全部上线。
+> 状态：**已实施**。Phase A–E 已在本地分支 `codex/design-ecosystem-integration` 完成。前置能力（[45-design-git-integration.md](45-design-git-integration.md) Phase 1–4）已在 `v1.8.0` 上线。
 >
 > 原则对齐：遵循 [03-architecture.md](03-architecture.md)、[06-coding-standards.md](06-coding-standards.md)（不过度防御、YAGNI、一处定义）、[07-testing-standards.md](07-testing-standards.md)、[38-convergence.md](38-convergence.md)（不增侧栏膨胀）与 [41-skills.md](41-skills.md)。
 
@@ -36,7 +36,7 @@ flowchart LR
 
 ## 2. 助手感知与协同闭环（Phase A）
 
-目前 `designs.staleness`、`designs.incrementalUpdate`、`gitReviews.start`（含 `compare`）、`gitReviews.get` 已在 `Operation Registry` 中标记 `assistant: true`，应用助手底层已具备调用权限，但缺少**零 AI 影响快查**和**串联这套工作流的内置 Skill**。
+助手通过 `Operation Registry` 调用 `designs.staleness`、`designs.lookupImpact`、`designs.incrementalUpdate`、`gitReviews.start`（含 `compare`）和 `gitReviews.get`。内置 Skill 说明各操作的适用场景与确认要求。
 
 ### 2.1 新增内置助手 Skill：`aw-design-git-review`
 
@@ -138,4 +138,4 @@ flowchart LR
 - [x] **Phase B**：从项目设计与双版本对比报告均可一键创建 PPT，生成后更新项目设计不影响已冻结的 PPT 素材内容。
 - [x] **Phase C**：任务交付页展示零 AI 影响初筛且不消耗模型额度；合入后展示过期提示且不自动触发 AI；回归建议预填功能测试任务可正常启动。
 - [x] **Phase D**：绑定项目的知识问答在存在设计时注入受控预算摘要，无设计时行为不变。
-- [ ] **Phase E**：`data-explorer` 在有/无只读数据库连接两种环境下均可正常生成设计，修改 DDL/SQL 后 Git 审查能追溯到受影响表与交易。
+- [x] **Phase E**：`data-explorer` 在有/无只读数据库连接两种环境下均可正常生成设计，修改 DDL/SQL 后 Git 审查能追溯到受影响表与交易。

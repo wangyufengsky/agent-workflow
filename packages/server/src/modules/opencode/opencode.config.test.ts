@@ -1,7 +1,9 @@
 import { pathToFileURL } from 'node:url';
 import { AGENT_SKILLS_MAX, ASSISTANT_SKILLS_MAX, PromptName, SkillName } from '@aw/builtin';
 import {
+  AttemptKind,
   BashPolicy,
+  DESIGN_ATTEMPT_KINDS,
   FUNCTIONAL_TEST_NODE,
   MCP_TOOL_PREFIX,
   McpToolName,
@@ -143,6 +145,30 @@ describe('opencode 配置生成', () => {
         web: true,
       }),
     ).toEqual(readonlyBashRules());
+  });
+
+  it.each(DESIGN_ATTEMPT_KINDS)('设计尝试 %s 只在可读取数据库元数据时开放两个工具', (designKind) => {
+    const normal = sessionPermissionRules(SessionAgent.Designer, BashPolicy.Auto, { designKind });
+    const dataExplorer = sessionPermissionRules(SessionAgent.Designer, BashPolicy.Auto, {
+      designKind,
+      designDatabaseMetadata: true,
+    });
+    expect(normal.map(({ permission }) => permission)).not.toContain(
+      `${MCP_TOOL_PREFIX}${McpToolName.DbListConnections}`,
+    );
+    expect(normal.map(({ permission }) => permission)).not.toContain(`${MCP_TOOL_PREFIX}${McpToolName.DbDescribe}`);
+    expect(dataExplorer.map(({ permission }) => permission)).not.toContain(`${MCP_TOOL_PREFIX}${McpToolName.DbQuery}`);
+    const baseline = new Set(normal.map(({ permission }) => permission));
+    const added = dataExplorer.filter(({ permission }) => !baseline.has(permission));
+    expect(added).toEqual(
+      designKind === AttemptKind.DesignGenerate || designKind === AttemptKind.DesignRevise
+        ? [
+            { permission: 'skill', action: 'allow', pattern: SkillName.DbReadonly },
+            { permission: `${MCP_TOOL_PREFIX}${McpToolName.DbListConnections}`, action: 'allow', pattern: '*' },
+            { permission: `${MCP_TOOL_PREFIX}${McpToolName.DbDescribe}`, action: 'allow', pattern: '*' },
+          ]
+        : [],
+    );
   });
 
   it('数据库分析员是专职只读节点，委派调查会话禁止直接工具访问', () => {

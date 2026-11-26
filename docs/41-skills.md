@@ -222,8 +222,9 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 - 助手协议在回答验收、重新核验或交付问题前点名 `aw-task-delivery`。涉及预览和修改时使用 `aw-assistant-preview`。
 - 执行协议按实际步骤匹配 `aw-backend-development` 和 `aw-frontend-development`。前端首版和多轮修改的步骤指令也点名前端 Skill。
 - 文档与表格任务每次从批注生成修改步骤时，步骤指令点名 `aw-artifact-revision`。
+- 「数据模型与 SQL 链路探索」的模板提示词在生成或重写章节需要核验元数据时点名 `aw-db-readonly`。
 
-其余 skill（`aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs`、`aw-db-readonly`、`aw-offline-network`）靠描述触发，不点名。
+其他场景的 `aw-db-readonly` 以及 `aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs` 和 `aw-offline-network` 靠描述触发。
 
 ### 7.5 生效与更新
 
@@ -318,3 +319,5 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 ## 项目设计分析
 
 `aw-design-analysis` 专供 `aw-designer` 在梳理大纲、生成或重写模块功能和独立复审时加载。每个生成会话聚焦一个章节。Skill 指导分析员从入口追踪功能、区分组成与依赖、用源码行支撑结论。章节数据经既有 `submit_design_section` 提交。
+
+「数据模型与 SQL 链路探索」生成或重写章节的会话开放元数据核验时，`aw-designer` 可加载 `aw-db-readonly`，使用 `db_list_connections` 和 `db_describe` 核验项目关联的只读连接及表结构。分析员的权限仅覆盖元数据。缺少连接或元数据不可用时，按仓库里的迁移、实体与 SQL 分析并标记证据缺口。

@@ -1,5 +1,6 @@
 import {
   AttemptKind,
+  DESIGN_DATABASE_METADATA_KINDS,
   dbDescribeInputSchema,
   dbDescribeOutputSchema,
   dbListConnectionsInputSchema,
@@ -7,36 +8,42 @@ import {
   dbQueryInputSchema,
   dbQueryOutputSchema,
   ErrorCode,
+  isDesignAttemptKind,
   McpToolName,
   readOnlyStatementGroups,
 } from '@aw/shared';
+import type { DesignSubmissions } from '../../designs/index.ts';
 import type { KnowledgeService } from '../../knowledge/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
 const ALL_KINDS = [AttemptKind.Plan, AttemptKind.Execute, AttemptKind.Review, AttemptKind.Research];
+const METADATA_KINDS = [...ALL_KINDS, ...DESIGN_DATABASE_METADATA_KINDS];
 const UNKNOWN_CONNECTION_HINT = 'Call db_list_connections and use one of the names it returns.';
 /** Unattended runs (schedules, batches) must not end quietly without the database (D178). */
 const LOCKED_HINT =
   'The database password is protected by the master password, which the user has not entered since the app started. If you can call ask_user, ask the user to unlock it in the app (the bar at the top of the window) and call this tool again after the answer; otherwise continue without the database and say in your result that its password was locked.';
 
-export const dbListConnectionsTool = (tasks: TasksService, knowledge: KnowledgeService) =>
+export const dbListConnectionsTool = (tasks: TasksService, knowledge: KnowledgeService, designs: DesignSubmissions) =>
   defineMcpTool({
     name: McpToolName.DbListConnections,
     description:
       'List the databases of the project that you may query read-only, with their type (mysql, goldendb, postgresql, opengauss, sqlserver): write SQL in that dialect.',
-    allowedKinds: ALL_KINDS,
+    allowedKinds: METADATA_KINDS,
     input: dbListConnectionsInputSchema,
     output: dbListConnectionsOutputSchema,
-    handler: (_input, { attempt }) =>
-      attempt.kind === AttemptKind.Research ? knowledge.dbConnections(attempt) : tasks.dbConnections(attempt),
+    handler: (_input, { attempt }) => {
+      if (isDesignAttemptKind(attempt.kind)) return designs.dbConnections(attempt);
+      if (attempt.kind === AttemptKind.Research) return knowledge.dbConnections(attempt);
+      return tasks.dbConnections(attempt);
+    },
   });
 
-export const dbDescribeTool = (tasks: TasksService, knowledge: KnowledgeService) =>
+export const dbDescribeTool = (tasks: TasksService, knowledge: KnowledgeService, designs: DesignSubmissions) =>
   defineMcpTool({
     name: McpToolName.DbDescribe,
     description: 'List the tables of a database, or show the columns and indexes of one table.',
-    allowedKinds: ALL_KINDS,
+    allowedKinds: METADATA_KINDS,
     input: dbDescribeInputSchema,
     output: dbDescribeOutputSchema,
     hints: {
@@ -45,10 +52,11 @@ export const dbDescribeTool = (tasks: TasksService, knowledge: KnowledgeService)
       [ErrorCode.DbConnectionFailed]: 'The database cannot be reached; continue without it and say so in your result.',
       [ErrorCode.CredentialLocked]: LOCKED_HINT,
     },
-    handler: ({ connection, table }, { attempt }) =>
-      attempt.kind === AttemptKind.Research
-        ? knowledge.dbDescribe(attempt, connection, table)
-        : tasks.dbDescribe(attempt, connection, table),
+    handler: ({ connection, table }, { attempt }) => {
+      if (isDesignAttemptKind(attempt.kind)) return designs.dbDescribe(attempt, connection, table);
+      if (attempt.kind === AttemptKind.Research) return knowledge.dbDescribe(attempt, connection, table);
+      return tasks.dbDescribe(attempt, connection, table);
+    },
   });
 
 export const dbQueryTool = (tasks: TasksService, knowledge: KnowledgeService) =>

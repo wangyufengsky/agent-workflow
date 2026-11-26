@@ -737,6 +737,8 @@ class AppError extends Error {
 `designer` 对应 `aw-designer`。`design_generate` 每章独占一个全新的会话，独立复审另开会话。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
 `design_review`。实体类型为 `design`，设计更新事件为 `design.updated`。
 
+只读内置模板键为 `general`、`transaction-explorer` 和 `data-explorer`。`data-explorer` 的章节生成与修订可以使用已关联数据库的连接列表和表结构工具。越权调用 `db_query` 返回 `MCP_TOOL_NOT_ALLOWED`，指定未关联连接返回 `DB_CONNECTION_NOT_FOUND`。
+
 | 错误码 | HTTP | 含义 |
 | --- | --- | --- |
 | DESIGN_NOT_FOUND | 404 | 设计或指定模板不存在 |

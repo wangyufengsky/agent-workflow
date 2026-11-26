@@ -47,7 +47,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [43-workflow-experience.md](43-workflow-experience.md) | 项目对话、任务验收与交付改进（共 12 项，第一批已实现），含会话续接、重验、流程图前置、计划存为模板、PR 状态与跨功能关联 | 全员 |
 | [44-project-design.md](44-project-design.md) | 项目设计工作台（设计稿，核心口径已确认）：面向已有仓库的现状技术设计工作台、程序扫描与大纲确认、分片实时生成、图下钻与显式离线 HTML 站点导出 | 全员 |
 | [45-design-git-integration.md](45-design-git-integration.md) | 项目设计与 Git 审查、版本对比融合（已实施，v1.8.0）：基于现有设计数据的轻量知识索引、两段式变更影响分析、提交审查增强、双版本对比与按变更增量更新设计 | 全员 |
-| [46-design-ecosystem-integration.md](46-design-ecosystem-integration.md) | 项目设计知识与助手、全模块联动方案（设计稿，待评审）：内置助手 Skill 与零 AI 影响快查、设计/对比一键生成 PPT、任务交付影响初筛与回归测试预填、知识问答增强与 `data-explorer` 模板 | 全员 |
+| [46-design-ecosystem-integration.md](46-design-ecosystem-integration.md) | 项目设计知识与助手、全模块联动方案（已实施）：内置助手 Skill 与零 AI 影响快查、设计/对比一键生成 PPT、任务交付影响初筛与回归测试预填、知识问答增强与 `data-explorer` 模板 | 全员 |
 
 ## 维护规则
 

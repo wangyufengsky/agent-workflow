@@ -778,6 +778,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
   const designs = createDesignsModule({
     repo: designsRepo,
+    databases: databases.service,
     attempts: attempts.service,
     projects: projects.service,
     inbox: inbox.service,

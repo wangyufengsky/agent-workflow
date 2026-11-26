@@ -53,6 +53,7 @@ it('通过 HTTP 轻量推荐、复制分析模板并保护设计引用的模板�
     techStack: ['JavaScript', 'React'],
   });
   expect(listed.body.items).toMatchObject([
+    { key: BuiltinDesignTemplateKey.DataExplorer, name: '数据模型与 SQL 链路探索', kind: DesignTemplateKind.Builtin },
     { key: BuiltinDesignTemplateKey.General, name: '架构探索', kind: DesignTemplateKind.Builtin },
     { key: BuiltinDesignTemplateKey.TransactionExplorer, name: '交易链路探索', kind: DesignTemplateKind.Builtin },
   ]);
@@ -93,6 +94,33 @@ it('通过 HTTP 轻量推荐、复制分析模板并保护设计引用的模板�
     await t.call(updateDesignTemplateOp, { key: base.key, name: '改内置' }),
     await t.call(deleteDesignTemplateOp, { key: base.key }),
   ]) {
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({ error: { code: ErrorCode.DesignTemplateReadonly } });
+  }
+});
+
+it('内置数据模型与 SQL 模板保留四章，多个源码目录不会展开额外章节', async () => {
+  const { project } = await addProject(t, {
+    files: {
+      'db/migrations/001.sql': 'CREATE TABLE orders (id BIGINT PRIMARY KEY);',
+      'src/api/orders.ts': 'export const endpoint = "/orders";',
+      'src/mappers/orders.ts': 'export const table = "orders";',
+    },
+  });
+  const key = BuiltinDesignTemplateKey.DataExplorer;
+  const design = await t.call(createDesignOp, { projectId: project.id, templateKey: key });
+  expect(design.status).toBe(201);
+  expect(design.body.templateSnapshot).toMatchObject({ key, name: '数据模型与 SQL 链路探索' });
+  expect(design.body.sections.map(({ title, selected }) => ({ title, selected }))).toEqual([
+    { title: '数据架构总览', selected: true },
+    { title: '核心实体与表结构', selected: true },
+    { title: 'SQL 读写与映射热点', selected: true },
+    { title: '事务边界与迁移风险', selected: true },
+  ]);
+  expect(t.fake.sessions).toHaveLength(0);
+  const update = await t.call(updateDesignTemplateOp, { key, name: '改内置' });
+  const remove = await t.call(deleteDesignTemplateOp, { key });
+  for (const result of [update, remove]) {
     expect(result.status).toBe(403);
     expect(result.body).toMatchObject({ error: { code: ErrorCode.DesignTemplateReadonly } });
   }

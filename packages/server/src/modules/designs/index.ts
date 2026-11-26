@@ -3,6 +3,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { DatabasesService } from '../databases/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -22,6 +23,7 @@ export function createDesignsModule(deps: {
   unit: UnitOfWork;
   attempts: AttemptsService;
   projects: ProjectsService;
+  databases: Pick<DatabasesService, 'linkedIds' | 'forProject' | 'investigationGrant' | 'describeByLink'>;
   inbox: InboxService;
   settings: SettingsService;
   prompts: Prompts;

@@ -362,6 +362,7 @@ export function sessionPermissionRules(
     web = false,
     browserTestSubmit,
     designKind,
+    designDatabaseMetadata,
     functionalTestNode,
     offline = false,
     allowedBash = [],
@@ -370,6 +371,7 @@ export function sessionPermissionRules(
     web?: boolean | undefined;
     browserTestSubmit?: BrowserTestSubmitTool | undefined;
     designKind?: DesignAttemptKind | undefined;
+    designDatabaseMetadata?: boolean | undefined;
     functionalTestNode?: FunctionalTestNode | undefined;
     offline?: boolean | undefined;
     allowedBash?: readonly string[] | undefined;
@@ -424,9 +426,12 @@ export function sessionPermissionRules(
     ];
   }
   if (base === SessionAgent.Designer) {
-    const tools = designKind === undefined ? [] : designAttemptTools(designKind);
+    const tools = designKind === undefined ? [] : designAttemptTools(designKind, designDatabaseMetadata);
     return [
       ...readonlyBashRules(),
+      ...(tools.includes(McpToolName.DbDescribe)
+        ? [{ permission: 'skill', action: 'allow' as const, pattern: SkillName.DbReadonly }]
+        : []),
       ...tools.map((tool) => ({ permission: `${MCP_TOOL_PREFIX}${tool}`, action: 'allow' as const, pattern: '*' })),
     ];
   }
