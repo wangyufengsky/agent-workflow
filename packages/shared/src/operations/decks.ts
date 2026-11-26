@@ -55,7 +55,8 @@ export const createDeckOp = defineOperationContract({
   title: 'op.decks.create',
   description:
     'Create a PPT from a brief and material such as pasted text, a task result, a specific document or spreadsheet ' +
-    'version (artifact with taskId and artifactVersionId), or a knowledge conversation. ' +
+    'version (artifact with taskId and artifactVersionId), a knowledge conversation, a project design (design with refId), ' +
+    'or a completed Git review or comparison (git_review with refId). ' +
     'The user confirms the outline before pages are made.',
   input: createDeckRequestSchema,
   output: deckSchema,

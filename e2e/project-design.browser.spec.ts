@@ -20,6 +20,7 @@ import {
 import { type APIRequestContext, type Browser, expect, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { createProject, type E2EProject, type FakeStep, git, patchSettings } from './helpers.ts';
+import { createPptFromSource } from './ppt-source-journey.ts';
 import { inspectPage, WALKTHROUGH_DIR } from './walkthrough.ts';
 
 const IMPLEMENTATION = 'src/refunds.ts';
@@ -447,6 +448,16 @@ test('设计工作台标记变动影响，定位章节时不会启动 AI', async
   await expect(locate).toHaveCount(0);
   await expect(directory.getByText('受影响', { exact: true })).toHaveCount(0);
   expect((await design(request, id)).runs.map(({ id }) => id)).toEqual(initialRuns);
+
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.locator('summary[aria-label="阅读与复审设置"]').click();
+  await createPptFromSource(page, request, info, project, {
+    kind: 'design',
+    refId: id,
+    title: (await design(request, id)).title,
+    theme: ThemeId.Codex,
+    brief: /架构与交易设计汇报/,
+  });
 });
 
 test.describe('项目设计阅读页主题走查', () => {

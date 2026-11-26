@@ -30,10 +30,12 @@ const KIND_ICON: Record<DeckMaterialKind, IconName> = {
   [DeckMaterialKind.Artifact]: 'file',
   [DeckMaterialKind.Knowledge]: 'book',
   [DeckMaterialKind.Web]: 'external',
+  [DeckMaterialKind.Design]: 'layers',
+  [DeckMaterialKind.GitReview]: 'git',
 };
 
 /** The material's name: a task or conversation is looked up for its title. */
-function MaterialTitle({ material }: { material: DeckMaterialInput }) {
+function MaterialTitle({ material, linkedTitle }: { material: DeckMaterialInput; linkedTitle: string | undefined }) {
   const fromTask = material.kind === DeckMaterialKind.Task || material.kind === DeckMaterialKind.Artifact;
   const task = useQuery({
     ...taskQuery(fromTask ? material.taskId : ''),
@@ -61,6 +63,9 @@ function MaterialTitle({ material }: { material: DeckMaterialInput }) {
       return <>{conversation.data?.title ?? '…'}</>;
     case DeckMaterialKind.Web:
       return <>{material.url}</>;
+    case DeckMaterialKind.Design:
+    case DeckMaterialKind.GitReview:
+      return <>{linkedTitle ?? '…'}</>;
   }
 }
 
@@ -189,6 +194,8 @@ export function MaterialsPicker({
   materials,
   onProject,
   onChange,
+  linkedTitle,
+  comparison,
 }: {
   projects: readonly ProjectDTO[];
   projectId: string | null;
@@ -196,6 +203,8 @@ export function MaterialsPicker({
   materials: readonly DeckMaterialInput[];
   onProject(projectId: string | null): void;
   onChange(materials: DeckMaterialInput[]): void;
+  linkedTitle: string | undefined;
+  comparison: boolean;
 }) {
   const [adding, setAdding] = useState<Adding>(null);
   const add = (material: DeckMaterialInput) => {
@@ -255,22 +264,27 @@ export function MaterialsPicker({
               <span className="hint">{C.projectCode}</span>
             </li>
           )}
-          {materials.map((material, i) => (
-            // Materials are only appended and removed; their position is their identity here.
-            // biome-ignore lint/suspicious/noArrayIndexKey: see above
-            <li key={i} className={styles.material}>
-              <Icon name={KIND_ICON[material.kind]} size="sm" />
-              <span className="ellipsis">
-                <MaterialTitle material={material} />
-              </span>
-              <span className="hint">{C.materialKind[material.kind]}</span>
-              <IconButton
-                icon="x"
-                label={C.remove(C.materialKind[material.kind])}
-                onClick={() => onChange(materials.filter((_, j) => j !== i))}
-              />
-            </li>
-          ))}
+          {materials.map((material, i) => {
+            const kindLabel =
+              material.kind === DeckMaterialKind.GitReview && comparison
+                ? C.compareMaterial
+                : C.materialKind[material.kind];
+            return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: 素材按位置删除，允许多份相同素材。
+              <li key={i} className={styles.material}>
+                <Icon name={KIND_ICON[material.kind]} size="sm" />
+                <span className="ellipsis">
+                  <MaterialTitle material={material} linkedTitle={linkedTitle} />
+                </span>
+                <span className="hint">{kindLabel}</span>
+                <IconButton
+                  icon="x"
+                  label={C.remove(kindLabel)}
+                  onClick={() => onChange(materials.filter((_, j) => j !== i))}
+                />
+              </li>
+            );
+          })}
         </ul>
       )}
       <span className="hint">{C.materialsHint}</span>

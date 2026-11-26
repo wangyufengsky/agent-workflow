@@ -79,7 +79,7 @@ flowchart LR
 - **界面入口**：
   - 项目设计工作台顶栏「更多」菜单增加 **「生成 PPT」**（仅存在已完成章节时可用），跳转 `/decks/new` 并预填 `material = { kind: 'design', refId: design.id }` 与默认主题提示（「架构/交易设计汇报」）；
   - Git 审查与双版本对比报告页头增加 **「生成 PPT」**（仅已成功报告可用），跳转 `/decks/new` 并预填 `material = { kind: 'git_review', refId: review.id }`（例如「版本变更评审 / 影响评估 PPT」）。
-- **助手直通**：`decks.create` 本身已开放给助手，用户直接说*「把刚才 `v1.7.5` 到 `v1.8.0` 的对比报告做成一页 8 页的发版评审 PPT」*即可一键起草大纲。
+- **助手直通**：`decks.create` 本身已开放给助手，用户可说「把刚才 `v1.7.5` 到 `v1.8.0` 的对比报告做成 8 页发版评审 PPT」。资料含设计或审查报告时逐次确认，用户确认后开始起草大纲。
 
 ---
 
@@ -135,7 +135,7 @@ flowchart LR
 ### 验收重点（遵循 [07-testing-standards.md](07-testing-standards.md)）
 
 - [x] **Phase A**：助手在只读场景下调用 `designs.staleness` / `designs.lookupImpact` 不弹写确认；发起 `compare` 或 `incrementalUpdate` 正确走确认卡；助手无法调用 `gitReviews.updateFindingStatus`。
-- [ ] **Phase B**：从项目设计与双版本对比报告均可一键创建 PPT，生成后更新项目设计不影响已冻结的 PPT 素材内容。
+- [x] **Phase B**：从项目设计与双版本对比报告均可一键创建 PPT，生成后更新项目设计不影响已冻结的 PPT 素材内容。
 - [ ] **Phase C**：任务交付页展示零 AI 影响初筛且不消耗模型额度；合入后展示过期提示且不自动触发 AI；回归建议预填功能测试任务可正常启动。
 - [ ] **Phase D**：绑定项目的知识问答在存在设计时注入受控预算摘要，无设计时行为不变。
 - [ ] **Phase E**：`data-explorer` 在有/无只读数据库连接两种环境下均可正常生成设计，修改 DDL/SQL 后 Git 审查能追溯到受影响表与交易。

@@ -9,6 +9,7 @@ import {
   gitReviewSchema,
   McpToolName,
   OPENCODE_AGENT_NAME,
+  ThemeId,
 } from '@aw/shared';
 import { type APIRequestContext, type APIResponse, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
@@ -20,6 +21,7 @@ import {
   queueCodeReviewerTurn,
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
+import { createPptFromSource } from './ppt-source-journey.ts';
 
 const feePath = 'src/calc-fee.ts';
 const settlePath = 'src/settle-batch.ts';
@@ -126,7 +128,7 @@ async function designFixture(request: APIRequestContext, project: E2EProject): P
   return load();
 }
 
-test('冻结的审查范围、设计下钻、人工处置与离线导出在亮暗主题下可用', async ({ page, request, browser }) => {
+test('冻结的审查范围、设计下钻、人工处置与离线导出在亮暗主题下可用', async ({ page, request, browser }, info) => {
   test.setTimeout(60_000);
   await patchSettings(request, { 'ui.theme': 'default', 'ui.mode': 'pro' });
   await page.setViewportSize({ width: 1600, height: 1050 });
@@ -376,6 +378,14 @@ test('冻结的审查范围、设计下钻、人工处置与离线导出在亮�
   await expect(
     page.getByRole('article', { name: moduleTitle, exact: true }).getByRole('button', { name: '跳到设计节点' }),
   ).toBeDisabled();
+
+  await createPptFromSource(page, request, info, project, {
+    kind: 'git_review',
+    refId: review.id,
+    title: review.label,
+    theme: ThemeId.Codex,
+    brief: /发版评审/,
+  });
 });
 
 test('工作区证据变化后提示历史报告差异，仍可阅读旧版基线', async ({ page, request }) => {

@@ -117,13 +117,15 @@ export type ListDecksQuery = z.infer<typeof listDecksQuerySchema>;
 
 const materialText = z.string().min(1).max(DECK_MATERIALS_MAX_CHARS);
 
-/** Material given when creating a PPT (23 §2.3); tasks, conversations and web pages are snapshotted by the backend. */
+/** Material given when creating a PPT (23 §2.3); the backend freezes the source text at creation. */
 export const deckMaterialInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(DeckMaterialKind.Text), content: materialText }),
   z.object({ kind: z.literal(DeckMaterialKind.File), title: z.string().trim().min(1).max(200), content: materialText }),
   z.object({ kind: z.literal(DeckMaterialKind.Task), taskId: z.string() }),
   z.object({ kind: z.literal(DeckMaterialKind.Artifact), taskId: z.string(), artifactVersionId: z.uuid() }),
   z.object({ kind: z.literal(DeckMaterialKind.Knowledge), conversationId: z.string() }),
+  z.object({ kind: z.literal(DeckMaterialKind.Design), refId: z.string().min(1) }),
+  z.object({ kind: z.literal(DeckMaterialKind.GitReview), refId: z.string().min(1) }),
   z.object({ kind: z.literal(DeckMaterialKind.Web), url: readWebsiteRequestSchema.shape.url }),
 ]);
 export type DeckMaterialInput = z.infer<typeof deckMaterialInputSchema>;

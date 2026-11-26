@@ -1,4 +1,5 @@
 import {
+  DeckMaterialKind,
   DesignKnowledgeMatch,
   DesignStalenessState,
   DiffSide,
@@ -22,6 +23,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { Tabs } from '../../components/tabs.tsx';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import { GIT_REVIEW_COPY as R } from '../../copy/git-review.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
 import { designQuery, designStalenessQuery } from '../designs/designs.queries.ts';
 import styles from './git.module.css';
 import { gitReviewQuery, useUpdateGitFindingStatus } from './git.queries.ts';
@@ -281,6 +283,14 @@ export function ReviewResult({
   return (
     <>
       <div className={report.toolbar}>
+        <Link
+          to={ROUTES.deckNew}
+          search={{ kind: DeckMaterialKind.GitReview, refId: review.id, projectId }}
+          className="btn sm"
+        >
+          <Icon name="slides" size="sm" />
+          {PPT_COPY.makeLinkedDeck}
+        </Link>
         <Button size="sm" onClick={() => setExportOpen(true)}>
           {exportTitle}
         </Button>

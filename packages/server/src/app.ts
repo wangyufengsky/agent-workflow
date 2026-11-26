@@ -710,20 +710,6 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   // Built-in composition templates of this app version, like the built-in workflows (34 §15.3).
   initiatives.service.templates.syncBuiltin(BUILTIN_INITIATIVE_TEMPLATES);
-  const decks = createDecksModule({
-    db: database.db,
-    unit,
-    clock,
-    attempts: attempts.service,
-    projects: projects.service,
-    tasks: tasks.service,
-    knowledge: knowledge.service,
-    browser: browser.service,
-    inbox: inbox.service,
-    settings: settings.service,
-    prompts,
-    dataDir: config.dataDir,
-  });
   const scheduler = createScheduler({
     tasks: tasks.service,
     nodes: nodes.service,
@@ -794,6 +780,22 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     prompts,
   });
   server.addHook('preClose', async () => designs.service.close());
+  const decks = createDecksModule({
+    db: database.db,
+    unit,
+    clock,
+    attempts: attempts.service,
+    projects: projects.service,
+    tasks: tasks.service,
+    knowledge: knowledge.service,
+    design: designs.service.get,
+    gitReview: gitReviews.service.get,
+    browser: browser.service,
+    inbox: inbox.service,
+    settings: settings.service,
+    prompts,
+    dataDir: config.dataDir,
+  });
   const mcp = createMcpModule({
     databaseInvestigations,
     events,
