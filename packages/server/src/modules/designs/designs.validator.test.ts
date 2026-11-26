@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rename, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  DESIGN_MAX_SOURCE_ISSUES,
   DesignDiagramKind,
   DesignEvidenceClass,
   DesignReviewState,
@@ -72,6 +73,30 @@ it('章节只允许本次目标和授权范围，证据行号按真实 CRLF 文�
       issue(['blocks', 0, 'lineEnd']),
     );
   }
+});
+
+it('同一章的引用错误按上限返回，每个越界代码块只报告行范围问题', async () => {
+  const context = await scopedProject();
+  const block = {
+    type: 'code',
+    language: 'typescript',
+    code: 'wrong',
+    relPath: source,
+    lineStart: 3,
+    lineEnd: 5,
+  } as const;
+  const blocks = Array.from({ length: DESIGN_MAX_SOURCE_ISSUES + 1 }, () => block);
+  await expect(validateDesignSection({ ...section, blocks }, context)).rejects.toMatchObject({
+    details: {
+      issues: Array.from({ length: DESIGN_MAX_SOURCE_ISSUES }, (_, index) => ({
+        path: ['blocks', index, 'lineEnd'],
+        relPath: source,
+        lineStart: 3,
+        lineEnd: 5,
+        fileLineCount: 2,
+      })),
+    },
+  });
 });
 
 it('关系图验证端点、静态证据和显式业务重试自环', async () => {

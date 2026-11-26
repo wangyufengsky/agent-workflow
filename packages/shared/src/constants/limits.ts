@@ -276,6 +276,7 @@ export const DESIGN_MAX_SECTIONS = 64;
 /** 每个复审会话最多读取的完整章节数。 */
 export const DESIGN_REVIEW_BATCH_SIZE = 4;
 export const DESIGN_INSTRUCTION_MAX_CHARS = 8000;
+export const DESIGN_MAX_SOURCE_ISSUES = 8;
 export const DESIGN_SCAN_MAX_FILE_BYTES = 512 * 1024;
 export const DESIGN_DIAGRAM_MAX_NODES = 100;
 export const DESIGN_DIAGRAM_MAX_EDGES = 250;
