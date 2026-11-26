@@ -1,4 +1,4 @@
-import { EMPTY_SECTION, PromptName, renderTemplate } from '@aw/builtin';
+import { BuiltinWorkflowKey, EMPTY_SECTION, PromptName, renderTemplate } from '@aw/builtin';
 import {
   AcceptanceCheckKind,
   AppError,
@@ -374,6 +374,10 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         return;
       }
       const submitTool = ctx.browserTest === true ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;
+      const designContext =
+        ctx.workflowKey === BuiltinWorkflowKey.DetailedDesign && node.dependsOn.length === 0
+          ? deps.projectDesignContext(ctx.projectId, ctx.baseCommit)
+          : '';
       const prompt = renderTemplate(prompts[PromptName.StartExecute], {
         taskKey: ctx.taskKey,
         taskTitle: ctx.taskTitle,
@@ -402,7 +406,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         title: `${ctx.taskKey} · ${node.title}`,
         model: role.model ?? settings.get('ai.defaultModel'),
         system: role.prompt,
-        prompt,
+        prompt: prompt + designContext,
         ...(ctx.browserTest === true ? { browserTestSubmit: submitTool } : {}),
         ...(ctx.functionalTest === true && isFunctionalTestNode(node.key) ? { functionalTestNode: node.key } : {}),
         // A step of a read-only role (the code review's reviewer) may run the project check like a review (D51).

@@ -1,13 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DesignSectionKind, type DesignTemplate, TRANSACTION_EXPLORER_KEY } from '@aw/shared';
+import {
+  DATA_EXPLORER_KEY,
+  DesignSectionKind,
+  type DesignTemplate,
+  GENERAL_DESIGN_TEMPLATE_KEY,
+  TRANSACTION_EXPLORER_KEY,
+} from '@aw/shared';
 
-export const BuiltinDesignTemplateKey = { General: 'general', TransactionExplorer: TRANSACTION_EXPLORER_KEY } as const;
+export const BuiltinDesignTemplateKey = {
+  General: GENERAL_DESIGN_TEMPLATE_KEY,
+  TransactionExplorer: TRANSACTION_EXPLORER_KEY,
+  DataExplorer: DATA_EXPLORER_KEY,
+} as const;
 export type BuiltinDesignTemplateKey = (typeof BuiltinDesignTemplateKey)[keyof typeof BuiltinDesignTemplateKey];
 
 export type BuiltinDesignTemplate = Omit<DesignTemplate, 'kind' | 'updatedAt'> & { key: BuiltinDesignTemplateKey };
 
-const { Overview, Architecture, Module, Flow } = DesignSectionKind;
+const { Overview, Architecture, Module, Flow, Custom } = DesignSectionKind;
 const blueprints: Omit<BuiltinDesignTemplate, 'focusPrompt'>[] = [
   {
     // 保留原有通用模板键。已有设计使用创建时的模板快照。
@@ -32,6 +42,18 @@ const blueprints: Omit<BuiltinDesignTemplate, 'focusPrompt'>[] = [
       { kind: Flow, title: '交易档案与处理链路', scopeHint: '.' },
       { kind: DesignSectionKind.Custom, title: '字段流转与报文映射', scopeHint: '.' },
       { kind: DesignSectionKind.Custom, title: '异常处理与事务边界', scopeHint: '.' },
+    ],
+  },
+  {
+    key: BuiltinDesignTemplateKey.DataExplorer,
+    name: '数据模型与 SQL 链路探索',
+    description: '从迁移、实体与 SQL 追到服务和交易，梳理数据关系、读写路径、事务边界与迁移风险。',
+    matchHints: [],
+    defaultSections: [
+      { kind: Overview, title: '数据架构总览', scopeHint: '.' },
+      { kind: Custom, title: '核心实体与表结构', scopeHint: '.' },
+      { kind: Custom, title: 'SQL 读写与映射热点', scopeHint: '.' },
+      { kind: Flow, title: '事务边界与迁移风险', scopeHint: '.' },
     ],
   },
 ];

@@ -4,12 +4,16 @@ import {
   AppError,
   DeliveryStatus,
   DeliveryStrategy,
+  DesignSectionKind,
   type DiffDTO,
   ErrorCode,
   type FileDiffDTO,
+  GitImpactTargetKind,
+  type TaskDesignImpactDTO,
   TaskStatus,
   WorktreeStatus,
 } from '@aw/shared';
+import { screenDesignImpact } from '../designs/index.ts';
 import {
   commitsExist,
   diffCommits,
@@ -34,7 +38,7 @@ export function taskDiffBase(worktreePath: string, targetBranch: string): Promis
 
 /** Diffs of a task's worktree (11 §5) and of its nodes' commits (11 §6). */
 export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
-  const { worktrees, nodes, projects, deliveries } = deps;
+  const { worktrees, nodes, projects, deliveries, readyDesignKnowledge } = deps;
 
   function readyWorktree(task: Task): Worktree {
     const worktree = worktrees.findByTask(task.id);
@@ -72,20 +76,60 @@ export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
     return { repo, base, head };
   }
 
+  async function diffOf(task: Task) {
+    const range = await deliveryRange(task);
+    if (range !== null)
+      return { base: range.base, files: await diffCommits(range.repo, range.base, range.head), worktreePath: null };
+    const { path } = readyWorktree(task);
+    const base = await taskDiffBase(path, task.baseBranch);
+    return { base, files: await diffWorktree(path, base), worktreePath: path };
+  }
+
   return {
+    async designImpact(taskId: string): Promise<TaskDesignImpactDTO | null> {
+      const task = state.get(taskId);
+      if (!readyDesignKnowledge.hasReadyDesign(task.projectId)) return null;
+      const { base, files } = await diffOf(task);
+      // 设计描述改动前的代码。只有干净快照与 Diff 基线同一提交时才精确匹配。
+      const selection = readyDesignKnowledge.read(task.projectId, base);
+      if (selection.knowledge === null) return null;
+      const { knowledge, match } = selection;
+      const { candidates, uncoveredPathSet, truncated } = screenDesignImpact(
+        { ...selection, worktreeFresh: false },
+        files,
+      );
+      const moduleCount = candidates.filter(
+        ({ targetKind, targetId }) =>
+          targetKind === GitImpactTargetKind.Submodule ||
+          (targetKind === GitImpactTargetKind.Section &&
+            knowledge.sections.get(targetId)?.kind === DesignSectionKind.Module),
+      ).length;
+      const transactionCount = candidates.filter(
+        ({ targetKind }) => targetKind === GitImpactTargetKind.Transaction,
+      ).length;
+      return {
+        designId: knowledge.designId,
+        snapshotSha: knowledge.sourceSnapshot.commitSha,
+        dirty: knowledge.sourceSnapshot.dirty,
+        coverage: knowledge.coverage,
+        candidates,
+        uncoveredPaths: [...uncoveredPathSet],
+        truncated,
+        match,
+        moduleCount,
+        transactionCount,
+      };
+    },
+
     async diff(taskId: string): Promise<DiffDTO> {
       const task = state.get(taskId);
-      const range = await deliveryRange(task);
-      if (range !== null) return { base: range.base, files: await diffCommits(range.repo, range.base, range.head) };
-      const worktree = readyWorktree(task);
-      const base = await taskDiffBase(worktree.path, task.baseBranch);
-      const files = await diffWorktree(worktree.path, base);
-      if (task.status !== TaskStatus.Running) return { base, files };
+      const { base, files, worktreePath } = await diffOf(task);
+      if (task.status !== TaskStatus.Running || worktreePath === null) return { base, files };
       let newest = -1;
       let latestPath: string | undefined;
       for (const file of files) {
         // 文件可能在 Git 列出清单之后被移动。删除取父目录的更新时间。
-        const path = join(worktree.path, file.path);
+        const path = join(worktreePath, file.path);
         const stats = await lstat(file.status === 'deleted' ? dirname(path) : path).catch(
           (error: NodeJS.ErrnoException) => {
             if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return undefined;

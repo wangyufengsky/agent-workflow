@@ -65,8 +65,9 @@ jobs:
       # Windows runner 只能运行 Windows 容器；数据库测试由两种 Linux 架构覆盖。
       - name: test:int (without the database tests)
         if: runner.os == 'Windows'
-        shell: bash
-        run: pnpm test:int --shard=${{ matrix.shard }}/2 $(git ls-files '*.int.test.ts' | grep -v '/databases\..*int.test.ts$')
+        env:
+          AW_TEST_WITHOUT_DB_CONTAINERS: '1'
+        run: pnpm test:int --shard=${{ matrix.shard }}/2
 
   e2e:
     name: e2e (${{ matrix.os }}, ${{ matrix.shard }}/2)
@@ -215,7 +216,9 @@ jobs:
         run: pnpm test
       - name: test:int (without the database tests, see the int job)
         if: ${{ !cancelled() }}
-        run: pnpm test:int $(git ls-files '*.int.test.ts' | grep -v '/databases\..*int.test.ts$')
+        env:
+          AW_TEST_WITHOUT_DB_CONTAINERS: '1'
+        run: pnpm test:int
 
   macos-browser-and-smoke:
     name: browser and smoke (macos-latest)

@@ -4,7 +4,9 @@ import {
   AttemptKind,
   type AttemptSummaryDTO,
   type DesignDTO,
+  DesignKnowledgeMatch,
   DesignRunKind,
+  DesignStatus,
   type DesignSummaryDTO,
   designStatusOf,
   ErrorCode,
@@ -14,6 +16,7 @@ import {
 import type { AttemptsService } from '../attempts/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
+import { type KnowledgeSelection, readProjectKnowledge } from './designs.knowledge.ts';
 import type { createDesignsRepo, DesignRun, ProjectDesign } from './designs.repo.ts';
 import type { DesignRuns } from './designs.runs.ts';
 
@@ -53,12 +56,7 @@ function summaryOf(
     id: design.id,
     title: design.title,
     projectId: design.projectId,
-    status: designStatusOf({
-      outlineConfirmed: design.outlineConfirmedAt !== null,
-      totalSections,
-      doneSections,
-      latestRun: latest === null ? null : { kind: latest.kind, status: latest.attempt.status },
-    }),
+    status: statusOf(design, { totalSections, doneSections }, latest),
     templateKey: design.templateKey,
     templateName: design.templateSnapshot.name,
     branch,
@@ -67,6 +65,49 @@ function summaryOf(
     analyzableCount,
     updatedAt: design.updatedAt,
     ...refs,
+  };
+}
+
+function statusOf(design: ProjectDesign, counts: SectionCounts, latest: ReturnType<typeof attemptOf> | null) {
+  return designStatusOf({
+    outlineConfirmed: design.outlineConfirmedAt !== null,
+    ...counts,
+    latestRun: latest === null ? null : { kind: latest.kind, status: latest.attempt.status },
+  });
+}
+
+/** 工作流和交付只使用当前为 ready 的设计。历史 Git 审查允许部分完成的参考设计。 */
+export function createReadyDesignKnowledgeReader(repo: DesignQueryDeps['repo'], attempts: DesignQueryDeps['attempts']) {
+  function readyDesigns(projectId: string) {
+    const candidates = repo.listKnowledgeDesigns(projectId);
+    if (candidates.length === 0) return [];
+    const ids = candidates.map(({ id }) => id);
+    const counts = new Map(repo.sectionCounts(ids).map((count) => [count.designId, count]));
+    const runs = new Map(repo.latestRuns(ids).map((run) => [run.designId, run]));
+    const summaries = attempts.summaries([...runs.values()].map(({ attemptId }) => attemptId));
+    return candidates.filter((design) => {
+      const count = counts.get(design.id);
+      if (count === undefined) throw new Error(`Design ${design.id} has no selected sections`);
+      const run = runs.get(design.id);
+      return statusOf(design, count, run === undefined ? null : attemptOf(run, summaries)) === DesignStatus.Ready;
+    });
+  }
+
+  return {
+    hasReadyDesign: (projectId: string) => readyDesigns(projectId).length > 0,
+    read(projectId: string, targetSha: string | null): KnowledgeSelection {
+      const ready = readyDesigns(projectId);
+      const latest = ready[0];
+      if (latest === undefined) return { match: DesignKnowledgeMatch.Missing, knowledge: null };
+      const exactIds =
+        targetSha === null
+          ? new Set<string>()
+          : new Set(repo.listKnowledgeDesigns(projectId, targetSha).map(({ id }) => id));
+      const exact = ready.find(({ id }) => exactIds.has(id));
+      return exact === undefined
+        ? { match: DesignKnowledgeMatch.Reference, knowledge: readProjectKnowledge(repo, latest) }
+        : { match: DesignKnowledgeMatch.Exact, knowledge: readProjectKnowledge(repo, exact) };
+    },
   };
 }
 

@@ -45,7 +45,7 @@ skill 是按需加载的知识包：会话里只列出名字和一句描述，�
 | D209 | 首版每个 skill 只有一个 `SKILL.md`（不超过 `SKILL_MAX_BYTES` 8 KB），不带附带文件，不放开 `external_directory` | 附带文件在安装目录里，属于 worktree 之外；要读就得给每个 agent 放行安装目录的 `external_directory`，执行者与助手还有 `edit: allow`，会连带允许改动应用自带的 skill。单文件已经够用，正文仍远小于把它塞进提示词的代价 |
 | D210 | 助手的 skill 先做，包括把助手提示词里画图、预览与浏览器、需求计划三段迁移成 skill；任务会话（规划、执行、评审）提示词里的浏览器检查段落之后再迁移（§5.3）。每项迁移：提示词保留触发句与规则并点名 skill，做法移进 skill；以 live 测试对比迁移前后同一场景的行为 | 助手的提示词最大、增长最快，收益最高；任务会话的浏览器检查直接影响页面改动的验收，行为已经稳定，迁移风险更大，放后。保留触发句让迁移后「什么时候做」不变，变的只是「怎么做」的说明何时读入 |
 | D211 | skill 用英文写，与协议提示词一致；静态文件，不做 `{{}}` 模板替换；名字用 `aw-` 前缀，与目录名相同 | opencode 直接读文件，没有渲染这一步，动态信息由工具和对话上下文提供；英文是提示词的既有约定（文档与界面才用中文）；前缀让白名单与用户自己的 skill 不会重名 |
-| D212 | 每个 agent 分配的 skill 不超过 `AGENT_SKILLS_MAX` 9 个；超过时先合并相近的 skill。助手的 `ASSISTANT_SKILLS_MAX` 为 10 个，其中包含识图 Skill | 模型靠列表里的描述决定加载哪个，列表越长越容易选错或漏选；每条描述也在每个会话里占上下文。助手自主性最高、能力最多，最容易越过这个数 |
+| D212 | 每个任务类 agent 分配的 skill 不超过 `AGENT_SKILLS_MAX` 9 个；超过时先合并相近的 skill。助手的 `ASSISTANT_SKILLS_MAX` 为 11 个，其中包含识图和项目设计与 Git 审查 Skill | 模型靠列表里的描述决定加载哪个，列表越长越容易选错或漏选；每条描述也在每个会话里占上下文。助手自主性最高、能力最多，最容易越过这个数 |
 
 ## 5. 需要哪些 skill
 
@@ -62,6 +62,7 @@ skill 是按需加载的知识包：会话里只列出名字和一句描述，�
 | `aw-assistant-memory` | 新增 | 用户明确要求跨对话记住、修改或忘记内容（点名） | 判断个人或项目范围，整理正文并经 `memory_create` 提议，逐条等待确认；修改和删除由用户在左侧「助手记忆」页面完成。 |
 | `aw-image-analysis` | 与任务会话共用，见 [30 §7](30-attachments.md#7-图像处理员) | 附图包含回答所需的视觉证据 | 按附件 ID 询问图像处理员，引用原图并说明不确定处 |
 | `aw-db-readonly` | 新增（与任务会话共用，§5.2） | 问题涉及数据库里的数据 | 见 §5.2；助手的工具名是 `agent-workflow-app_databases_*`，数据库属于专业模式，简单模式下提示切换 |
+| `aw-design-git-review` | [设计生态联动 §2](46-design-ecosystem-integration.md#2-助手感知与协同闭环phase-a) | 用户询问设计过期、改动影响、Git 审查或双版本对比（点名） | 专业模式下先用只读工具检查过期或初筛影响，说明快照基线、覆盖范围和未覆盖路径。仅在用户要求时发起审查、版本对比或设计增量更新，沿用确认流程。审查问题的处置由用户在 Git 工作台完成 |
 
 团队分析段不迁移：它主要是规则（按数字回答、不打分不排名、分析会把代码发给模型），做法部分很短。
 
@@ -221,8 +222,9 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 - 助手协议在回答验收、重新核验或交付问题前点名 `aw-task-delivery`。涉及预览和修改时使用 `aw-assistant-preview`。
 - 执行协议按实际步骤匹配 `aw-backend-development` 和 `aw-frontend-development`。前端首版和多轮修改的步骤指令也点名前端 Skill。
 - 文档与表格任务每次从批注生成修改步骤时，步骤指令点名 `aw-artifact-revision`。
+- 「数据模型与 SQL 链路探索」的模板提示词在生成或重写章节需要核验元数据时点名 `aw-db-readonly`。
 
-其余 skill（`aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs`、`aw-db-readonly`、`aw-offline-network`）靠描述触发，不点名。
+其他场景的 `aw-db-readonly` 以及 `aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs` 和 `aw-offline-network` 靠描述触发。
 
 ### 7.5 生效与更新
 
@@ -317,3 +319,5 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 ## 项目设计分析
 
 `aw-design-analysis` 专供 `aw-designer` 在梳理大纲、生成或重写模块功能和独立复审时加载。每个生成会话聚焦一个章节。Skill 指导分析员从入口追踪功能、区分组成与依赖、用源码行支撑结论。章节数据经既有 `submit_design_section` 提交。
+
+「数据模型与 SQL 链路探索」生成或重写章节的会话开放元数据核验时，`aw-designer` 可加载 `aw-db-readonly`，使用 `db_list_connections` 和 `db_describe` 核验项目关联的只读连接及表结构。分析员的权限仅覆盖元数据。缺少连接或元数据不可用时，按仓库里的迁移、实体与 SQL 分析并标记证据缺口。

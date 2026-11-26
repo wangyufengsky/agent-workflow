@@ -78,7 +78,7 @@
   - **项目级「总是允许」**（D101）：opencode 的「总是允许」只对当前会话生效，且按它的命令前缀表放得很宽（`unzip -l x.jar` → `unzip *`）。用户在「需要你处理」中对 bash 请求选「总是允许」时，后端在回复 opencode 之外，把请求的每条子命令按「程序 + 开头的选项（到第一个不以 `-` 开头的参数为止）+ ` *`」记到该尝试所属项目（`attempts.project_id`）的 `project_bash_rules`（`projectBashPatterns`：`unzip -l x.jar` → `unzip -l *`、`./scripts/mvn.sh -q test 2>&1` → `./scripts/mvn.sh -q *`、`javap -p -cp "$JAR" Foo` → `javap -p -cp *`、`make` → `make *`），所以批准列表不等于批准解压。Git（模型不写 Git，12 §1）与前置变量赋值（`PATH=… mvn -v`，D64）的子命令不记，只留在 opencode 的会话里。项目之后新建的只读会话（规划、评审、研究员、PPT 写作者，以及 `ask` 策略的执行者）带上这些模式（第 4a、6 步）；研究员与 PPT 写作者在项目主仓库中运行（D69），这正是模式要窄的原因。`auto` 策略的执行者本来就放行 Git 以外的命令，规则不变。已在运行的会话不受撤销影响（D35）。没有项目的调试运行不记。
 - 知识研究员（v1.1，18 §5.1）的会话级规则：不带检查命令的 `readonlyBashRules()`；对话打开网络检索时末尾再加 `webfetch *` 与 `websearch *` allow（离线环境只加 `webfetch *`，D168）（agent 规则在前、会话规则在后，最后匹配生效；被整体 deny 的工具不出现在工具列表中，见 §8）。会话目录为项目主仓库，不建 worktree。
 - PPT 写作者（v1.2，23 §7.1）的会话级规则：不带检查命令的 `readonlyBashRules()`，没有网络；会话目录为项目仓库，没有项目时为 `<数据目录>/ppt/blank/`。
-- 项目设计使用 `aw-designer`（44 §7.1）。原生工具限于读文件、路径查找、搜索和会话只读 Bash 规则，不读取项目已保存的 Bash 授权。执行 MCP 允许对应阶段的提交工具、当前设计范围内的 `list_design_files` 和 `read_design_section`、`report_progress` 和当前物理会话的 `recall`。生成、重写章节时还可用 `get_submission_guide` 查询章节提交示例与本次尝试最近的退回原因。直接调用其他内置执行 MCP 工具返回 `MCP_TOOL_NOT_ALLOWED`。用户配置的外部 MCP 依照 OpenCode 的项目及全局权限提供给设计会话。
+- 项目设计使用 `aw-designer`（44 §7.1）。原生工具限于读文件、路径查找、搜索和会话只读 Bash 规则，不读取项目已保存的 Bash 授权。执行 MCP 允许对应阶段的提交工具、当前设计范围内的 `list_design_files` 和 `read_design_section`、`report_progress` 和当前物理会话的 `recall`。生成、重写章节时还可用 `get_submission_guide` 查询章节提交示例与本次尝试最近的退回原因。内置 `data-explorer` 模板生成或修订章节时，若项目已关联数据库，还可用 `db_list_connections` 和 `db_describe` 核验表、列和索引，权限按实际尝试和当前项目关联核对。直接调用其他内置执行 MCP 工具返回 `MCP_TOOL_NOT_ALLOWED`。用户配置的外部 MCP 依照 OpenCode 的项目及全局权限提供给设计会话。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。
 - **应用助手**（15 §2）：会话 bash 规则统一 `*: ask`，不继承任务的只读命令自动放行；真实 opencode 1.19 的 `head` / `rg` 等命令可能不检查 `external_directory`。原生 `task` 子代理禁用，因为不完整继承父助手权限；应用 `tasks_create` 仍按操作清单的确认策略执行。
 - 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。
@@ -185,8 +185,8 @@ Worker 在临时目录中使用本次请求实际选定的模型和对应项目 
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
 | `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message · team_analysis · breakdown · design_outline · design_generate · design_revise · design_review | 上报一句当前进展 |
-| `db_list_connections` | plan · execute · review · research | 列出项目关联的数据库 |
-| `db_describe` | plan · execute · review · research | 查看表结构 |
+| `db_list_connections` | plan · execute · review · research · data-explorer 的 design_generate / design_revise | 列出项目关联的数据库 |
+| `db_describe` | plan · execute · review · research · data-explorer 的 design_generate / design_revise | 查看表结构 |
 | `db_query` | plan · execute · review · research | 只读查询 |
 | `submit_answer` | research | 提交带引用的回答（v1.1 知识问答，18 §6） |
 | `submit_outline` | deck_outline | 提交 PPT 大纲与 AI 的理解（v1.2，23 §7.3） |

@@ -56,6 +56,7 @@ export type KnowledgeServiceDeps = {
   inbox: InboxService;
   settings: SettingsService;
   prompts: Prompts;
+  projectDesignContext: (projectId: string) => string;
   /** What the researcher read with the browser, for its `web` citations' excerpts (29 §2.8). */
   browser: Pick<BrowserService, 'pageText'>;
 };
@@ -211,6 +212,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     const turns = repo.listTurns(conversation.id);
     const previous = turns.at(-1);
     const attemptId = randomUUID();
+    const { code, docs } = conversation.sources;
     const started = attempts.dispatchObjectAttempt({
       purpose: SessionPurpose.Knowledge,
       previousId: previous?.attemptId,
@@ -233,11 +235,12 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         directory: project.repoPath,
         title: `${SESSION_TITLE_PREFIX} · ${conversation.title}`,
         model,
-        prompt: renderTemplate(prompts[PromptName.StartResearch], {
-          projectName: project.name,
-          question,
-          sources: describeSources(conversation),
-        }),
+        prompt:
+          renderTemplate(prompts[PromptName.StartResearch], {
+            projectName: project.name,
+            question,
+            sources: describeSources(conversation),
+          }) + (previous === undefined && (code || docs) ? deps.projectDesignContext(project.id) : ''),
         web: conversation.sources.web,
       }),
     });

@@ -36,6 +36,7 @@ import { AutoAcceptanceEvidence } from '../tasks/auto-acceptance-evidence.tsx';
 import { noAutomaticCheck, skippedChecks } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
+import { DeliveryDesignNotice } from './delivery-design.tsx';
 import { Check } from './node-drawer.tsx';
 import { RemoteDeliveryStatus } from './remote-delivery-status.tsx';
 import { ReviewComments } from './review-comments.tsx';
@@ -67,22 +68,25 @@ export function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
     );
   }
   return (
-    <p className="row" data-testid="delivery-outcome">
-      <Icon name="check" />
-      {delivery.commitSha === null ? (
-        D.reportDone
-      ) : pro && delivery.diffBase === null ? (
-        <Link
-          to={ROUTES.gitProject}
-          params={{ projectId: task.project.id }}
-          search={{ view: 'commits', ref: delivery.targetBranch, sha: delivery.commitSha }}
-        >
-          {D.merged(delivery.targetBranch, delivery.commitSha)}
-        </Link>
-      ) : (
-        D.merged(delivery.targetBranch, delivery.commitSha)
-      )}
-    </p>
+    <>
+      <p className="row" data-testid="delivery-outcome">
+        <Icon name="check" />
+        {delivery.commitSha === null ? (
+          D.reportDone
+        ) : pro && delivery.diffBase === null ? (
+          <Link
+            to={ROUTES.gitProject}
+            params={{ projectId: task.project.id }}
+            search={{ view: 'commits', ref: delivery.targetBranch, sha: delivery.commitSha }}
+          >
+            {D.merged(delivery.targetBranch, delivery.commitSha)}
+          </Link>
+        ) : (
+          D.merged(delivery.targetBranch, delivery.commitSha)
+        )}
+      </p>
+      <DeliveryDesignNotice task={task} delivery={delivery} />
+    </>
   );
 }
 

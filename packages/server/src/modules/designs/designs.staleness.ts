@@ -1,6 +1,7 @@
 import { constants } from 'node:fs';
 import { access, realpath, stat } from 'node:fs/promises';
 import { type DesignStalenessDTO, DesignStalenessState } from '@aw/shared';
+import { withGitCommitTree } from '../git/index.ts';
 import { observeDesignChanges } from './designs.changes.ts';
 import type { createDesignsRepo, ProjectDesign } from './designs.repo.ts';
 import { readDesignGitStatus, type ScannedDesignFile, scanDesignFiles } from './designs.scanner.ts';
@@ -8,12 +9,17 @@ import { readDesignGitStatus, type ScannedDesignFile, scanDesignFiles } from './
 const CHANGED_PATHS_SAMPLE_LIMIT = 20;
 type Repo = ReturnType<typeof createDesignsRepo>;
 
+async function readDirectory(repoPath: string) {
+  const root = await realpath(repoPath);
+  if (!(await stat(root)).isDirectory()) return undefined;
+  await access(root, constants.R_OK | constants.X_OK);
+  return root;
+}
+
 async function readWorktree(repoPath: string) {
   try {
-    const root = await realpath(repoPath);
-    if (!(await stat(root)).isDirectory()) return undefined;
-    await access(root, constants.R_OK | constants.X_OK);
-    return { root, status: await readDesignGitStatus(root) };
+    const root = await readDirectory(repoPath);
+    return root === undefined ? undefined : { root, status: await readDesignGitStatus(root) };
   } catch (error) {
     if (directoryUnavailable(error)) return undefined;
     throw error;
@@ -63,33 +69,46 @@ export async function readDesignStaleness(
   repo: Repo,
   design: ProjectDesign,
   repoPath: string | null,
+  commitSha?: string,
 ): Promise<DesignStalenessDTO> {
   const baseSha = design.sourceSnapshot.commitSha;
   const baselineSha = baseSha === null ? {} : { baseSha };
   const empty = { ...baselineSha, changedFilesCount: 0, affectedSectionIds: [], changedPathsSample: [] };
   if (repoPath === null) return { ...empty, state: DesignStalenessState.Unknown, reason: 'project_unbound' };
   const unavailable = { ...empty, state: DesignStalenessState.Unknown, reason: 'directory_unavailable' };
-  const worktree = await readWorktree(repoPath);
-  if (worktree === undefined) return unavailable;
-  const headSha = worktree.status?.commit ?? null;
-  const currentSha = headSha === null ? {} : { headSha };
-  const fresh = { ...empty, ...currentSha, state: DesignStalenessState.Fresh };
-  if (matchesCleanHead(design, worktree.status) && !repo.hasSectionSourceHashes(design.id)) return fresh;
+  const freshAt = (headSha: string | null): DesignStalenessDTO => ({
+    ...empty,
+    ...(headSha === null ? {} : { headSha }),
+    state: DesignStalenessState.Fresh,
+  });
 
-  try {
-    const { files: current } = await scanDesignFiles(worktree.root, design.excludePatterns);
+  async function compare(root: string, headSha: string | null): Promise<DesignStalenessDTO> {
+    const fresh = freshAt(headSha);
+    const { files: current } = await scanDesignFiles(root, design.excludePatterns);
     const { changes, affectedSectionIds } = observeDesignChanges(repo, design, repo.listFiles(design.id), current);
     if (changes.length === 0) return fresh;
     const changedFilesSample = changes.slice(0, CHANGED_PATHS_SAMPLE_LIMIT);
     return {
+      ...fresh,
       state: DesignStalenessState.Stale,
-      ...baselineSha,
-      ...currentSha,
       changedFilesCount: changes.length,
       affectedSectionIds,
       changedPathsSample: changedFilesSample.map(({ relPath }) => relPath),
       changedFilesSample,
     };
+  }
+
+  try {
+    if (commitSha !== undefined) {
+      const root = await readDirectory(repoPath);
+      if (root === undefined) return unavailable;
+      return await withGitCommitTree(root, commitSha, (target) => compare(target, commitSha));
+    }
+    const worktree = await readWorktree(repoPath);
+    if (worktree === undefined) return unavailable;
+    const headSha = worktree.status?.commit ?? null;
+    if (matchesCleanHead(design, worktree.status) && !repo.hasSectionSourceHashes(design.id)) return freshAt(headSha);
+    return await compare(worktree.root, headSha);
   } catch (error) {
     if (directoryUnavailable(error)) return unavailable;
     throw error;

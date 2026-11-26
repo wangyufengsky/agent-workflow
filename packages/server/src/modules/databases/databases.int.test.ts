@@ -2,17 +2,23 @@ import {
   askKnowledgeOp,
   createConversationOp,
   createDbConnectionOp,
+  createDesignOp,
   DbTlsMode,
   DbType,
+  DesignStatus,
   databaseInvestigationSchema,
   dbSchemaOp,
   deleteDbConnectionOp,
   ErrorCode,
+  generateDesignOp,
+  getDesignOp,
   getKnowledgeOp,
   getProjectOp,
   knowledgeCitationOp,
   listDatabaseInvestigationsOp,
   listDbConnectionsOp,
+  McpToolName,
+  OPENCODE_AGENT_NAME,
   queryDbOp,
   ServerEventType,
   sendAssistantMessageOp,
@@ -149,6 +155,75 @@ describe('数据库连接（11 §9）', () => {
     expect((await t.call(queryDbOp, { id: body.id, sql: 'SELECT bump()' })).body).toMatchObject({
       error: { code: ErrorCode.DbQueryRejected },
     });
+  });
+});
+
+it('数据探索模板用关联的只读 MySQL 账号核对列与索引，生成四章设计', async () => {
+  const reader = 'schema_reader';
+  const password = 'aw-fixture-metadata';
+  await mysql.exec(`CREATE USER '${reader}'@'%' IDENTIFIED BY '${password}'`);
+  await mysql.exec(`GRANT SELECT ON shop.* TO '${reader}'@'%'`);
+  const { project } = await addProject(t, {
+    files: { 'ddl/items.sql': 'CREATE TABLE items (id INT PRIMARY KEY, name VARCHAR(64), INDEX idx_name (name));' },
+  });
+  const { body: connection } = await t.call(createDbConnectionOp, {
+    ...connectionInput('目录核验', password),
+    username: reader,
+  });
+  await t.call(createDbConnectionOp, connectionInput('其他项目的连接'));
+  await t.call(setProjectDbConnectionsOp, { id: project.id, connectionIds: [connection.id] });
+  const { body: design } = await t.call(createDesignOp, {
+    projectId: project.id,
+    templateKey: 'data-explorer',
+    aiReviewEnabled: false,
+  });
+  expect(design.sections).toHaveLength(4);
+  for (const [i, section] of design.sections.entries()) {
+    const turn = script();
+    if (i === 1) {
+      turn
+        .callTool(McpToolName.DbListConnections)
+        .callTool(McpToolName.DbDescribe, { connection: '目录核验', table: 'items' })
+        .callTool(McpToolName.DbDescribe, { connection: '其他项目的连接', table: 'items' })
+        .callTool(McpToolName.DbQuery, { connection: '目录核验', sql: 'SELECT name FROM items' });
+    }
+    turn.callTool(McpToolName.SubmitDesignSection, {
+      sectionId: section.id,
+      summary: section.title,
+      blocks: [{ type: 'markdown', markdown: '商品主键为 id，名称索引为 idx_name。' }],
+      files: [],
+      diagrams: [],
+    });
+    t.fake.enqueue(turn, { agent: OPENCODE_AGENT_NAME.designer });
+  }
+  const ready = waitForEvent(
+    t.app.events,
+    ServerEventType.DesignUpdated,
+    ({ designId }) => designId === design.id && t.app.services.designs.get(designId).status === DesignStatus.Ready,
+  );
+  expect((await t.call(generateDesignOp, { id: design.id })).status).toBe(200);
+  await ready;
+  await t.fake.settled();
+  expect((await t.call(getDesignOp, { id: design.id })).body.doneSections).toBe(4);
+  const calls = t.fake.toolCalls;
+  expect(calls.find(({ name }) => name === McpToolName.DbListConnections)?.result).toEqual({
+    connections: [{ name: '目录核验', type: DbType.Mysql, database: mysql.database }],
+  });
+  const [allowed, unlinked] = calls.filter(({ name }) => name === McpToolName.DbDescribe);
+  expect(allowed).toMatchObject({
+    isError: false,
+    result: {
+      columns: expect.arrayContaining([expect.objectContaining({ name: 'id', key: 'PRI' })]),
+      indexes: expect.arrayContaining([
+        { name: 'idx_name', columns: ['name'], unique: false },
+        { name: 'PRIMARY', columns: ['id'], unique: true },
+      ]),
+    },
+  });
+  expect(unlinked).toMatchObject({ isError: true, result: { code: ErrorCode.DbConnectionNotFound } });
+  expect(calls.find(({ name }) => name === McpToolName.DbQuery)).toMatchObject({
+    isError: true,
+    result: { code: ErrorCode.McpToolNotAllowed },
   });
 });
 

@@ -1,6 +1,6 @@
 import { type DesignSymbol, encodeGitImpactTargetId, GitImpactTargetKind } from '@aw/shared';
-import type { ProjectKnowledgeIndex } from '../designs/index.ts';
-import { type createImpactTargets, type ImpactTarget, targetKey } from './git-reviews.impact-candidates.ts';
+import { type createImpactTargets, type ImpactTarget, targetKey } from './designs.impact-candidates.ts';
+import type { ProjectKnowledgeIndex } from './designs.knowledge.ts';
 
 type Diagram = NonNullable<ReturnType<ProjectKnowledgeIndex['diagrams']['get']>>;
 type SymbolNode = { kind: 'symbol'; key: string; target: ImpactTarget & { relPath: string }; symbol: DesignSymbol };

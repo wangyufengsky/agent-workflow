@@ -71,8 +71,8 @@ export function createDesignsRepo(db: DbExecutor) {
       const row = knowledgeDesigns(db, projectId, targetSha).limit(1).get();
       return row === undefined ? undefined : toDesign(row);
     },
-    listKnowledgeDesigns(projectId: string): ProjectDesign[] {
-      return knowledgeDesigns(db, projectId).all().map(toDesign);
+    listKnowledgeDesigns(projectId: string, targetSha?: string): ProjectDesign[] {
+      return knowledgeDesigns(db, projectId, targetSha).all().map(toDesign);
     },
     page(
       filter: { projectId?: string | undefined; query?: string | undefined },

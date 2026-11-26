@@ -21,6 +21,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { DatabasesService } from '../databases/index.ts';
 import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -28,6 +29,7 @@ import { type FrozenDesignUpdate, filesForDesignUpdateSection, freezeDesignUpdat
 import { designScope, planningInventory } from './designs.planning.ts';
 import { promptSections } from './designs.prompt-section.ts';
 import type { createDesignsRepo, DesignRun, DesignSection, ProjectDesign } from './designs.repo.ts';
+import { isDataExplorerSectionRun } from './designs.templates.ts';
 
 type Dependencies = {
   repo: ReturnType<typeof createDesignsRepo>;
@@ -36,6 +38,7 @@ type Dependencies = {
     'abort' | 'dispatchObjectAttempt' | 'get' | 'onSignal' | 'requireReady' | 'isReady' | 'waitForSessionRelease'
   >;
   projects: Pick<ProjectsService, 'getRecord'>;
+  databases: Pick<DatabasesService, 'linkedIds'>;
   unit: UnitOfWork;
   clock: Clock;
   settings: Pick<SettingsService, 'get'>;
@@ -81,7 +84,17 @@ function invalidState(message: string): never {
   throw new AppError(ErrorCode.StateTransitionInvalid, message);
 }
 
-export function createDesignRuns({ repo, attempts, projects, unit, clock, settings, prompts, log }: Dependencies) {
+export function createDesignRuns({
+  repo,
+  attempts,
+  projects,
+  databases,
+  unit,
+  clock,
+  settings,
+  prompts,
+  log,
+}: Dependencies) {
   const handoffs = new Map<string, DesignRun>();
   // 只记录本次请求的章节。重启后从已保存章节续作，不恢复未完成的内存队列。
   const followUps = new Map<string, FollowUp>();
@@ -178,6 +191,7 @@ export function createDesignRuns({ repo, attempts, projects, unit, clock, settin
       nodeId: null,
       roleId: null,
       projectId: project.id,
+      designDatabaseMetadata: isDataExplorerSectionRun(work.kind, design) && databases.linkedIds(project.id).length > 0,
       directory: work.followUp?.kind === 'incremental' ? work.followUp.plan.sourceDir : project.repoPath,
       title: `Project Design · ${design.title}`,
       model: work.model,

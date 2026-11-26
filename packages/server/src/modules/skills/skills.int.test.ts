@@ -139,7 +139,35 @@ describe('我的 Skill', () => {
     const response = await app.call(getSkillCatalogOp, {});
     expect(response.status).toBe(200);
     const { builtin, scopes } = response.body;
-    expect(builtin).toHaveLength(20);
+    expect(builtin.map(({ name }) => name).sort()).toEqual([
+      'aw-artifact-revision',
+      'aw-assistant-charts',
+      'aw-assistant-memory',
+      'aw-assistant-preview',
+      'aw-backend-development',
+      'aw-code-review',
+      'aw-db-readonly',
+      'aw-design-analysis',
+      'aw-design-git-review',
+      'aw-frontend-development',
+      'aw-functional-testing',
+      'aw-image-analysis',
+      'aw-merge-conflicts',
+      'aw-office-docs',
+      'aw-offline-network',
+      'aw-page-check',
+      'aw-recurring-work',
+      'aw-submit-result',
+      'aw-task-delivery',
+      'aw-task-diagnosis',
+      'aw-task-requirement',
+    ]);
+    expect(builtin.find(({ name }) => name === 'aw-design-git-review')).toMatchObject({
+      source: expect.stringContaining('name: aw-design-git-review'),
+      assistantEnabled: true,
+      agents: [],
+      workflows: [],
+    });
     expect(builtin.find(({ name }) => name === 'aw-design-analysis')).toMatchObject({
       source: expect.stringContaining('name: aw-design-analysis'),
       assistantEnabled: false,

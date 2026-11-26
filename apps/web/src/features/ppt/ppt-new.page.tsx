@@ -3,21 +3,25 @@ import {
   DECK_MAX_SLIDES,
   type DeckMaterialInput,
   DeckMaterialKind,
+  GitReviewTarget,
   SlideLayout,
   THEME_IDS,
   type ThemeId,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
+import { z } from 'zod';
 import { ApiError } from '../../api/client.ts';
 import { MOD_KEY } from '../../app/platform.ts';
-import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { PPT_COPY as C } from '../../copy/ppt.ts';
 import { THEME_LABEL } from '../../copy/themes.ts';
 import { resolveTheme } from '../../theme/apply-theme.ts';
+import { designQuery } from '../designs/designs.queries.ts';
+import { gitReviewQuery } from '../git/git.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { ModelPicker } from '../knowledge/model-picker.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
@@ -28,15 +32,21 @@ import styles from './ppt.module.css';
 import { useCreateDeck } from './ppt.queries.ts';
 import { SlideView } from './slide/slide-view.tsx';
 
-const route = getRouteApi(ROUTE_IDS.pptNew);
 const THEME_THUMB_WIDTH = 168;
 
-/** Material given in the address (「做成 PPT」on a result card or a knowledge conversation, 23 §2.5). */
-function prefilled(search: {
-  taskId?: string | undefined;
-  artifactVersionId?: string | undefined;
-  knowledgeConversationId?: string | undefined;
-}): DeckMaterialInput[] {
+export const newDeckSearchSchema = z.object({
+  projectId: z.string().optional(),
+  taskId: z.string().optional(),
+  artifactVersionId: z.uuid().optional(),
+  knowledgeConversationId: z.string().optional(),
+  kind: z.enum([DeckMaterialKind.Design, DeckMaterialKind.GitReview]).optional(),
+  refId: z.string().min(1).optional(),
+});
+
+type NewDeckSearch = z.infer<typeof newDeckSearchSchema>;
+
+/** Materials given in the address (23 §2.5). */
+function prefilled(search: NewDeckSearch): DeckMaterialInput[] {
   return [
     ...(search.taskId === undefined
       ? []
@@ -52,6 +62,7 @@ function prefilled(search: {
     ...(search.knowledgeConversationId === undefined
       ? []
       : [{ kind: DeckMaterialKind.Knowledge, conversationId: search.knowledgeConversationId } as const]),
+    ...(search.kind === undefined || search.refId === undefined ? [] : [{ kind: search.kind, refId: search.refId }]),
   ];
 }
 
@@ -63,17 +74,13 @@ const typedChars = (materials: readonly DeckMaterialInput[]) =>
   );
 
 /** 「做一份 PPT」(23 §2.3): brief, material, number of pages, theme and model; the AI writes the outline first. */
-export function PptNewPage() {
-  const search = route.useSearch();
+export function PptNewPage({ search }: { search: NewDeckSearch }) {
   const navigate = useNavigate();
   const settings = useSettings();
   const projects = useQuery(projectsQuery).data ?? [];
-  const [brief, setBrief] = useState('');
+  const [briefDraft, setBrief] = useState<string>();
   const [materials, setMaterials] = useState<DeckMaterialInput[]>(() => prefilled(search));
-  // Undefined until the user picks one: then the project of a prefilled task or conversation.
-  const [chosenProject, setChosenProject] = useState<string | null | undefined>(
-    projects.some((p) => p.id === search.projectId) ? search.projectId : undefined,
-  );
+  const [chosenProject, setChosenProject] = useState<string | null>();
   const [autoCount, setAutoCount] = useState(true);
   const [count, setCount] = useState(8);
   const [theme, setTheme] = useState<ThemeId>(() =>
@@ -89,12 +96,30 @@ export function PptNewPage() {
     ...knowledgeConversationQuery(conversationId ?? ''),
     enabled: conversationId !== undefined,
   });
-  const fromMaterial = prefillTask.data?.project.id ?? prefillConversation.data?.project.id;
-  const projectId = chosenProject === undefined ? (fromMaterial ?? null) : chosenProject;
+  const isDesign = search.kind === DeckMaterialKind.Design && search.refId !== undefined;
+  const isReview = search.kind === DeckMaterialKind.GitReview && search.refId !== undefined;
+  const prefillDesign = useQuery({ ...designQuery(search.refId ?? ''), enabled: isDesign });
+  const prefillReview = useQuery({ ...gitReviewQuery(search.refId ?? ''), enabled: isReview });
+  const source = isDesign ? prefillDesign : isReview ? prefillReview : undefined;
+  const projectHint = projects.find((p) => p.id === search.projectId)?.id;
+  const fromMaterial = projectHint ?? prefillTask.data?.project.id ?? prefillConversation.data?.project.id ?? null;
+  const projectId =
+    chosenProject === undefined ? (source?.data === undefined ? fromMaterial : source.data.projectId) : chosenProject;
+  const comparison = prefillReview.data?.target === GitReviewTarget.Compare;
+  const brief =
+    briefDraft ?? (isDesign ? C.designBrief : isReview ? (comparison ? C.comparisonBrief : C.reviewBrief) : '');
   const projectLocked = materials.some(
     (m) =>
-      m.kind === DeckMaterialKind.Task || m.kind === DeckMaterialKind.Artifact || m.kind === DeckMaterialKind.Knowledge,
+      m.kind === DeckMaterialKind.Task ||
+      m.kind === DeckMaterialKind.Artifact ||
+      m.kind === DeckMaterialKind.Knowledge ||
+      m.kind === DeckMaterialKind.Design ||
+      m.kind === DeckMaterialKind.GitReview,
   );
+  const hasLinkedMaterial = materials.some(
+    (m) => m.kind === DeckMaterialKind.Design || m.kind === DeckMaterialKind.GitReview,
+  );
+  const sourceUnavailable = hasLinkedMaterial && source?.data === undefined;
 
   const chars = typedChars(materials);
   const problem =
@@ -106,7 +131,7 @@ export function PptNewPage() {
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
-    if (problem !== undefined) return;
+    if (problem !== undefined || sourceUnavailable || create.isPending) return;
     create.mutate(
       {
         brief: brief.trim(),
@@ -160,7 +185,12 @@ export function PptNewPage() {
           materials={materials}
           onProject={setChosenProject}
           onChange={setMaterials}
+          linkedTitle={prefillDesign.data?.title ?? prefillReview.data?.label}
+          comparison={comparison}
         />
+        {hasLinkedMaterial && source?.isError && (
+          <ErrorState error={source.error} onRetry={() => void source.refetch()} />
+        )}
         <div className="field">
           <span className="label">{C.slideCount}</span>
           <div className="row" role="radiogroup" aria-label={C.slideCount}>
@@ -223,7 +253,7 @@ export function PptNewPage() {
             variant="primary"
             icon="sparkle"
             pending={create.isPending}
-            disabled={problem !== undefined}
+            disabled={problem !== undefined || sourceUnavailable}
           >
             {C.generateOutline}
             <span className="kbd">

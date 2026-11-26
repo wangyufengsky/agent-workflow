@@ -74,4 +74,13 @@ export const DELIVERY_COPY = {
   viewChanges: '查看改动',
   changesTitle: '改动',
   changesGone: '任务已结束，工作区已清理。',
+  designImpact: (modules: number, transactions: number, exact: boolean) =>
+    `设计影响初筛：命中 ${modules} 个模块 / ${transactions} 条交易 · ${exact ? '精确匹配快照' : '参考快照'}`,
+  designUncovered: (files: number) => `当前设计未覆盖 ${files} 个改动文件。`,
+  designTruncated: '仅展示扫描范围内的部分影响。',
+  designStale: (files: number, sections: number, comparesMerge: boolean) =>
+    `${comparesMerge ? '本次合入提交相对项目设计快照有' : '项目设计有'} ${files} 个文件变动（影响 ${sections} 章）`,
+  openDesign: '打开项目设计',
+  switchBranchToUpdate: (branch: string) => `切换到 ${branch} 后再增量更新。`,
+  openDesignUpdate: '打开项目设计去增量更新',
 } as const;

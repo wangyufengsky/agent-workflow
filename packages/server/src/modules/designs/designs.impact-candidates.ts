@@ -1,5 +1,5 @@
 import { encodeGitImpactTargetId, GitImpactTargetKind } from '@aw/shared';
-import type { ProjectKnowledgeIndex } from '../designs/index.ts';
+import type { ProjectKnowledgeIndex } from './designs.knowledge.ts';
 
 export type ImpactTarget = {
   targetKind: GitImpactTargetKind;

@@ -213,6 +213,7 @@ type KnowledgeConversationSummaryDTO = {
 
 - `AttemptKind.Research`；提交工具 `ATTEMPT_SUBMIT_TOOL.research = submit_answer`；`nudge.md` 照常提醒；超时用 `attempt.timeoutMinutes`。
 - 模型：这一轮的 `model`（请求给出的，或 `ai.defaultModel`）记录在研究尝试上并随每条消息发送；续问可以换模型（`continueSession` 带新模型），同一 opencode 会话里前后轮可以是不同模型。
+- 勾选代码或文档且项目已有就绪设计时，首条消息附带设计目录，包括快照基线、覆盖章节、模块、交易与依赖。目录按 UTF-8 计量，上限 16 KiB。研究员按本次勾选的来源核验；只查数据库或网页时不附带目录。
 - 首条消息 `start-research.md`：项目名、问题、本对话的资料范围（勾选项、关联数据库名称、网络开关）、引用规则（§6）；续问 `research-followup.md`：新问题，提醒仍需 `submit_answer`。
 - 不计入调度器的并发上限（D68：研究是用户当场发起、等着看的）。
 

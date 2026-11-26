@@ -30,6 +30,7 @@ import { UnmetNotice, useDeliveryAcknowledgement } from '../requirements/unmet-n
 import { useSettings } from '../settings/settings.queries.ts';
 import { noAutomaticCheck, skippedChecks } from '../tasks/skipped-checks.ts';
 import { useCancelTask, useDeliver, useRequestChanges } from '../tasks/tasks.queries.ts';
+import { DeliveryDesignImpact } from './delivery-design.tsx';
 import styles from './task-page.module.css';
 
 type Open = 'options' | 'pr' | 'revise' | 'manual' | 'discard' | undefined;
@@ -240,6 +241,7 @@ export function DeliveryActions({
 
   return (
     <div className="col">
+      <DeliveryDesignImpact task={task} />
       <UnmetNotice acknowledgement={acknowledgement} />
       {conflict !== null && (
         <div className="banner warn" role="status" data-testid="delivery-conflict">

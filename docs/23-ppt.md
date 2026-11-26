@@ -177,8 +177,8 @@
 | id | TEXT PK | |
 | deck_id | TEXT → decks，CASCADE | |
 | seq | INTEGER | |
-| kind | TEXT | `DeckMaterialKind`：`text` `file` `task` `knowledge` `web` |
-| ref_id | TEXT NULL | 任务 / 知识对话 id（只用于界面跳转；不设外键，原对象删除后快照仍在）；网页为读到的最终地址 |
+| kind | TEXT | `DeckMaterialKind`：`text` `file` `task` `artifact` `knowledge` `web` `design` `git_review` |
+| ref_id | TEXT NULL | 任务、知识对话、设计或审查报告 id（记录来源；不设外键，原对象删除后快照仍在）；网页为读到的最终地址 |
 | artifact_version_id | TEXT NULL | 产物资料所用的固定版本，用于回查 |
 | title | TEXT | 文件名、任务「编号 · 标题」、对话标题、网页标题（没有标题时为地址）；粘贴的文字为「粘贴的文字」 |
 | content | TEXT | 快照正文（Markdown），创建时写入，之后不变 |
@@ -339,6 +339,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 - 产物版本的快照是指定版本提取出的正文或表格数据，带任务编号、文件名与版本。
 - 任务结果的快照：任务编号与标题、需求、结果摘要、假设、改动文件列表与增删行数（不含 diff 正文；需要细节时 AI 可以读仓库代码）。
 - 知识对话的快照：每一轮的问题与回答，引用改写为「路径 第 a–b 行」并附上存下的原文摘录。
+- 项目设计工作台和已成功的 Git 审查、双版本对比报告可打开「生成 PPT」预填素材与汇报要求。创建时冻结设计基线、已完成章节、子模块职责、交易和关系，或报告范围、两端版本、问题、影响、对比差异和回归清单。后续修订来源不会改写该 PPT 的资料。
 - 项目代码不进消息：AI 自己按需读。
 
 ### 7.3 执行 MCP 工具
@@ -360,7 +361,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 | --- | --- | --- | --- |
 | `decks.list` | `GET /decks?projectId&query&limit&cursor` | read | 列表（`DeckSummaryDTO`），按 `updated_at` 倒序，游标分页 |
 | `decks.get` | `GET /decks/:id` | read | 详情：要求、资料（标题与类型，不含正文）、理解、全部页、显示状态、最近的工作 |
-| `decks.create` | `POST /decks` `{ brief, projectId?, materials, slideCount?, theme?, model? }` | write | 创建并开始出大纲（201）；`produces: deck`。`materials` 为 `{ kind: text, title?, content }` / `{ kind: file, title, content }` / `{ kind: task, taskId }` / `{ kind: knowledge, conversationId }` / `{ kind: web, url }`，后三者由后端生成快照（网页按网站规则只读读取，错误同 `browser.readUrl`）；任务或对话所属项目与 `projectId` 不一致 → `VALIDATION_FAILED` |
+| `decks.create` | `POST /decks` `{ brief, projectId?, materials, slideCount?, theme?, model? }` | write | 创建并开始出大纲（201）；`produces: deck`。`materials` 为 `{ kind: text, title?, content }` / `{ kind: file, title, content }` / `{ kind: task, taskId }` / `{ kind: knowledge, conversationId }` / `{ kind: artifact, taskId, artifactVersionId }` / `{ kind: web, url }` / `{ kind: design, refId }` / `{ kind: git_review, refId }`。引用类素材由后端生成快照（网页按网站规则只读读取，错误同 `browser.readUrl`）；任务或对话所属项目与 `projectId` 不一致 → `VALIDATION_FAILED` |
 | `decks.update` | `PATCH /decks/:id` `{ title?, theme? }` | write | 改名、换主题（不调用 AI） |
 | `decks.reviseOutline` | `POST /decks/:id/outline/revise` `{ instruction, model? }` | write | 按意见重写大纲；已确认大纲后 → `STATE_TRANSITION_INVALID` |
 | `decks.updateOutline` | `PUT /decks/:id/outline` `{ slides: [{ id?, layout, title, points }] }` | write | 保存手改的大纲（整体替换；有 id 的保留，没有的新建）；已确认后 → `STATE_TRANSITION_INVALID` |
@@ -398,6 +399,7 @@ type SlideDTO = { id: string; seq: number; layout: SlideLayout; title: string; p
 ## 9. 与应用助手（D96）
 
 - 操作清单注册后助手自动获得工具（15 §3）：`decks_create`、`decks_generate`、`decks_reviseSlides` 等为 write，**出现确认卡片**，用户可以「确认并总是允许」；`decks_delete` 为 critical，每次确认；列表、详情为 read，直接执行。
+- 助手创建的 PPT 含项目设计或 Git 审查报告（含版本对比）时逐次确认，包含混合资料。完全访问模式和旧的「总是允许」授权也需要确认。只含其他类型资料的创建沿用原权限。
 - 典型对话：「把 T-12 的结果做成 5 页汇报」→ 助手调用 `decks_create`（`materials: [{ kind: task, taskId }]`、`slideCount: 5`）→ 确认卡片（显示要求、资料「T-12 · 退款单分页查询与导出」、页数）→ 确认后对话里出现 PPT 导航卡片（D66，`EntityKind.Deck`），状态随 `deck.updated` 实时变化（「正在写大纲」→「大纲待确认」）→「打开」进入工作台看大纲。
 - **不阻塞、不回发消息**：工具立即返回 PPT 的摘要；与知识问答不同（18 §4a），大纲或页面做好后**不**把结果作为下一条消息发回助手会话——PPT 要在工作台里看，卡片上的实时状态已经告诉用户进展。用户也可以继续让助手「确认大纲开始制作」「把第 3 页改短」。
 - 导出与放映不是操作。助手用专用工具 `export_deck` 导出做好的 PPT：界面打开工作台，页头执行与「导出」按钮相同的流程，保存位置由用户选（15 §3、28 §4）；放映仍由用户点。它也可以 `open_page` 打开工作台（`AssistantPage` 增加 `ppt`、`ppt_deck`）。
@@ -405,7 +407,7 @@ type SlideDTO = { id: string; seq: number; layout: SlideLayout; title: string; p
 
 ## 10. 枚举、常量、错误码（08）
 
-- 枚举（`shared/enums/deck.ts`）：`DeckStatus`（`outlining` `outline_ready` `failed` `generating` `incomplete` `ready`，`STATUS_TONE`：run / wait / danger / run / warn / ok）、`DeckRunKind`（`outline` `slides`）、`DeckMaterialKind`（`text` `file` `task` `knowledge`）、`SlideLayout`（§5.1 十种）；`AttemptKind` 加 `deck_outline` `deck_slides`；`SessionAgent` 加 `slides_writer`；`EntityKind` 加 `deck`；`McpToolName` 加 `SubmitOutline` `SubmitSlide`；`ServerEventType.DeckUpdated`；`AssistantPage` 加 `ppt` `ppt_deck`（参数 `deckId`，工作台另带选中的页 `slideId`）。
+- 枚举（`shared/enums/deck.ts`）：`DeckStatus`（`outlining` `outline_ready` `failed` `generating` `incomplete` `ready`，`STATUS_TONE`：run / wait / danger / run / warn / ok）、`DeckRunKind`（`outline` `slides`）、`DeckMaterialKind`（见 §3 资料表）、`SlideLayout`（§5.1 十种）；`AttemptKind` 加 `deck_outline` `deck_slides`；`SessionAgent` 加 `slides_writer`；`EntityKind` 加 `deck`；`McpToolName` 加 `SubmitOutline` `SubmitSlide`；`ServerEventType.DeckUpdated`；`AssistantPage` 加 `ppt` `ppt_deck`（参数 `deckId`，工作台另带选中的页 `slideId`）。
 - 常量（08 §4.2）：`OPENCODE_AGENT_NAME.slides_writer = 'aw-slides'`；`DECK_BRIEF_MAX_CHARS`（4000）、`DECK_TITLE_MAX_CHARS`（60）、`DECK_MATERIALS_MAX`（10 份）、`DECK_MATERIALS_MAX_CHARS`（60000）、`DECK_INSTRUCTION_MAX_CHARS`（2000）、`DECK_MAX_SLIDES`（30）、`DECK_AUTO_SLIDES_MIN` / `MAX`（5 / 12）、`SLIDE_POINTS_MAX` / `SLIDE_POINT_MAX_CHARS`（6 / 120）、`SLIDE_NOTES_MAX_CHARS`（1000）、`SLIDE_TEXT_LIMITS`（各版式字段的字数与条数）、`SLIDE_FIT_MIN_SCALE`（0.8）。画布尺寸 1280×720 只在渲染进程使用（`features/ppt/slide/geometry.ts`）。
 - 错误码：`DECK_NOT_FOUND`（404）、`DECK_SLIDE_NOT_FOUND`（404）、`DECK_BUSY`（409）；提交工具的校验失败用 `VALIDATION_FAILED`。
 - 没有新设置项。

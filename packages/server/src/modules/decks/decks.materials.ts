@@ -6,11 +6,14 @@ import {
   DECK_MATERIALS_MAX_CHARS,
   type DeckMaterialInput,
   DeckMaterialKind,
+  type DesignDTO,
   ErrorCode,
+  type GitReviewDTO,
   type KnowledgeConversationDTO,
   KnowledgeTurnStatus,
   type TaskDetailDTO,
 } from '@aw/shared';
+import { renderDesignMaterial, renderGitReviewMaterial } from './decks.design-materials.ts';
 
 /** Pasted text is listed by its first line. */
 const PASTED_TITLE_MAX_CHARS = 40;
@@ -35,6 +38,8 @@ export type MaterialSources = {
     limit: number,
   ): Promise<{ version: ArtifactVersion; text: string; chars: number }>;
   knowledge(id: string): KnowledgeConversationDTO;
+  design(id: string): DesignDTO;
+  gitReview(id: string): GitReviewDTO;
   /** Reads the page with the website session, read only (`browser.readUrl`). */
   web(url: string): Promise<WebPage>;
 };
@@ -172,6 +177,14 @@ async function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): P
         projectId: conversation.project.id,
         content: knowledgeSnapshot(conversation),
       };
+    }
+    case DeckMaterialKind.Design: {
+      const design = sources.design(input.refId);
+      return { kind: input.kind, refId: design.id, projectId: design.projectId, ...renderDesignMaterial(design) };
+    }
+    case DeckMaterialKind.GitReview: {
+      const review = sources.gitReview(input.refId);
+      return { kind: input.kind, refId: review.id, projectId: review.projectId, ...renderGitReviewMaterial(review) };
     }
     case DeckMaterialKind.Web: {
       const page = await sources.web(input.url);

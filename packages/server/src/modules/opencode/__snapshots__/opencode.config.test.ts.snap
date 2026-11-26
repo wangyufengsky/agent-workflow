@@ -9955,6 +9955,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 br
           "aw-assistant-memory": "allow",
           "aw-assistant-preview": "allow",
           "aw-db-readonly": "allow",
+          "aw-design-git-review": "allow",
           "aw-image-analysis": "allow",
           "aw-office-docs": "allow",
           "aw-recurring-work": "allow",

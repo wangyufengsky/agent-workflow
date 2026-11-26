@@ -108,6 +108,7 @@ export type StartAttemptInput = {
   web?: boolean;
   browserTestSubmit?: BrowserTestSubmitTool;
   functionalTestNode?: FunctionalTestNode;
+  designDatabaseMetadata?: boolean;
   delegation?: { parentAttemptId: string; commit: string };
 };
 
@@ -323,6 +324,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       web: input.web,
       browserTestSubmit: input.browserTestSubmit,
       designKind: isDesignAttemptKind(input.kind) ? input.kind : undefined,
+      designDatabaseMetadata: input.designDatabaseMetadata,
       functionalTestNode: input.functionalTestNode,
       offline: settings.get('network.offline'),
       allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),

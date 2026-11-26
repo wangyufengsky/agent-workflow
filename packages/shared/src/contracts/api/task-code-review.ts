@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { GIT_REVIEW_FINDINGS_MAX } from '../../constants/limits.ts';
 import { WorkflowKind } from '../../enums/workflow.ts';
-import { codeFindingSchema } from './git.ts';
+import { codeFindingSchema, fullGitCommitShaSchema } from './git.ts';
 
 export const CODE_REVIEW_WORKFLOW_KEY = 'code_review';
 export const VERSION_REVIEW_WORKFLOW_KEY = 'version_review';
@@ -15,11 +15,9 @@ export const isTaskCodeReview = (workflow: { key: string; kind: WorkflowKind }):
 export const isDesignProposalWorkflow = (workflow: { key: string; kind: WorkflowKind }) =>
   workflow.kind === WorkflowKind.Builtin && workflow.key === DESIGN_PROPOSAL_WORKFLOW_KEY;
 
-const commitSha = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
-
 export const taskCodeReviewScopeSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('diff'), from: commitSha, to: commitSha }),
-  z.object({ kind: z.literal('files'), commit: commitSha, directory: z.string() }),
+  z.object({ kind: z.literal('diff'), from: fullGitCommitShaSchema, to: fullGitCommitShaSchema }),
+  z.object({ kind: z.literal('files'), commit: fullGitCommitShaSchema, directory: z.string() }),
 ]);
 
 export const taskCodeReviewInputSchema = z.object({
@@ -32,7 +30,7 @@ export const taskCodeReviewReportSchema = z.object({
   scope: taskCodeReviewScopeSchema,
   findings: z.array(
     codeFindingSchema.extend({
-      location: z.object({ commit: commitSha, path: z.string() }),
+      location: z.object({ commit: fullGitCommitShaSchema, path: z.string() }),
     }),
   ),
 });

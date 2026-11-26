@@ -7,6 +7,7 @@ export {
   installGitProcessEnvironment,
   runGit,
 } from './git.cli.ts';
+export { withGitCommitTree } from './git.commit-tree.ts';
 export {
   diffChangeFile,
   diffCommits,
