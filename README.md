@@ -86,7 +86,7 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 | --- | --- |
 | **应用助手** | 主页的大输入框和任意页面的 `⌘J` 浮层。用自然语言让助手调用应用的各项功能（加项目、开任务、查状态、改设置、查数据库、看 Git……），还能画柱状图、饼图和流程图。写操作会弹出确认卡片，合并、取消、删除每次都要确认；密码与令牌只在表单里输入，不经过对话。 |
 | **知识问答** | 针对一个项目提问（「退款金额在哪里四舍五入？」），只读的知识研究员去查代码、文档和关联数据库，给出**带引用的回答**，点开引用编号就是原文。网络检索单独开关，默认关闭。 |
-| **项目设计** | 从项目架构图逐级查看模块、文件和带证据的功能说明。按章节独立生成，可在本机查看完整源码，或导出只带引用片段的离线 HTML。 |
+| **项目设计** | 从架构图进入模块和文件，或按交易码、渠道、版本筛选一笔交易，沿处理链路查看字段流转、事务边界与源码引用。可让 AI 规划并逐章生成，导出的离线 HTML 保留交互和引用片段。 |
 | **PPT 制作** | 把任务结果、知识问答或你给的材料做成一份 PPT：AI 先出大纲，确认后逐页制作；可以放映、逐页让 AI 改、自己改文字，最后导出 PDF 或 PowerPoint。 |
 | **质量与用量** | 简单模式在任务页顶部看本周三个数；专业模式看 tokens 用量、趋势、按项目 / 流程 / 模型拆分，以及完成率、首次通过率、平均重试、到待合并耗时等质量指标。 |
 | **团队** | 按项目看成员这段时间的提交、改动与质量信号，按时间纵向对比、成员之间横向对比，并可让 AI 给出成员的工作总结。不打分、不排名。 |
@@ -236,16 +236,16 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.7.3** 的安装包如下。
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.7.4** 的安装包如下。
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.7.3-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.7.3_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.7.3_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.7.3-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.7.3-arm64.AppImage` |
-| Windows 10 / 11 x64 | `agent-workflow-1.7.3-setup-x64.exe` |
+| macOS（Apple 芯片） | `agent-workflow-1.7.4-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.7.4_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.7.4_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.7.4-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.7.4-arm64.AppImage` |
+| Windows 10 / 11 x64 | `agent-workflow-1.7.4-setup-x64.exe` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -292,7 +292,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.7.3_amd64.deb
+sudo apt install ./agent-workflow_1.7.4_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
@@ -300,8 +300,8 @@ arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.7.3-x86_64.AppImage
-./agent-workflow-1.7.3-x86_64.AppImage
+chmod +x agent-workflow-1.7.4-x86_64.AppImage
+./agent-workflow-1.7.4-x86_64.AppImage
 ```
 
 - AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。
