@@ -155,7 +155,13 @@ test('UX-02 长流程在待合并时可查看并交付', async ({ page, request 
       await page.setViewportSize(viewport);
       await page.reload();
       await expect(fold).toHaveAttribute('open', '');
-      await page.getByTestId('progress-canvas').getByTestId('step-step_7').click();
+      const canvas = page.getByTestId('progress-canvas');
+      const lastStep = canvas.getByTestId('step-step_7');
+      // 画布平移才能让后面的步骤进入视口，React Flow 会复位浏览器自动滚动产生的偏移。
+      await canvas.hover();
+      await page.mouse.wheel(1600, 0);
+      await expect(lastStep).toBeInViewport({ ratio: 1 });
+      await lastStep.click();
       await expect(page.getByRole('dialog')).toHaveAccessibleName('开发步骤 8');
       await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
       await expect(page.getByTestId('task-side')).toContainText('开发步骤 8');
