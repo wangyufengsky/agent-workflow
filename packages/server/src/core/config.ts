@@ -50,7 +50,9 @@ export type AppConfig = {
 /** Locations relative to this source file; valid when running from source (development, tests). */
 const SOURCE_MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));
 const SOURCE_PROMPTS_DIR = fileURLToPath(new URL('../../../builtin/prompts', import.meta.url));
-export const SOURCE_DESIGN_SITE_ASSETS_DIR = fileURLToPath(new URL('../modules/designs/site-assets', import.meta.url));
+export const SOURCE_DESIGN_SITE_ASSETS_DIR = fileURLToPath(
+  new URL('../../../../apps/web/src/features/designs/site-assets', import.meta.url),
+);
 export const SOURCE_DESIGN_SITE_COPY_FILE = fileURLToPath(
   new URL('../../../../apps/web/src/copy/design-site.json', import.meta.url),
 );

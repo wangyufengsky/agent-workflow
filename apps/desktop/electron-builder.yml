@@ -16,7 +16,7 @@ extraResources:
     to: migrations
   - from: ../../packages/builtin/prompts
     to: prompts
-  - from: ../../packages/server/src/modules/designs/site-assets
+  - from: ../web/src/features/designs/site-assets
     to: design-site-assets
   - from: ../web/src/copy/design-site.json
     to: design-site-assets/design-site.json

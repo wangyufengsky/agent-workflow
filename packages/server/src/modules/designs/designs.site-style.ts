@@ -1,5 +1,5 @@
 import { SYSTEM_THEME_MAP, type ThemeId } from '@aw/shared';
-import { DESIGN_CODE_TOKENS, THEMES, type ThemeTokenName } from '@aw/shared/theme';
+import { DESIGN_CODE_TOKENS, THEMES, type ThemeTokenName, TRANSACTION_THEME_TOKENS } from '@aw/shared/theme';
 
 const offlineTokens = [
   'bg',
@@ -19,6 +19,7 @@ function themeRule(selector: string, id: ThemeId): string {
   const variables = [
     ...offlineTokens.map((name) => [name, tokens[name]]),
     ...Object.entries(DESIGN_CODE_TOKENS[colorScheme]),
+    ...Object.entries(TRANSACTION_THEME_TOKENS[colorScheme]),
   ]
     .map(([name, value]) => `  --${name}: ${value};`)
     .join('\n');

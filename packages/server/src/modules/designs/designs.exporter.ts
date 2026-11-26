@@ -226,8 +226,9 @@ function serializeSite(value: object, paths: readonly (string | null)[], redacte
 async function writeSite(targetDir: string, options: ExportOptions, model: DesignSiteModel): Promise<void> {
   await existingSite(targetDir, model.designId, options.overwrite === true);
   const assetDir = options.assetsDir ?? SOURCE_DESIGN_SITE_ASSETS_DIR;
-  const [stylesheet, viewer, copyJson] = await Promise.all([
+  const [stylesheet, transactionStyles, viewer, copyJson] = await Promise.all([
     readFile(join(assetDir, 'style.css'), 'utf8'),
+    readFile(join(assetDir, 'transaction-reader.css'), 'utf8'),
     readFile(join(assetDir, 'viewer.js'), 'utf8'),
     readFile(options.copyFile ?? SOURCE_DESIGN_SITE_COPY_FILE, 'utf8'),
   ]);
@@ -251,7 +252,10 @@ async function writeSite(targetDir: string, options: ExportOptions, model: Desig
     await writeFile(join(stage, 'index.html'), entry);
     await writeFile(join(stage, 'design-model.json'), `${json}\n`);
     await writeFile(join(stage, 'design-data.js'), siteDataScript(json));
-    await writeFile(join(stage, 'assets', 'style.css'), designSiteStylesheet(stylesheet));
+    await writeFile(
+      join(stage, 'assets', 'style.css'),
+      designSiteStylesheet(model.transactionExplorer ? [stylesheet, transactionStyles].join('\n') : stylesheet),
+    );
     await writeFile(
       join(stage, 'assets', 'viewer.js'),
       `window.__AW_DESIGN_SITE_COPY__ = ${scriptJson(JSON.stringify(copy))};\n${viewer}`,

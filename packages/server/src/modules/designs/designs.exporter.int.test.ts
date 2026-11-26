@@ -199,6 +199,34 @@ describe('项目设计离线导出', () => {
     expect(exported).not.toContain('PRIVATE_SCANNED_PATH');
   });
 
+  it('交易可用扫描文件 ID 定位已引用路径，离线只导出该交易牵涉的来源', async () => {
+    const source = contents(project);
+    const path = 'src/dispatch.ts';
+    const file = source.files.find(({ sectionId }) => sectionId === null);
+    const diagram = source.diagrams[0];
+    if (!file || !diagram) throw new Error('Expected scan inventory and diagram');
+    const transaction = {
+      type: 'transaction' as const,
+      title: '派发指令',
+      diagramId: diagram.id,
+      evidence: [{ evidenceClass: 'inferred' as const, rationale: '根据分派节点归纳。' }],
+    };
+    await exportDesignSite({
+      ...source,
+      sections: source.sections.map((section) => ({ ...section, blocks: [transaction] })),
+      files: [...source.files, { ...file, id: 'entry', relPath: path }],
+      diagrams: [{ ...diagram, nodes: [{ id: 'send', label: '派发指令', targetKind: 'file', targetId: 'entry' }] }],
+      projectRoot: project,
+      targetDir: site,
+    });
+    const json = await readFile(join(site, 'design-model.json'), 'utf8');
+    const [graph] = JSON.parse(json).diagrams;
+    expect(graph.presentation.sourcePaths).toEqual([path]);
+    expect(graph.presentation.nodes[0].source).toEqual({ fileId: 'entry', path });
+    expect(JSON.parse(json).files.map((item: { relPath: string }) => item.relPath)).not.toContain(path);
+    expect(json).not.toContain('PRIVATE_SCANNED_PATH');
+  });
+
   it('显式确认后覆盖同名入口，保留其他文件，并依次处理同目录的导出', async () => {
     await mkdir(join(site, 'assets'), { recursive: true });
     await writeFile(join(site, 'index.html'), 'hand-written index');

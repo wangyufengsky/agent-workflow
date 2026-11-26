@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
 
 import { designSiteStylesheet } from '../packages/server/src/modules/designs/designs.site-style.ts';
 
-const assets = fileURLToPath(new URL('../packages/server/src/modules/designs/site-assets', import.meta.url));
+const assets = fileURLToPath(new URL('../apps/web/src/features/designs/site-assets', import.meta.url));
 const copy = new URL('../apps/web/src/copy/design-site.json', import.meta.url);
 const nodes = [
   { id: 'order', label: '订单入口', targetKind: 'module', targetId: 'orders' },

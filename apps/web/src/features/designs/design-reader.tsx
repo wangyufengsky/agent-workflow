@@ -1,4 +1,4 @@
-import { type DesignDTO, DesignReviewState, type DesignSectionDTO } from '@aw/shared';
+import { type DesignDiagramNode, type DesignDTO, DesignReviewState, type DesignSectionDTO } from '@aw/shared';
 import { Button } from '../../components/button.tsx';
 import { toast } from '../../components/toast.tsx';
 import { DESIGN_WORKBENCH_COPY as C, DESIGN_DIAGRAM_LABEL, DESIGN_REVIEW_LABEL } from '../../copy/design-workbench.ts';
@@ -15,6 +15,7 @@ import {
   submodulesOf,
 } from './design-reading.ts';
 import { SectionDetails, SubmoduleDetails } from './design-section-detail.tsx';
+import { TransactionFigure } from './design-transactions.tsx';
 import styles from './design-workbench.module.css';
 
 type ReaderProps = {
@@ -126,6 +127,14 @@ export function DesignReader({
     figure: (id) => {
       const diagram = design.diagrams.find((item) => item.id === id);
       if (diagram === undefined) return null;
+      const owner = design.sections.find(({ id }) => id === diagram.sectionId);
+      const transaction = owner?.blocks?.find((block) => block.type === 'transaction' && block.diagramId === id);
+      const actions = {
+        diagram,
+        targetOf: (node: DesignDiagramNode) => graphNodeTarget(design, diagram.sectionId, node),
+        onNavigate,
+        source: context.source,
+      };
       return (
         <section className={styles.proseBlock}>
           {graph?.id !== diagram.id && (
@@ -139,16 +148,11 @@ export function DesignReader({
               </button>
             </h2>
           )}
-          <DesignDiagram
-            key={diagram.id}
-            diagram={diagram}
-            transaction={section.blocks
-              ?.filter((block) => block.type === 'transaction')
-              .find((block) => block.diagramId === id)}
-            targetOf={(node) => graphNodeTarget(design, diagram.sectionId, node)}
-            onNavigate={onNavigate}
-            source={context.source}
-          />
+          {transaction?.type === 'transaction' ? (
+            <TransactionFigure key={diagram.id} {...actions} design={design} transaction={transaction} />
+          ) : (
+            <DesignDiagram key={diagram.id} {...actions} />
+          )}
         </section>
       );
     },
