@@ -785,7 +785,7 @@ payload / response：
 | target | TEXT | `GitReviewTarget` |
 | label | TEXT | 分支名或短 SHA，显示用 |
 | parent | INTEGER NULL | 提交的审查对比的是第几个父提交（从 1 起），重新审查按同一个父提交；其他对象为空 |
-| from_sha | TEXT | 审查的 diff 的起点（工作区改动为 HEAD，提交为所选的父提交，分支与区间为 merge-base） |
+| from_sha | TEXT | 审查的 diff 的起点（工作区改动为 HEAD，提交为所选的父提交，分支与区间为 merge-base，compare 为指定起点提交） |
 | to_sha | TEXT NULL | 终点；空 = 主工作区的未提交改动 |
 | focus | TEXT NULL | 用户填的关注点 |
 | attempt_id | TEXT → attempts | `git_review` 尝试；审查的状态即它的状态，无状态列 |
@@ -798,6 +798,7 @@ payload / response：
 | impacts | TEXT(JSON) NULL | `GitImpactItemDTO[]`，审查完成时提交的业务影响 |
 | impact_truncated | INTEGER(bool) NULL | 初筛的传播或上下文字节预算触顶 |
 | regression_checks | TEXT(JSON) NULL | 模型提交的回归检查清单 |
+| comparison | TEXT(JSON) NULL | 迁移 0061 新增。compare 启动时冻结两端设计 ID、匹配态和章节、交易差异，提交成功后保存核验结果与业务摘要。其他目标与历史审查保持 NULL |
 | created_at / finished_at | INTEGER | `finished_at` 在尝试结束（任何终态）时写入 |
 
 索引：`(project_id, created_at)`、`(attempt_id)`。AI 草拟提交信息不存库（27 §7.3），只留下它的 `commit_message` 尝试。

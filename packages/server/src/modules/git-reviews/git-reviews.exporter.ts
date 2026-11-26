@@ -1,7 +1,16 @@
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, open, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, isAbsolute, join } from 'node:path';
-import { AppError, ErrorCode, FindingSeverity, GitImpactClassification, type GitReviewDTO } from '@aw/shared';
+import {
+  AppError,
+  ErrorCode,
+  FindingSeverity,
+  type GitComparisonDTO,
+  type GitComparisonItemDTO,
+  GitImpactClassification,
+  type GitReviewDTO,
+  GitReviewTarget,
+} from '@aw/shared';
 import copy from '../../../../../apps/web/src/copy/git-review-site.json' with { type: 'json' };
 import {
   canonicalExportTarget,
@@ -52,8 +61,8 @@ article { margin-block: .75rem; }
 .statistics { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .75rem; }
 .statistics dt, .meta { color: var(--secondary); }
 .statistics dd { margin: 0; font-size: 1.7rem; font-weight: 650; }
-h1, h2, h3, p { margin-block: 0 .6rem; }
-h1, h2, h3 { line-height: 1.3; overflow-wrap: anywhere; }
+h1, h2, h3, h4, p { margin-block: 0 .6rem; }
+h1, h2, h3, h4 { line-height: 1.3; overflow-wrap: anywhere; }
 code, .body-text { overflow-wrap: anywhere; white-space: pre-wrap; }
 select { font: inherit; }
 [hidden] { display: none !important; }
@@ -156,32 +165,80 @@ function completionTime(finishedAt: number | null): string {
   return `<p class="meta">${copy.finishedAt} <time datetime="${time.toISOString()}">${escapeHtml(label)}</time></p>`;
 }
 
+function comparisonItems(title: string, items: GitComparisonItemDTO[], text: (value: string) => string): string {
+  const labels = copy.comparison;
+  const articles = items.map((item) => {
+    const paths = (
+      [
+        [labels.from, item.fromPath],
+        [labels.to, item.toPath],
+      ] as const
+    ).flatMap(([label, path]) => (path === undefined ? [] : [`<p>${label} <code>${text(path)}</code></p>`]));
+    return `<article>
+      <h4>${text(item.title)}</h4>
+      <p>${labels.status[item.status]}</p>
+      ${paths.join('')}
+      ${item.detail === undefined ? '' : `<p class="body-text">${text(item.detail)}</p>`}
+    </article>`;
+  });
+  return `<h3>${title}</h3>${articles.length === 0 ? `<p>${labels.empty}</p>` : articles.join('')}`;
+}
+
+function comparisonSection(comparison: GitComparisonDTO, text: (value: string) => string): string {
+  const labels = copy.comparison;
+  return `<section id="comparison"><h2>${labels.title}</h2>
+    <h3>${labels.summary}</h3><p class="body-text">${text(comparison.summary)}</p>
+    ${comparisonItems(labels.sections, comparison.sections, text)}
+    ${comparisonItems(labels.transactions, comparison.transactions, text)}
+  </section>`;
+}
+
+function comparisonFiles(files: GitReviewDTO['files'], text: (value: string) => string): string {
+  const labels = copy.comparison;
+  const items = files.map(({ path, oldPath, status, additions, deletions }) => {
+    const location = oldPath === undefined ? text(path) : `${text(oldPath)} → ${text(path)}`;
+    const stats = additions === null || deletions === null ? '' : ` · +${additions} / −${deletions}`;
+    return `<li>${labels.fileStatus[status]} · <code>${location}</code>${stats}</li>`;
+  });
+  return `<section id="files"><h2>${labels.files}</h2>${items.length === 0 ? `<p>${labels.empty}</p>` : `<ul>${items.join('')}</ul>`}</section>`;
+}
+
 function renderReport(review: GitReviewDTO, name: string, privatePaths: string[]): string {
   const redact = (value: string) =>
     privatePaths.reduce((current, path) => current.replaceAll(path, copy.localPath), value);
   const text = (value: string) => escapeHtml(redact(value));
   const hash = (content: string) => `'sha256-${createHash('sha256').update(content).digest('base64')}'`;
+  const { comparison } = review;
+  const isCompare = review.target === GitReviewTarget.Compare;
+  const title = isCompare ? copy.comparison.title : copy.title;
   return `${markerFor(review.id)}<html lang="${copy.language}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${hash(THEME_AND_FILTERS)}; style-src ${hash(STYLES)}; base-uri 'none'; form-action 'none'">
-<title>${text(name)} · ${copy.title}</title>
+<title>${text(name)} · ${title}</title>
 <style>${STYLES}</style>
 </head>
 <body>
 <header id="overview">
-<h1>${text(name)} · ${copy.title}</h1>
+<h1>${text(name)} · ${title}</h1>
 <label>${copy.theme.label} <select id="theme"><option value="auto">${copy.theme.auto}</option><option value="light">${copy.theme.light}</option><option value="dark">${copy.theme.dark}</option></select></label>
-<nav aria-label="${copy.navigation}"><a href="#overview">${copy.overview}</a><a href="#findings">${copy.findings}</a><a href="#impacts">${copy.impacts}</a><a href="#regression">${copy.regression}</a></nav>
-<h2>${copy.target[review.target]} · ${text(review.label)}</h2>
-<p><code>${text(review.from)} → ${review.to === null ? copy.worktreeVersion : text(review.to)}</code></p>
+<nav aria-label="${copy.navigation}"><a href="#overview">${copy.overview}</a>${comparison === undefined ? '' : `<a href="#comparison">${copy.comparison.title}</a>`}${isCompare ? `<a href="#files">${copy.comparison.files}</a>` : ''}<a href="#findings">${copy.findings}</a><a href="#impacts">${copy.impacts}</a><a href="#regression">${copy.regression}</a></nav>
+<h2>${isCompare ? copy.comparison.mode : copy.target[review.target]} · ${text(review.label)}</h2>
+${
+  comparison === undefined
+    ? `<p><code>${text(review.from)} → ${review.to === null ? copy.worktreeVersion : text(review.to)}</code></p>`
+    : `<p>${copy.comparison.from} <code>${text(review.from)}</code> · ${copy.comparison.match[comparison.fromMatch]}</p>
+<p>${copy.comparison.to} <code>${review.to === null ? copy.worktreeVersion : text(review.to)}</code> · ${copy.comparison.match[comparison.toMatch]}</p>`
+}
 ${completionTime(review.finishedAt)}
-<p>${copy.match[review.designMatch]}${review.designSnapshotSha === null ? '' : ` · <code>${text(review.designSnapshotSha)}</code>`}</p>
+${comparison === undefined ? `<p>${copy.match[review.designMatch]}${review.designSnapshotSha === null ? '' : ` · <code>${text(review.designSnapshotSha)}</code>`}</p>` : ''}
 ${reportStatistics(review)}
 ${review.summary === null ? '' : `<p class="body-text">${text(review.summary)}</p>`}
 </header>
 <main>
+${comparison === undefined ? '' : comparisonSection(comparison, text)}
+${isCompare ? comparisonFiles(review.files, text) : ''}
 ${findingsSection(review, text)}
 ${impactsSection(review, text)}
 <section id="regression"><h2>${copy.regression}</h2>${review.regressionChecks.length === 0 ? `<p>${copy.noChecks}</p>` : checks(review.regressionChecks, text)}</section>

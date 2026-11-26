@@ -96,7 +96,10 @@ export function screenDesignImpact(
   };
 }
 
-export function renderDesignImpact(impact: ReturnType<typeof screenDesignImpact>) {
+export function renderDesignImpact(
+  impact: ReturnType<typeof screenDesignImpact>,
+  maxBytes = DESIGN_IMPACT_PROMPT_MAX_BYTES,
+) {
   if (impact.match === DesignKnowledgeMatch.Missing) {
     return { context: '未建立可用项目设计（missing）。基于目标源码和 Diff 完成审查。', truncated: false };
   }
@@ -113,7 +116,7 @@ export function renderDesignImpact(impact: ReturnType<typeof screenDesignImpact>
   const truncatedNotice = '\n影响初筛已截断，仍需核查未列出的变更。';
   const bytes = (value: string) => Buffer.byteLength(value, 'utf8');
   const header = [matchLabel, baseline, ...details].join('\n');
-  let remaining = DESIGN_IMPACT_PROMPT_MAX_BYTES - bytes(header) - bytes(truncatedNotice);
+  let remaining = maxBytes - bytes(header) - bytes(truncatedNotice);
   if (remaining < 0) {
     return { context: [matchLabel, ...details].join('\n') + truncatedNotice, truncated: true };
   }

@@ -18,6 +18,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
+import { GIT_REVIEW_COPY as R } from '../../copy/git-review.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import styles from './git.module.css';
 import {
@@ -119,6 +120,7 @@ export function BranchesView({
 }) {
   const branches = useQuery(gitBranchesQuery(project.id));
   const switchTo = useSwitchBranch(project.id);
+  const compareEndpoints = useStartReview(project.id);
   const [showRemote, setShowRemote] = useState(false);
   const [from, setFrom] = useState(project.defaultBranch);
   const [since, setSince] = useState('');
@@ -305,7 +307,21 @@ export function BranchesView({
         >
           {C.compareRun}
         </Button>
+        <Button
+          variant="primary"
+          disabled={since !== '' || from.trim() === '' || to.trim() === ''}
+          pending={compareEndpoints.isPending}
+          onClick={() =>
+            compareEndpoints.mutate(
+              { target: { kind: GitReviewTarget.Compare, from: from.trim(), to: to.trim() } },
+              { onSuccess: (started) => onOpenReview(started.id) },
+            )
+          }
+        >
+          {R.comparison.mode}
+        </Button>
       </div>
+      {compareEndpoints.isError && <ErrorState error={compareEndpoints.error} />}
       {since !== '' && (
         <p className={styles.fine}>
           <Icon name="info" size="sm" />

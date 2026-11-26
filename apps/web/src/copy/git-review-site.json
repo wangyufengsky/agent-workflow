@@ -45,7 +45,45 @@
   "classification": { "direct": "直接影响", "indirect": "间接影响", "possible": "潜在待核实" },
   "evidence": { "static": "静态确认", "inferred": "AI 推断" },
   "kind": { "section": "章节", "submodule": "子模块", "file": "文件", "symbol": "符号", "transaction": "交易" },
-  "target": { "worktree": "工作区改动", "commit": "提交", "branch": "分支", "range": "区间" },
+  "target": {
+    "worktree": "工作区改动",
+    "commit": "提交",
+    "branch": "分支",
+    "range": "区间",
+    "compare": "双版本端点对比"
+  },
+  "comparison": {
+    "screening": {
+      "duplicate": "同一稳定键对应多个设计条目，需核实各条目与源码的对应关系。",
+      "possibleRename": "可能存在改名或范围调整，需核实 Git 两端源码。",
+      "coverageGap": "另一端设计覆盖不完整，需核实 Git 两端源码。",
+      "partialIdentity": "交易身份信息不完整，需核实源码中的交易码、渠道与版本。",
+      "sourceOnlySummary": "根据两端 Git 源码核验架构与交易变化。",
+      "initialSummary": "设计初筛等待源码核验。"
+    },
+    "title": "双版本端点对比",
+    "mode": "直连双端点 · 非 merge-base",
+    "from": "旧版 · from",
+    "to": "新版 · to",
+    "sections": "架构与模块变化",
+    "transactions": "交易链路变化",
+    "files": "源码变更",
+    "summary": "对比摘要",
+    "empty": "暂无对比条目。",
+    "status": {
+      "added": "＋ 新增",
+      "removed": "－ 删除",
+      "modified": "～ 修改",
+      "unchanged": "＝ 未变",
+      "uncertain": "？ 待确认"
+    },
+    "match": {
+      "exact": "精确匹配快照",
+      "reference": "参考设计",
+      "missing": "无设计快照"
+    },
+    "fileStatus": { "added": "＋ 新增", "deleted": "－ 删除", "modified": "～ 修改", "renamed": "→ 重命名" }
+  },
   "match": {
     "exact": "精确匹配快照",
     "reference": "参考设计（非当前目标版本）",

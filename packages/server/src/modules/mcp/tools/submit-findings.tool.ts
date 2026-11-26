@@ -7,7 +7,7 @@ export const submitFindingsTool = (reviews: GitReviewsService) =>
   defineMcpTool({
     name: McpToolName.SubmitFindings,
     description:
-      'Submit your review: a conclusion, code findings on the reviewed diff, business impacts with evidence, and regression checks. Call it exactly once; the review is not done until it succeeds.',
+      'Submit the review conclusion, code findings, business impacts and regression checks. Only a direct endpoint comparison accepts comparison, with the endpoint matches, verified module and transaction changes, and business summary.',
     allowedKinds: [AttemptKind.GitReview],
     input: submitFindingsInputSchema,
     output: z.object({ accepted: z.literal(true) }),

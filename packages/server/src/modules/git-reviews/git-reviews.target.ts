@@ -104,11 +104,25 @@ export async function resolveTarget(
         files: await diffCommits(repo, from, to),
       };
     }
+    case GitReviewTarget.Compare: {
+      const [from, to] = await Promise.all([commitOf(repo, input.from), commitOf(repo, input.to)]);
+      return {
+        target: input.kind,
+        label: `${short(from)} → ${short(to)}`,
+        from,
+        to,
+        parent: null,
+        files: await diffCommits(repo, from, to),
+      };
+    }
   }
 }
 
 /** How the reviewer reads the diff (its first message, 27 §4.3). */
-export function readCommands(target: Pick<ResolvedTarget, 'from' | 'to' | 'files'>): string {
+export function readCommands(target: ResolvedTarget): string {
+  if (target.target === GitReviewTarget.Compare) {
+    return `- \`git diff -M ${target.from} ${target.to}\`\n- Read the old and new source with \`git show ${target.from}:<old-path>\` and \`git show ${target.to}:<new-path>\`.`;
+  }
   if (target.to !== null) return `- \`git diff ${target.from} ${target.to}\` (one file: add \`-- <path>\`)`;
   return [
     `- \`git diff ${target.from}\` for tracked files (staged and unstaged changes together)`,

@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
 import {
+  type DesignBlock,
   type DesignDiagramNode,
   type DesignEvidence,
   DesignEvidenceClass,
@@ -45,6 +46,7 @@ export type ProjectKnowledgeIndex = Readonly<{
   sourceSnapshot: Readonly<ProjectDesign['sourceSnapshot']>;
   coverage: Readonly<{ doneSections: number; totalSections: number }>;
   sections: ReadonlyMap<string, Section>;
+  sectionBlocks: ReadonlyMap<string, readonly DesignBlock[]>;
   submodules: ReadonlyMap<string, ReadonlyMap<string, Submodule>>;
   transactions: ReadonlyMap<string, ReadonlyMap<string, Transaction>>;
   files: ReadonlyMap<string, Readonly<DesignFile>>;
@@ -206,11 +208,13 @@ export function buildProjectKnowledgeIndex(
 ): ProjectKnowledgeIndex {
   const refs = collectReferences();
   const completed = new Map<string, Section>();
+  const sectionBlocks = new Map<string, readonly DesignBlock[]>();
   const submodules = new Map<string, ReadonlyMap<string, Submodule>>();
   const transactions = new Map<string, ReadonlyMap<string, Transaction>>();
   for (const { id, kind, title, scopePaths, blocks } of sections) {
     if (blocks === null) continue;
     completed.set(id, { id, kind, title, scopePaths });
+    sectionBlocks.set(id, blocks);
     const indexed = indexSectionBlocks(id, blocks, refs);
     submodules.set(id, indexed.submodules);
     transactions.set(id, indexed.transactions);
@@ -229,6 +233,7 @@ export function buildProjectKnowledgeIndex(
     sourceSnapshot: design.sourceSnapshot,
     coverage: { doneSections: selected.filter(({ id }) => completed.has(id)).length, totalSections: selected.length },
     sections: completed,
+    sectionBlocks,
     submodules,
     transactions,
     files: inventory.filesByPath,

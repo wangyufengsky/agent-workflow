@@ -26,6 +26,7 @@ import { designQuery, designStalenessQuery } from '../designs/designs.queries.ts
 import styles from './git.module.css';
 import { gitReviewQuery, useUpdateGitFindingStatus } from './git.queries.ts';
 import { severityCounts } from './git-parts.tsx';
+import { ReviewComparison } from './review-comparison.tsx';
 import { type EvidenceLocation, ReviewEvidenceDialog } from './review-evidence-dialog.tsx';
 import { ReviewExportDialog } from './review-export-dialog.tsx';
 import { ReviewImpacts } from './review-impacts.tsx';
@@ -240,6 +241,13 @@ export function ReviewResult({
   const chosen = findings.filter(isChosen);
   const cannotFixWorktree = review.target === GitReviewTarget.Worktree;
   const canFix = chosen.length > 0 && !cannotFixWorktree;
+  const comparison = review.target === GitReviewTarget.Compare ? review.comparison : undefined;
+  const exportTitle = comparison === undefined ? R.export : R.exportComparison;
+  const toSha = review.to;
+  const comparisonReport =
+    comparison == null || toSha === null ? null : (
+      <ReviewComparison review={review} toSha={toSha} comparison={comparison} />
+    );
   const worktree = useQuery({
     ...gitReviewQuery(review.id),
     enabled: cannotFixWorktree,
@@ -274,7 +282,7 @@ export function ReviewResult({
     <>
       <div className={report.toolbar}>
         <Button size="sm" onClick={() => setExportOpen(true)}>
-          {R.export}
+          {exportTitle}
         </Button>
         <Button
           size="sm"
@@ -293,7 +301,7 @@ export function ReviewResult({
           {R.worktreeDrift}
         </p>
       )}
-      <ReviewDesign review={review} projectId={projectId} />
+      {comparisonReport === null && <ReviewDesign review={review} projectId={projectId} />}
       <Tabs
         value={tab}
         onValueChange={(next) => {
@@ -303,8 +311,8 @@ export function ReviewResult({
         items={[
           {
             value: Tab.Overview,
-            label: R.overview,
-            content: (
+            label: comparisonReport === null ? R.overview : R.comparison.title,
+            content: comparisonReport ?? (
               <div className={report.stack}>
                 <div className={report.target}>
                   <span className="badge">{C.targetLabel[review.target]}</span>
@@ -383,7 +391,7 @@ export function ReviewResult({
       {evidence !== undefined && (
         <ReviewEvidenceDialog review={review} location={evidence} close={() => setEvidence(undefined)} />
       )}
-      {exportOpen && <ReviewExportDialog reviewId={review.id} close={() => setExportOpen(false)} />}
+      {exportOpen && <ReviewExportDialog reviewId={review.id} title={exportTitle} close={() => setExportOpen(false)} />}
     </>
   );
 }

@@ -1,10 +1,12 @@
 import {
   DesignKnowledgeMatch,
   diffFileSchema,
+  type GitComparisonDTO,
   type GitFindingDTO,
   type GitFindingInput,
   GitFindingStatus,
   type GitImpactItemDTO,
+  gitComparisonSchema,
   gitFindingSchema,
   gitReviewImpactsSchema,
   gitReviewRegressionChecksSchema,
@@ -23,12 +25,13 @@ const findingsSchema = z.array(gitFindingSchema.partial({ id: true, status: true
 
 export type Review = Omit<
   ReviewRow,
-  'files' | 'findings' | 'impacts' | 'regressionChecks' | 'designMatch' | 'impactTruncated'
+  'files' | 'findings' | 'impacts' | 'regressionChecks' | 'designMatch' | 'impactTruncated' | 'comparison'
 > & {
   files: z.infer<typeof filesSchema>;
   findings: GitFindingDTO[];
   impacts: GitImpactItemDTO[];
   regressionChecks: string[];
+  comparison?: GitComparisonDTO | undefined;
   designMatch: DesignKnowledgeMatch;
   impactTruncated: boolean;
 };
@@ -40,7 +43,7 @@ type DesignMetadata = 'designId' | 'designSnapshotSha' | 'designMatch' | 'impact
 const findingId = (index: number): string => `finding-${index + 1}`;
 
 // JSON columns are parsed at the boundary (06 §9).
-function toReview({ files, findings, impacts, regressionChecks, ...row }: ReviewRow): Review {
+function toReview({ files, findings, impacts, regressionChecks, comparison, ...row }: ReviewRow): Review {
   return {
     ...row,
     files: filesSchema.parse(JSON.parse(files)),
@@ -56,6 +59,7 @@ function toReview({ files, findings, impacts, regressionChecks, ...row }: Review
     impacts: impacts === null ? [] : gitReviewImpactsSchema.parse(JSON.parse(impacts)),
     regressionChecks:
       regressionChecks === null ? [] : gitReviewRegressionChecksSchema.parse(JSON.parse(regressionChecks)),
+    ...(comparison === null ? {} : { comparison: gitComparisonSchema.parse(JSON.parse(comparison)) }),
     designMatch: row.designMatch ?? DesignKnowledgeMatch.Missing,
     impactTruncated: row.impactTruncated ?? false,
   };
@@ -64,12 +68,13 @@ function toReview({ files, findings, impacts, regressionChecks, ...row }: Review
 export function createGitReviewsRepo(db: DbExecutor) {
   const r = gitReviewsTable;
   return {
-    insert({ designMatch, ...review }: NewReview): void {
+    insert({ designMatch, comparison, ...review }: NewReview): void {
       db.insert(r)
         .values({
           ...review,
           designMatch: designMatch === undefined || designMatch === DesignKnowledgeMatch.Missing ? null : designMatch,
           files: JSON.stringify(review.files),
+          comparison: comparison === undefined ? null : JSON.stringify(comparison),
         })
         .run();
     },
@@ -97,6 +102,7 @@ export function createGitReviewsRepo(db: DbExecutor) {
       findings: readonly GitFindingInput[],
       impacts?: readonly GitImpactItemDTO[],
       regressionChecks?: readonly string[],
+      comparison?: GitComparisonDTO,
     ): void {
       const newFindings = findings.map((finding, index) => ({
         ...finding,
@@ -109,6 +115,7 @@ export function createGitReviewsRepo(db: DbExecutor) {
           findings: JSON.stringify(newFindings),
           impacts: impacts === undefined ? null : JSON.stringify(impacts),
           regressionChecks: regressionChecks === undefined ? null : JSON.stringify(regressionChecks),
+          ...(comparison === undefined ? {} : { comparison: JSON.stringify(comparison) }),
         })
         .where(eq(r.id, id))
         .run();

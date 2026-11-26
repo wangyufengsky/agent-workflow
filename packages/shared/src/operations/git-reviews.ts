@@ -20,7 +20,7 @@ export const startGitReviewOp = defineOperationContract({
   refs: { id: InputRef.Project },
   title: 'op.gitReviews.start',
   description:
-    'Let the AI review uncommitted changes, a commit, a branch or a range read-only; it reports structured findings',
+    'Review uncommitted changes, a commit, a branch or a merge-base range read-only, or compare two commit endpoints directly',
   input: z.object({ id: z.string(), target: gitReviewTargetInputSchema, focus: gitReviewFocusSchema.optional() }),
   output: gitReviewSchema,
   // Starts a model session that reads the repository and uses model quota.

@@ -105,9 +105,21 @@ export const GitReviewTarget = {
   Branch: 'branch',
   /** Any two refs, from their merge base. */
   Range: 'range',
+  /** Any two refs, using both resolved commits directly. */
+  Compare: 'compare',
 } as const;
 export type GitReviewTarget = (typeof GitReviewTarget)[keyof typeof GitReviewTarget];
 export const gitReviewTargetSchema = z.enum(GitReviewTarget);
+
+export const GitComparisonStatus = {
+  Added: 'added',
+  Removed: 'removed',
+  Modified: 'modified',
+  Unchanged: 'unchanged',
+  Uncertain: 'uncertain',
+} as const;
+export type GitComparisonStatus = (typeof GitComparisonStatus)[keyof typeof GitComparisonStatus];
+export const gitComparisonStatusSchema = z.enum(GitComparisonStatus);
 
 export const GitReviewEvidenceState = {
   Available: 'available',

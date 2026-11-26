@@ -791,6 +791,10 @@
   }
 }
 
+.changes[data-comparison] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .changes > * {
   min-height: 0;
   overflow: auto;

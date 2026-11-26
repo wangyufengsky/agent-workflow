@@ -10,6 +10,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY, formatTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
+import { GIT_REVIEW_COPY as R } from '../../copy/git-review.ts';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { BranchesView, isTaskOwned } from './branches-view.tsx';
 import { type ChangePick, ChangesList, ChangesMain } from './changes-view.tsx';
@@ -305,6 +306,7 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
   if (review.isError) return <ErrorState error={review.error} />;
   const r = review.data;
   const place = reviewSearch(r);
+  const compare = r.target === GitReviewTarget.Compare;
   // A worktree or commit review is shown where its diff is (a link to one may still name this view).
   if (place.view !== 'review') return <Navigate to={ROUTES.gitProject} params={{ projectId }} search={place} replace />;
   const history = (recent.data ?? []).filter(
@@ -317,13 +319,14 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
     : [...history, r];
   const selectReview = (id: string) => void navigate({ search: { view: 'review', review: id } });
   return (
-    <div className={styles.changes}>
+    <div className={styles.changes} data-comparison={compare || undefined}>
       <section className={styles.detail}>
         <div className={styles.detailHead}>
           <div className={styles.titleRow}>
             <h2>
               {C.targetLabel[r.target]} · <span className="mono">{r.label}</span>
             </h2>
+            {compare && <span className="badge">{R.comparison.mode}</span>}
           </div>
         </div>
         <ReviewPanel
@@ -332,11 +335,11 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
           reviews={reports}
           selectedReviewId={r.id}
           onSelectReview={selectReview}
-          onLocate={(f) => setFocus({ path: f.path, line: f.line, side: f.side ?? DiffSide.New })}
+          onLocate={compare ? undefined : (f) => setFocus({ path: f.path, line: f.line, side: f.side ?? DiffSide.New })}
         />
       </section>
-      <section className={styles.diffPane}>
-        {r.to !== null && (
+      {!compare && r.to !== null && (
+        <section className={styles.diffPane}>
           <DiffBrowser
             files={r.files}
             fileQuery={gitDiffFileQuery(projectId, r.from, r.to)}
@@ -349,8 +352,8 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
             }
             focus={focus?.line === undefined ? undefined : { line: focus.line, side: focus.side }}
           />
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

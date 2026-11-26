@@ -23,6 +23,7 @@ export function reviewSearch(review: GitReviewDTO): ReviewSearch {
         review: review.id,
       };
     case GitReviewTarget.Branch:
+    case GitReviewTarget.Compare:
     case GitReviewTarget.Range:
       return { view: 'review', review: review.id };
   }
@@ -41,6 +42,7 @@ export function reviewTarget(review: GitReviewDTO): GitReviewTargetInput {
       };
     case GitReviewTarget.Branch:
       return { kind: review.target, branch: review.label };
+    case GitReviewTarget.Compare:
     case GitReviewTarget.Range:
       return { kind: review.target, from: review.from, to: review.to ?? review.from };
   }
