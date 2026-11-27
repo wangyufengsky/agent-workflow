@@ -53,6 +53,7 @@ import {
   type AttemptSignal,
   type AttemptStateDeps,
   createAttemptState,
+  type DesignContinuation,
   errorOf,
   hasPendingEndCommand,
   type LiveSession,
@@ -109,6 +110,7 @@ export type StartAttemptInput = {
   browserTestSubmit?: BrowserTestSubmitTool;
   functionalTestNode?: FunctionalTestNode;
   designDatabaseMetadata?: boolean;
+  designContinuation?: DesignContinuation;
   delegation?: { parentAttemptId: string; commit: string };
 };
 
@@ -204,7 +206,10 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   /** Registers the session as ours, with the attempt timeout running. */
   function track(
     attempt: Attempt,
-    session: Pick<LiveSession, 'attemptId' | 'taskId' | 'sessionId' | 'directory' | 'agent' | 'model' | 'system'>,
+    session: Pick<
+      LiveSession,
+      'attemptId' | 'taskId' | 'sessionId' | 'directory' | 'agent' | 'model' | 'system' | 'designContinuation'
+    >,
     parked: boolean,
     submitTool: McpToolName | null = ATTEMPT_SUBMIT_TOOL[attempt.kind],
   ): LiveSession {
@@ -363,6 +368,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         agent,
         model: input.model === null ? undefined : parseModelRef(input.model),
         system: input.system,
+        designContinuation: input.designContinuation,
       },
       false,
       input.browserTestSubmit ?? ATTEMPT_SUBMIT_TOOL[input.kind],
@@ -766,27 +772,31 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
      * else; while it is still working the answer waits for its next idle. After a restart the persisted session is
      * re-attached. An attempt that already ended keeps the answer only in the task context.
      */
-    async deliverAnswer(attemptId: string, text: string, resume: ResumeInput): Promise<void> {
+    async deliverAnswer(attemptId: string, text: string, restore: () => ResumeInput): Promise<void> {
       const attempt = mustFind(attemptId);
       if (attempt.status !== AttemptStatus.Running || attempt.opencodeSessionId === null) return;
-      if (!state.sessionOf(attemptId)) await restorePermissionRules(attempt, resume);
-      if (mustFind(attemptId).status !== AttemptStatus.Running) return;
-      const session =
-        state.sessionOf(attemptId) ??
-        track(
-          attempt,
-          {
-            attemptId,
-            taskId: attempt.taskId,
-            sessionId: attempt.opencodeSessionId,
-            directory: attempt.directory,
-            agent: resume.functionalTest ? OPENCODE_FUNCTIONAL_TEST_AGENT : OPENCODE_AGENT_NAME[resume.agent],
-            model: attempt.model === null ? undefined : parseModelRef(attempt.model),
-            system: resume.system,
-          },
-          true,
-          null,
-        );
+      let session = state.sessionOf(attemptId);
+      if (!session) {
+        const resume = restore();
+        await restorePermissionRules(attempt, resume);
+        if (mustFind(attemptId).status !== AttemptStatus.Running) return;
+        session =
+          state.sessionOf(attemptId) ??
+          track(
+            attempt,
+            {
+              attemptId,
+              taskId: attempt.taskId,
+              sessionId: attempt.opencodeSessionId,
+              directory: attempt.directory,
+              agent: resume.functionalTest ? OPENCODE_FUNCTIONAL_TEST_AGENT : OPENCODE_AGENT_NAME[resume.agent],
+              model: attempt.model === null ? undefined : parseModelRef(attempt.model),
+              system: resume.system,
+            },
+            true,
+            null,
+          );
+      }
       session.pendingAnswers.push(text);
       reactions.resume(session);
     },

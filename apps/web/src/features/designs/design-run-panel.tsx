@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { ATTEMPT_STATUS_LABEL } from '../../copy/attempts.ts';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
 import { DESIGNS_COPY } from '../../copy/designs.ts';
+import { InboxCard } from '../inbox/inbox-card.tsx';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { progressSection } from './design-reading.ts';
 import styles from './design-workbench.module.css';
@@ -54,7 +55,8 @@ export function DesignRunPanel({
         <Button size="sm" variant="ghost" icon="chevRight" onClick={onClose} aria-label={C.hideAttempts} />
       </div>
       <div className={styles.activityBody}>
-        {active?.awaitingInput && (
+        {design.continuationQuestion && <InboxCard item={design.continuationQuestion} />}
+        {active?.awaitingInput && !design.continuationQuestion && (
           <Link className="link" to={ROUTES.inbox}>
             {DESIGNS_COPY.permissions}
           </Link>

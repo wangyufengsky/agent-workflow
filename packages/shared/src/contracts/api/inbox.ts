@@ -6,12 +6,16 @@ import { errorInfoSchema } from '../../errors/codes.ts';
 
 // Payload (what the item asks) and response (what the user decided) per kind (10 §inbox_items).
 
-export const questionPayloadSchema = z.object({
+const modelQuestionSchema = z.object({
   question: z.string(),
   options: z.array(z.string()).optional(),
   blocking: z.boolean(),
   defaultAssumption: z.string().optional(),
 });
+export const questionPayloadSchema = z.union([
+  modelQuestionSchema,
+  z.object({ continueDesign: z.literal(true), blocking: z.literal(true) }),
+]);
 export type QuestionPayload = z.infer<typeof questionPayloadSchema>;
 export const questionAnswerSchema = z.object({ answer: z.string().trim().min(1) });
 /** The model went on with its own assumption; recorded without asking (`ask_on_uncertainty` off). */
@@ -90,9 +94,11 @@ const base = {
 const item = <K extends InboxKind, P extends z.ZodType, R extends z.ZodType>(kind: K, payload: P, response: R) =>
   z.object({ ...base, kind: z.literal(kind), payload, response: response.nullable() });
 
+export const inboxQuestionSchema = item(InboxKind.Question, questionPayloadSchema, questionResponseSchema);
+
 /** `InboxItemDTO` (11 §7). */
 export const inboxItemSchema = z.discriminatedUnion('kind', [
-  item(InboxKind.Question, questionPayloadSchema, questionResponseSchema),
+  inboxQuestionSchema,
   item(InboxKind.Permission, permissionPayloadSchema, permissionResponseSchema),
   item(InboxKind.Acceptance, acceptancePayloadSchema, acceptanceResponseSchema),
   item(InboxKind.Plan, planPayloadSchema, planResponseSchema),

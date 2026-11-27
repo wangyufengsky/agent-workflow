@@ -292,6 +292,7 @@
 | 全量/继续生成 | `designs.generate` | `design_generate` | 首次调用锁定 `outline_confirmed_at`；按章节顺序对所有未完成章节（`blocks IS NULL`）逐章分析，每章提交即落库并推送 `design.updated`；每章一个独立会话，释放模型槽后再串行启动下一章。每轮带精简大纲、当前授权目录的统计和文件样本，目录与样本合计最多 16 KiB；完整扫描索引保存在本地，可在本次会话内按路径查询和翻页。已生成的章节长字段按需分页读取。失败/停止保留提交结果，续作只处理尚未生成的勾选章 |
 | 局部重写 | `designs.reviseSection` | `design_revise` | 目标为单个章节（可带聚焦的文件路径/符号名/图 ID 与一句用户要求）；覆盖前把该章当前内容快照进 `previous` |
 | 独立复审（可选） | `designs.review`（或生成完成后自动衔接） | `design_review` | 独立新会话，对照源码抽查关键结论、无依据断言与跨模块遗漏，经 `submit_design_review` 写回各章 `review_state` 与 `review_notes` |
+| 会话内续作 | `inbox.resolve` | 当前设计尝试 | 压缩恢复时发送本轮目标和预期提交工具。没有成功提交就空闲时自动提醒一次，生成和重写可用 `get_submission_guide({})` 找回最近的校验问题。再次空闲时暂停计时、释放模型名额，在工作台与收件箱显示提问。选「继续当前会话」或补充说明后，原会话继续当前目标，成功后按原队列推进 |
 | 停止与续作 | `designs.stop` / 再次 `designs.generate` | — | 停止中止当前尝试或取消等待中的交接，已提交章节完整保留；应用重启时未完成尝试标为 `interrupted`，用户点「继续生成」只补跑剩余未完成章节 |
 
 **程序化校验（在 `submit_design_section` 边界强制执行）**：

@@ -59,7 +59,7 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
       .list({ taskId, kind: InboxKind.Question }, InboxStatus.Resolved)
       .reverse()
       .flatMap((item) => {
-        if (item.kind !== InboxKind.Question || item.response === null) return [];
+        if (item.kind !== InboxKind.Question || !('question' in item.payload) || item.response === null) return [];
         const answer = 'answer' in item.response ? item.response.answer : `(assumed) ${item.response.value}`;
         return [{ question: item.payload.question, answer }];
       });

@@ -10,6 +10,7 @@ import {
   type DesignSummaryDTO,
   designStatusOf,
   ErrorCode,
+  InboxKind,
   type ListDesignsQuery,
   type ListDesignsResponse,
 } from '@aw/shared';
@@ -172,11 +173,11 @@ export function createDesignQueries({ repo, projects, attempts, inbox, runs: des
         latest !== undefined && latestDetails !== null && ACTIVE_ATTEMPT_STATUSES.includes(latestDetails.attempt.status)
           ? latest.id
           : null;
-      const awaitingInput =
-        activeRunId !== null && latest !== undefined && inbox.listOpen({ attemptId: latest.attemptId }).length > 0;
+      const pending =
+        activeRunId !== null && latest !== undefined ? inbox.listOpen({ attemptId: latest.attemptId }) : [];
       const runs = records.map((record) => {
         const { designId: _designId, attemptId: _attemptId, ...run } = record;
-        return { ...run, ...attemptOf(record, summaries), awaitingInput: run.id === activeRunId && awaitingInput };
+        return { ...run, ...attemptOf(record, summaries), awaitingInput: run.id === activeRunId && pending.length > 0 };
       });
       const { projectId } = design;
       const project = projectId === null ? null : projects.getRecord(projectId);
@@ -198,6 +199,7 @@ export function createDesignQueries({ repo, projects, attempts, inbox, runs: des
         diagrams,
         runs,
         activeRunId,
+        continuationQuestion: pending.find((item) => item.kind === InboxKind.Question) ?? null,
         handoffPending: designRuns.hasPendingHandoff(id),
       };
     },

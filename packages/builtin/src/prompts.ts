@@ -41,6 +41,7 @@ export const PromptName = {
   /** The PPT writer's agent prompt, the first message's context and the message of each kind of work (23 §7). */
   ProtocolSlides: 'protocol-slides',
   ProtocolDesign: 'protocol-design',
+  DesignContinue: 'design-continue',
   DesignOutline: 'design-outline',
   DesignSection: 'design-section',
   DesignRevise: 'design-revise',
@@ -115,6 +116,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ResearchFollowUp]: read(PromptName.ResearchFollowUp),
     [PromptName.ProtocolSlides]: read(PromptName.ProtocolSlides),
     [PromptName.ProtocolDesign]: read(PromptName.ProtocolDesign),
+    [PromptName.DesignContinue]: read(PromptName.DesignContinue),
     [PromptName.DesignOutline]: read(PromptName.DesignOutline),
     [PromptName.DesignSection]: read(PromptName.DesignSection),
     [PromptName.DesignRevise]: read(PromptName.DesignRevise),

@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PromptName, type Prompts } from '@aw/builtin';
+import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   AppError,
+  ATTEMPT_SUBMIT_TOOL,
   AttemptKind,
   AttemptStatus,
   DESIGN_MAX_SECTIONS,
@@ -14,6 +15,7 @@ import {
   type IncrementalUpdateDesignRequest,
   isAttemptActive,
   isDesignAttemptKind,
+  MCP_TOOL_PREFIX,
   ServerEventType,
   SessionAgent,
 } from '@aw/shared';
@@ -196,6 +198,13 @@ export function createDesignRuns({
       title: `Project Design · ${design.title}`,
       model: work.model,
       prompt: work.prompt,
+      designContinuation: {
+        title: design.title,
+        prompt: renderTemplate(prompts[PromptName.DesignContinue], {
+          targets: JSON.stringify(work.targets.map(({ id, title }) => ({ id, title }))),
+          submitTool: MCP_TOOL_PREFIX + ATTEMPT_SUBMIT_TOOL[work.kind],
+        }),
+      },
     } as const;
 
     return unit.transact(() => {
