@@ -1,6 +1,7 @@
 import type { DesignSourceHashes, DesignSourceSnapshot, DesignTemplate } from '@aw/shared';
 import { and, asc, desc, eq, exists, inArray, isNotNull, lt, notExists, or, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
+import type { ReadonlyPermissionPolicy } from '../permissions/index.ts';
 import {
   type DesignDiagramRecord,
   type DesignFile,
@@ -60,6 +61,25 @@ function knowledgeDesigns(db: DbExecutor, projectId: string, targetSha?: string)
 
 export function createDesignsRepo(db: DbExecutor) {
   return {
+    permissionPolicy(attemptId: string): ReadonlyPermissionPolicy | undefined {
+      const row = db
+        .select({ id: designs.id, mode: designs.permissionMode, intent: designs.title })
+        .from(runs)
+        .innerJoin(designs, eq(runs.designId, designs.id))
+        .where(eq(runs.attemptId, attemptId))
+        .get();
+      if (!row) return undefined;
+      return {
+        mode: row.mode,
+        intent: row.intent,
+        canReadFile: (relPath) =>
+          db
+            .select({ id: files.id })
+            .from(files)
+            .where(and(eq(files.designId, row.id), eq(files.relPath, relPath)))
+            .get() !== undefined,
+      };
+    },
     insertDesign(design: ProjectDesign): void {
       db.insert(designs).values(fromDesign(design)).run();
     },
@@ -152,6 +172,7 @@ export function createDesignsRepo(db: DbExecutor) {
           | 'title'
           | 'layoutStyle'
           | 'theme'
+          | 'permissionMode'
           | 'aiReviewEnabled'
           | 'outlineConfirmedAt'
           | 'lastExportedPath'

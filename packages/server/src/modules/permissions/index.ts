@@ -5,9 +5,7 @@ import {
   APPROVER_ROLE_KEY,
   AppError,
   type BashGrant,
-  classifySource,
   ErrorCode,
-  type KnowledgeSources,
   modelEfforts,
   OPENCODE_APPROVER_AGENT,
   type PermissionAction,
@@ -32,7 +30,11 @@ import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 
 export type TaskPermissionPolicy = { mode: PermissionMode; intent: string; checkCommand: string | null };
-export type KnowledgePermissionPolicy = { mode: PermissionMode; intent: string; sources: KnowledgeSources };
+export type ReadonlyPermissionPolicy = {
+  mode: PermissionMode;
+  intent: string;
+  canReadFile: ((relativePath: string) => boolean) | null;
+};
 
 type Asked = Extract<OpencodeEvent, { type: typeof OpencodeEventType.PermissionAsked }>;
 type Call = Extract<OpencodeEvent, { type: typeof OpencodeEventType.Tool }>;
@@ -151,8 +153,13 @@ function researchFiles(command: string): string[] | undefined {
   if (args.length > 0 && args.every((word) => relativeFileWord.test(word))) return args;
 }
 
-async function researchQuery(event: Asked, call: Call | undefined, root: string, sources: KnowledgeSources) {
-  if (!sources.code && !sources.docs) return null;
+async function readonlyQuery(
+  event: Asked,
+  call: Call | undefined,
+  root: string,
+  canReadFile: ReadonlyPermissionPolicy['canReadFile'],
+) {
+  if (canReadFile === null) return null;
   try {
     const local = await localBashCall(event, call, root);
     if (!local) return null;
@@ -172,7 +179,7 @@ async function researchQuery(event: Asked, call: Call | undefined, root: string,
         if (
           isAbsolute(sub) ||
           segments.some((part) => part === '..' || part.toLowerCase() === '.git') ||
-          !sources[classifySource(segments.join('/'))]
+          !canReadFile(segments.join('/'))
         )
           return null;
       }
@@ -320,19 +327,18 @@ export function createPermissionReviewer(deps: {
   return {
     review,
     remember: grants.remember,
-    async researchNative(input: {
-      event: Asked;
-      call: Call | undefined;
-      directory: string;
-      intent: string;
-      mode: PermissionMode;
-      signal: AbortSignal;
-      parentSignal: AbortSignal;
-      sources: KnowledgeSources;
-    }): Promise<{ reply?: PermissionDecision; reason?: string; bashGrant?: BashGrant | null }> {
+    async readonlyNative(
+      input: ReadonlyPermissionPolicy & {
+        event: Asked;
+        call: Call | undefined;
+        directory: string;
+        signal: AbortSignal;
+        parentSignal: AbortSignal;
+      },
+    ): Promise<{ reply?: PermissionDecision; reason?: string; bashGrant?: BashGrant | null }> {
       const { event, call, directory, mode, intent, signal, parentSignal } = input;
       signal.throwIfAborted();
-      const local = await researchQuery(event, call, directory, input.sources);
+      const local = await readonlyQuery(event, call, directory, input.canReadFile);
       if (!local) return {};
       if (mode === PermissionMode.Full) return { reply: PermissionDecision.Once };
       if (mode !== PermissionMode.Assisted) return {};

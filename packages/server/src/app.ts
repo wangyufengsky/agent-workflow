@@ -10,10 +10,12 @@ import {
 } from '@aw/builtin';
 import {
   AppError,
+  AttemptKind,
   DB_QUERY_TIMEOUT_MS,
   ErrorCode,
   getAssistantContextOp,
   getAttemptContextOp,
+  isDesignAttemptKind,
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
@@ -448,7 +450,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     permissionReviewer,
     effortsForRole: (id) => modelEfforts(settings.service.getAll(), id ? roles.service.get(id) : undefined),
     taskPolicy: (id) => readTaskPermissionPolicy(database.db, id),
-    knowledgePolicy: (id) => readKnowledgePermissionPolicy(database.db, id),
+    readonlyPolicy: (kind, id) => {
+      if (isDesignAttemptKind(kind)) return designsRepo.permissionPolicy(id);
+      if (kind === AttemptKind.Research) return readKnowledgePermissionPolicy(database.db, id);
+      return undefined;
+    },
     sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,

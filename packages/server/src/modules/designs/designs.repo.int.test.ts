@@ -14,6 +14,7 @@ import {
   DesignSectionKind,
   DesignStalenessState,
   DesignTemplateKind,
+  PermissionMode,
   ThemeId,
 } from '@aw/shared';
 import { eq } from 'drizzle-orm';
@@ -51,6 +52,7 @@ function design(id: string, projectId: string | null = null): ProjectDesign {
     layoutStyle: DesignLayoutStyle.Doc,
     theme: ThemeId.Default,
     excludePatterns: [],
+    permissionMode: PermissionMode.Ask,
     aiReviewEnabled: false,
     sourceSnapshot: {
       branch: null,

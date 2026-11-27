@@ -763,7 +763,7 @@ payload / response：
 
 | 表 | 字段与关系 | 索引 |
 | --- | --- | --- |
-| `project_designs` | 主键 `id`。可空的 `project_id` 引用 `projects`（SET NULL）。保存标题、分析深度、模板键与模板快照 JSON、阅读风格、主题、排除规则 JSON、复审开关、源码扫描快照 JSON、大纲确认时间、最近导出路径和时间、创建及更新时间。 | `(project_id, updated_at, id)`、`(updated_at, id)` |
+| `project_designs` | 主键 `id`。可空的 `project_id` 引用 `projects`（SET NULL）。保存标题、分析深度、模板键与模板快照 JSON、阅读风格、主题、排除规则 JSON、复审开关、审批模式（`permission_mode`，迁移 `0063_design_permission_mode`，新旧设计均默认 `ask`）、源码扫描快照 JSON、大纲确认时间、最近导出路径和时间、创建及更新时间。 | `(project_id, updated_at, id)`、`(updated_at, id)` |
 | `design_sections` | 主键 `id`，`design_id` 引用设计（CASCADE）。顺序 `seq`、是否勾选 `is_selected`（默认 true）、种类、标题、路径范围 JSON、摘要、正文块 JSON（NULL 表示待生成，submodule 保存子模块、归属文件与带证据的功能解读）、复审状态、复审意见 JSON、可空的章节源码哈希覆盖 `source_hashes` JSON（删除或尚不存在的路径记为 null）、上一版内容及原哈希 JSON、更新时间。 | `(design_id, seq)` |
 | `design_files` | 主键 `id`，`design_id` 引用设计（CASCADE），可空的 `section_id` 引用所属章节（SET NULL）。保存项目相对路径、扫描时或相关章节最近一次提交时的内容哈希（部分更新删除时用空串保留原记录）、可空的职责说明、符号列表 JSON、更新时间。 | `(design_id, rel_path)` 唯一，另有 `(design_id, section_id)` |
 | `design_diagrams` | 主键 `id`，`design_id`、`section_id` 分别引用设计及章节（CASCADE）。保存图种类、标题、节点 JSON、边 JSON、更新时间。 | `(design_id, section_id)` |

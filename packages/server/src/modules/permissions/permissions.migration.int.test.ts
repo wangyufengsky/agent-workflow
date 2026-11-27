@@ -57,3 +57,22 @@ it('升级前已有的知识对话按始终询问打开，历史回答和引用�
     db.close();
   }
 });
+
+it('已有项目设计升级后沿用始终询问，保留每份设计的进度', () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec('CREATE TABLE projects(id TEXT PRIMARY KEY);');
+    db.exec(readFileSync(new URL('../../../migrations/0058_project_designs.sql', import.meta.url), 'utf8'));
+    db.exec(`INSERT INTO project_designs (id,title,depth,template_key,template_snapshot,layout_style,theme,exclude_patterns,ai_review_enabled,source_snapshot,outline_confirmed_at,created_at,updated_at)
+      VALUES ('d','设计','standard','general','{}','arch','default','[]',0,'{}',123,1,2)`);
+    db.exec(readFileSync(new URL('../../../migrations/0063_design_permission_mode.sql', import.meta.url), 'utf8'));
+    expect(
+      db.prepare('SELECT permission_mode, outline_confirmed_at FROM project_designs WHERE id = ?').get('d'),
+    ).toEqual({
+      permission_mode: 'ask',
+      outline_confirmed_at: 123,
+    });
+  } finally {
+    db.close();
+  }
+});

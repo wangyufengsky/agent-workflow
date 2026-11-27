@@ -22,6 +22,7 @@ import {
   MCP_TOOL_PREFIX,
   McpToolName,
   OPENCODE_AGENT_NAME,
+  PermissionMode,
   ServerEventType,
   SessionAgent,
   setProjectDbConnectionsOp,
@@ -65,6 +66,7 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
       layoutStyle: DesignLayoutStyle.Doc,
       theme: ThemeId.Default,
       excludePatterns: [],
+      permissionMode: PermissionMode.Ask,
       aiReviewEnabled: false,
       sourceSnapshot: {
         branch: 'main',

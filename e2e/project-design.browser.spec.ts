@@ -275,11 +275,23 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await expect(template.getByRole('radio', { name: /^交易链路探索/ })).toBeVisible();
   await expect(template.getByRole('radio', { name: /^架构探索/ })).toBeChecked();
   await expect(page.getByLabel('主题', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '设计权限 · 始终询问' }).click();
+  await page.screenshot({ path: test.info().outputPath('design-permissions-create.png'), animations: 'disabled' });
+  await page
+    .getByRole('group', { name: '设计权限' })
+    .getByRole('button', { name: /^自动批准只读/ })
+    .click();
   await page.getByRole('button', { name: '扫描项目并拟定大纲' }).click();
   await expect(page).toHaveURL(/\/designs\/[0-9a-f-]+(?:\?|$)/);
   await expect(page.getByRole('heading', { name: '分析大纲' })).toBeVisible();
   const id = designId(page);
   expect((await design(request, id)).templateKey).toBe('general');
+  await page.getByRole('button', { name: '设计权限 · 自动批准只读' }).click();
+  await page
+    .getByRole('group', { name: '设计权限' })
+    .getByRole('button', { name: /^始终询问/ })
+    .click();
+  await expect(page.getByRole('button', { name: '设计权限 · 始终询问' })).toBeVisible();
 
   await queueDesign(request, project, [
     tool(McpToolName.SubmitDesignOutline, { title: REPOSITORY_TITLE, sections: OUTLINE }),
@@ -312,6 +324,14 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   await page.mouse.wheel(0, 310);
   await expect.poll(() => scrollArea.evaluate((element) => element.scrollTop)).toBeGreaterThan(100);
   const scrollBefore = await scrollArea.evaluate((element) => element.scrollTop);
+  await page.getByRole('button', { name: '设计权限 · 始终询问' }).click();
+  await page.screenshot({ path: test.info().outputPath('design-permissions-running.png'), animations: 'disabled' });
+  await page
+    .getByRole('group', { name: '设计权限' })
+    .getByRole('button', { name: /^帮我批准/ })
+    .click();
+  await expect(page.getByRole('button', { name: '设计权限 · 帮我批准' })).toBeVisible();
+  expect((await design(request, id)).permissionMode).toBe('assisted');
   await releaseGate(request, GATES[0]);
   await expect(page.getByText('2 / 3 章节', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: OVERVIEW, exact: true })).toBeAttached();

@@ -14,6 +14,7 @@ import {
   type GenerateDesignRequest,
   type IncrementalUpdateDesignRequest,
   type LookupDesignImpactRequest,
+  PermissionMode,
   type ReviewDesignRequest,
   type ReviseDesignOutlineRequest,
   type ReviseDesignSectionRequest,
@@ -172,6 +173,7 @@ export function createDesignsService({
         templateSnapshot: { key, name, defaultSections, focusPrompt },
         theme: input.theme ?? (preference === ThemePreference.System ? SYSTEM_THEME_MAP.light : preference),
         layoutStyle: input.layoutStyle ?? DesignLayoutStyle.Arch,
+        permissionMode: input.permissionMode ?? PermissionMode.Ask,
         aiReviewEnabled: input.aiReviewEnabled ?? depth === DesignDepth.Deep,
         excludePatterns,
         sourceSnapshot: scan.snapshot,
@@ -200,12 +202,15 @@ export function createDesignsService({
       });
       return queries.get(id);
     },
-    update({ id, title, layoutStyle, theme, aiReviewEnabled }: UpdateDesignRequest) {
-      const readingOnly =
-        (layoutStyle !== undefined || theme !== undefined) && title === undefined && aiReviewEnabled === undefined;
-      writableDesign(id, { allowDuringRun: readingOnly });
+    update({ id, title, layoutStyle, theme, aiReviewEnabled, permissionMode }: UpdateDesignRequest) {
+      const allowDuringRun =
+        (layoutStyle !== undefined || theme !== undefined || permissionMode !== undefined) &&
+        title === undefined &&
+        aiReviewEnabled === undefined;
+      writableDesign(id, { allowDuringRun });
       return change(id, () =>
         repo.updateDesign(id, {
+          ...(permissionMode === undefined ? {} : { permissionMode }),
           ...(title === undefined ? {} : { title }),
           ...(layoutStyle === undefined ? {} : { layoutStyle }),
           ...(theme === undefined ? {} : { theme }),

@@ -128,7 +128,7 @@ export function KnowledgeWelcomePage() {
               <>
                 <ModelPicker value={model} projectId={projectId ?? null} onChange={setModel} />
                 <PermissionPicker
-                  knowledge
+                  scope="knowledge"
                   value={permissionMode}
                   disabled={ask.isPending}
                   onChange={setPermissionMode}
@@ -310,7 +310,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
             <>
               <ModelPicker value={model} projectId={conversation.project.id} onChange={setModel} />
               <PermissionPicker
-                knowledge
+                scope="knowledge"
                 value={conversation.permissionMode}
                 disabled={pending}
                 onChange={(permissionMode) => changeMode.mutate({ id: conversation.id, permissionMode })}

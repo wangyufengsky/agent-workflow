@@ -10,6 +10,7 @@ import {
   AttemptStatus,
   ErrorCode,
   InboxKind,
+  isDesignAttemptKind,
   MCP_TOOL_PREFIX,
   McpToolName,
   PermissionMode,
@@ -30,8 +31,8 @@ import {
 } from '../opencode/index.ts';
 import {
   grantKey,
-  type KnowledgePermissionPolicy,
   type PermissionReviewer,
+  type ReadonlyPermissionPolicy,
   type TaskPermissionPolicy,
 } from '../permissions/index.ts';
 import type { Attempt } from './attempts.repo.ts';
@@ -54,7 +55,7 @@ export function watchSessions(
   deps: {
     settings: { get(key: 'ai.contextEngine'): boolean };
     taskPolicy(id: string): TaskPermissionPolicy;
-    knowledgePolicy(id: string): KnowledgePermissionPolicy | undefined;
+    readonlyPolicy(kind: AttemptKind, id: string): ReadonlyPermissionPolicy | undefined;
     permissionReviewer: PermissionReviewer;
     opencode: OpencodeClient;
     prompts: Prompts;
@@ -195,10 +196,10 @@ export function watchSessions(
     session.seenPermissions.add(event.permissionId);
     const taskId = attempt.taskId;
     const taskPolicy = taskId === null ? undefined : deps.taskPolicy(taskId);
-    const isResearch = taskId === null && attempt.kind === AttemptKind.Research;
-    const researchPolicy = isResearch ? deps.knowledgePolicy(attempt.id) : undefined;
-    const currentPolicy = () => (taskId === null ? deps.knowledgePolicy(attempt.id) : deps.taskPolicy(taskId));
-    const policy = taskPolicy ?? researchPolicy;
+    const readonlyPolicy = taskId === null ? deps.readonlyPolicy(attempt.kind, attempt.id) : undefined;
+    const currentPolicy = () =>
+      taskId === null ? deps.readonlyPolicy(attempt.kind, attempt.id) : deps.taskPolicy(taskId);
+    const policy = taskPolicy ?? readonlyPolicy;
     if (
       !policy ||
       (taskId === null && (event.permission !== 'bash' || policy.mode === PermissionMode.Ask)) ||
@@ -226,8 +227,8 @@ export function watchSessions(
         parentSignal: session.permissionStop.signal,
         signal,
       };
-      const result = researchPolicy
-        ? await deps.permissionReviewer.researchNative({ ...input, sources: researchPolicy.sources })
+      const result = readonlyPolicy
+        ? await deps.permissionReviewer.readonlyNative({ ...input, canReadFile: readonlyPolicy.canReadFile })
         : taskId === null
           ? {}
           : await deps.permissionReviewer.native({
@@ -284,7 +285,8 @@ export function watchSessions(
         directory: event.directory,
         permission: event.permission,
         patterns: event.patterns,
-        ...(event.permission === 'bash' && (attempt.taskId !== null || attempt.kind === AttemptKind.Research)
+        ...(event.permission === 'bash' &&
+        (attempt.taskId !== null || attempt.kind === AttemptKind.Research || isDesignAttemptKind(attempt.kind))
           ? {
               bashGrant: bashGrant ?? null,
               projectGrantAvailable: attempt.taskId !== null && attempt.projectId !== null,

@@ -3,6 +3,14 @@ export const PERMISSIONS_COPY = {
   conversation: '对话权限',
   task: '任务权限',
   question: '如何批准操作？',
+  design: {
+    label: '设计权限',
+    fullName: '自动批准只读',
+    hint: '适用于本设计之后的权限请求和章节。已出现的审批卡仍需处理。',
+    [PermissionMode.Ask]: '需要额外权限时，由你逐次确认。',
+    [PermissionMode.Assisted]: '审批员核对扫描范围内的只读命令，拿不准时询问你。',
+    [PermissionMode.Full]: '自动允许可核验的项目只读命令。超出扫描范围或无法核验的操作仍需确认。',
+  },
   knowledge: {
     label: '问答权限',
     [PermissionMode.Ask]: '超出只读命令白名单的操作由你审批。',

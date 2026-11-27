@@ -90,7 +90,7 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
           label={task.status === TaskStatus.Review ? reviewLabel : undefined}
         />
         <PermissionPicker
-          task
+          scope="task"
           disabled={finished || permission.isPending}
           value={task.permissionMode ?? PermissionMode.Ask}
           onChange={(permissionMode) => permission.mutate({ id: task.id, permissionMode })}
