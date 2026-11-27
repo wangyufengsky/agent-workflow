@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   createDesignRequestSchema,
   createDesignTemplateRequestSchema,
+  designImpactLookupSchema,
   designSchema,
   designSectionRefSchema,
   designStalenessSchema,
@@ -13,6 +14,7 @@ import {
   listDesignsResponseSchema,
   listDesignTemplatesQuerySchema,
   listDesignTemplatesResponseSchema,
+  lookupDesignImpactRequestSchema,
   reviewDesignRequestSchema,
   reviseDesignOutlineRequestSchema,
   reviseDesignSectionRequestSchema,
@@ -20,6 +22,7 @@ import {
   updateDesignRequestSchema,
   updateDesignTemplateRequestSchema,
 } from '../contracts/api/designs.ts';
+import { fullGitCommitShaSchema } from '../contracts/api/git.ts';
 import { designTemplateSchema } from '../contracts/design/template.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
@@ -58,11 +61,25 @@ export const getDesignStalenessOp = defineOperationContract({
   ...common,
   id: 'designs.staleness',
   title: 'op.designs.staleness',
-  description: 'Check whether project files have changed since this design was scanned',
-  input: byId,
+  description:
+    'Check whether project files have changed since this design was scanned, optionally comparing a specific commit',
+  input: byId.extend({ commitSha: fullGitCommitShaSchema.optional() }),
   output: designStalenessSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/designs/:id/staleness' },
+  refs: designRef,
+});
+
+export const lookupDesignImpactOp = defineOperationContract({
+  ...common,
+  id: 'designs.lookupImpact',
+  title: 'op.designs.lookupImpact',
+  description:
+    'Look up static impact candidates for up to 50 project-relative file paths against a saved design snapshot',
+  input: lookupDesignImpactRequestSchema,
+  output: designImpactLookupSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/designs/:id/lookup-impact' },
   refs: designRef,
 });
 
@@ -88,6 +105,7 @@ export const createDesignOp = defineOperationContract({
   title: 'op.designs.create',
   description: 'Scan the project and create a draft design outline without calling any AI model',
   input: createDesignRequestSchema,
+  assistantOmit: ['permissionMode'],
   output: designSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/designs', status: 201 },
@@ -101,6 +119,7 @@ export const updateDesignOp = defineOperationContract({
   title: 'op.designs.update',
   description: 'Rename a design or change its presentation and review settings',
   input: updateDesignRequestSchema,
+  assistantOmit: ['permissionMode'],
   output: designSchema,
   risk: OperationRisk.Write,
   http: { method: 'PATCH', path: '/designs/:id' },

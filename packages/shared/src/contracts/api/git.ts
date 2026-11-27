@@ -29,6 +29,8 @@ import { errorInfoSchema } from '../../errors/codes.ts';
 import { designRelativePathSchema, designTitleSchema } from '../design/block.ts';
 import { diffFileSchema } from '../mcp/get-task-diff.ts';
 
+export const fullGitCommitShaSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
+
 /** The task a branch or worktree belongs to (Git console, 11 §8). */
 export const gitTaskRefSchema = z.object({ id: z.string(), key: z.string(), status: taskStatusSchema });
 
@@ -324,6 +326,10 @@ export const gitReviewSchema = z.object({
   finishedAt: z.number().nullable(),
 });
 export type GitReviewDTO = z.infer<typeof gitReviewSchema>;
+
+export function reviewRegressionChecks(review: Pick<GitReviewDTO, 'regressionChecks' | 'impacts'>): string[] {
+  return [...new Set([...review.regressionChecks, ...review.impacts.flatMap((impact) => impact.suggestedChecks)])];
+}
 
 export const gitReviewEvidenceSchema = z.object({
   path: z.string(),

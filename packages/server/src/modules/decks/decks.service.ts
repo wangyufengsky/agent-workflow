@@ -42,7 +42,7 @@ import { SessionPurpose } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { TasksService } from '../tasks/index.ts';
-import { describeMaterials, snapshotMaterials } from './decks.materials.ts';
+import { describeMaterials, type MaterialSources, snapshotMaterials } from './decks.materials.ts';
 import {
   describeLayouts,
   describeOutline,
@@ -52,7 +52,7 @@ import {
 } from './decks.prompts.ts';
 import { createDecksRepo, type Deck, type Run, type Slide } from './decks.repo.ts';
 
-export type DecksServiceDeps = {
+export type DecksServiceDeps = Pick<MaterialSources, 'design' | 'gitReview'> & {
   db: Db;
   unit: UnitOfWork;
   clock: Clock;
@@ -369,6 +369,8 @@ export function createDecksService(deps: DecksServiceDeps) {
         task: tasks.detail,
         artifact: tasks.artifacts.textAt,
         knowledge: knowledge.get,
+        design: deps.design,
+        gitReview: deps.gitReview,
         web: browser.readUrl,
       });
       const projectIds = new Set(

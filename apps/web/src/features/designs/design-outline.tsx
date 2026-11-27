@@ -17,6 +17,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { DESIGN_WORKBENCH_COPY } from '../../copy/design-workbench.ts';
 import { DESIGNS_COPY as C, DESIGN_SECTION_LABEL, DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
+import { DesignPermissionPicker } from './design-permission-picker.tsx';
 import { DeleteDesignDialog } from './design-workbench-dialogs.tsx';
 import styles from './designs.module.css';
 import { useGenerateDesign, useReviseDesignOutline, useStopDesign, useUpdateDesignOutline } from './designs.queries.ts';
@@ -148,6 +149,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
           <h1 className="title">{design.title}</h1>
           <p className="lede">{C.outlineHint}</p>
         </div>
+        <DesignPermissionPicker design={design} />
         <span className="badge">{DESIGN_STATUS_LABEL[design.status]}</span>
         <Button
           icon="trash"

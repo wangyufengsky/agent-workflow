@@ -1,4 +1,6 @@
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   createDesignOp,
@@ -18,6 +20,8 @@ import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject } from '../../../test/helpers/tasks.ts';
+import { DATABASE_FILE, openDatabase } from '../../core/db/database.ts';
+import { createDesignsRepo } from './designs.repo.ts';
 
 let t: TestApp;
 beforeEach(async () => {
@@ -209,4 +213,120 @@ it('不存在的设计返回 DESIGN_NOT_FOUND', async () => {
   const response = await t.call(getDesignStalenessOp, { id: 'missing' });
   expect(response.status).toBe(404);
   expect(response.raw.json()).toMatchObject({ error: { code: ErrorCode.DesignNotFound } });
+});
+
+it('功能分支保持原样时按主分支合入提交比对，并尊重逐章历史哈希', async () => {
+  const relPath = 'src/initial.ts';
+  const before = 'export const version = 1;\n';
+  const after = 'export const version = 2;\n';
+  const { project, repo } = await addProject(t, {
+    files: { [relPath]: before, 'scratch.txt': 'ignored\n', '.gitattributes': '*.ts filter=phase-c-test\n' },
+  });
+  const baseSha = await repo.git('rev-parse', 'HEAD');
+  const { body: design } = await t.call(createDesignOp, { projectId: project.id, excludePatterns: ['scratch.txt'] });
+  const { body: outline } = await t.call(updateDesignOutlineOp, {
+    id: design.id,
+    sections: [
+      { kind: DesignSectionKind.Module, title: '先更新的模块', scopePaths: ['src'] },
+      { kind: DesignSectionKind.Overview, title: '仍使用旧版的总览', scopePaths: [relPath] },
+    ],
+  });
+  const [updated, older] = outline.sections;
+  if (updated === undefined || older === undefined) throw new Error('Expected two chapters');
+
+  await repo.git('branch', 'feature');
+  await repo.git('switch', '-c', 'delivery');
+  await writeFile(join(repo.path, relPath), after);
+  await writeFile(join(repo.path, 'scratch.txt'), 'changed but excluded\n');
+  await repo.git('commit', '-am', 'Implement delivery changes');
+  await repo.git('switch', 'main');
+  await repo.git('merge', '--no-ff', '-m', 'Merge delivery', 'delivery');
+  const commitSha = await repo.git('rev-parse', 'HEAD');
+  await repo.git('switch', 'feature');
+  const current = await t.call(getDesignStalenessOp, { id: design.id });
+  expect(current.body).toMatchObject({ state: DesignStalenessState.Fresh, headSha: baseSha });
+  expect(await repo.git('status', '--porcelain')).toBe('');
+
+  const db = openDatabase(join(t.dataDir, DATABASE_FILE), join(import.meta.dirname, '../../../migrations'));
+  try {
+    const designs = createDesignsRepo(db.db);
+    const section = designs.listSections(design.id).find(({ id }) => id === updated.id);
+    if (section === undefined) throw new Error('Expected chapter source hash fixture');
+    designs.updateSection({
+      ...section,
+      sourceHashes: [{ relPath, contentHash: createHash('sha256').update(after).digest('hex') }],
+    });
+  } finally {
+    db.close();
+  }
+
+  const expected = {
+    state: DesignStalenessState.Stale,
+    baseSha,
+    headSha: commitSha,
+    changedFilesCount: 1,
+    affectedSectionIds: [older.id],
+    changedPathsSample: [relPath],
+    changedFilesSample: [{ relPath, kind: 'modified' }],
+  };
+  const cleanFeature = await t.call(getDesignStalenessOp, { id: design.id, commitSha });
+  expect(cleanFeature.status, cleanFeature.raw.body).toBe(200);
+  expect(cleanFeature.body).toEqual(expected);
+
+  await writeFile(join(repo.path, 'local.txt'), 'unrelated staged edit\n');
+  await repo.git('add', 'local.txt');
+  const originalGitRoot = join(repo.path, '.git');
+  const hook = join(originalGitRoot, 'hooks', 'post-index-change');
+  const hookMarker = join(repo.path, 'hook-ran.txt');
+  await writeFile(
+    hook,
+    `#!/bin/sh
+: > "${hookMarker}"
+`,
+    { mode: 0o755 },
+  );
+  await repo.git('config', 'core.hooksPath', join(originalGitRoot, 'hooks'));
+  await repo.git('config', 'core.fsmonitor', hook);
+  await repo.git('config', 'core.splitIndex', 'true');
+  await repo.git('config', 'filter.phase-c-test.smudge', 'exit 19');
+  await repo.git('config', 'filter.phase-c-test.required', 'true');
+
+  const gitIndex = join(originalGitRoot, 'index');
+  const originalIndex = await readFile(gitIndex);
+  const originalRefs = await repo.git('show-ref');
+  const originalWorktrees = await repo.git('worktree', 'list', '--porcelain');
+  const sharedIndexes = async () => (await readdir(originalGitRoot)).filter((name) => name.startsWith('sharedindex.'));
+  const originalSharedIndexes = await sharedIndexes();
+  const temporaryTrees = async () => (await readdir(tmpdir())).filter((name) => name.startsWith('aw-design-commit-'));
+  const originalTemp = await temporaryTrees();
+  const response = await t.call(getDesignStalenessOp, { id: design.id, commitSha });
+  expect(response.status, response.raw.body).toBe(200);
+  expect(response.body).toEqual(expected);
+  expect(await sharedIndexes()).toEqual(originalSharedIndexes);
+  await expect(readFile(hookMarker)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(await readFile(gitIndex)).toEqual(originalIndex);
+  expect(await repo.git('show-ref')).toBe(originalRefs);
+  expect(await repo.git('worktree', 'list', '--porcelain')).toBe(originalWorktrees);
+  expect(await repo.git('branch', '--show-current')).toBe('feature');
+  expect(await readFile(join(repo.path, relPath), 'utf8')).toBe(before);
+  expect(await temporaryTrees()).toEqual(originalTemp);
+  expect(t.fake.sessions).toHaveLength(0);
+});
+
+it('按完整提交校验显式目标，拒绝分支名、短提交及带注解的标签对象', async () => {
+  const { project, repo } = await addProject(t);
+  const { body: design } = await t.call(createDesignOp, { projectId: project.id });
+  const sha = await repo.git('rev-parse', 'HEAD');
+  for (const commitSha of ['main', sha.slice(0, 7)]) {
+    const response = await t.call(getDesignStalenessOp, { id: design.id, commitSha });
+    expect(response.status).toBe(400);
+    expect(response.raw.json().error.code).toBe(ErrorCode.ValidationFailed);
+  }
+  await repo.git('tag', '-a', 'design-test', '-m', 'annotation');
+  const tagSha = await repo.git('rev-parse', 'design-test');
+  for (const commitSha of [tagSha, 'f'.repeat(40)]) {
+    const response = await t.call(getDesignStalenessOp, { id: design.id, commitSha });
+    expect(response.status).toBe(404);
+    expect(response.raw.json().error.code).toBe(ErrorCode.NotFound);
+  }
 });

@@ -1,9 +1,13 @@
 ---
 name: aw-db-readonly
-description: Use when a question, step or review involves data in a project database: db_list_connections, db_describe, db_query, or the assistant's databases_list, databases_schema, databases_query. How to investigate read-only step by step, write SQL in the connection's dialect, read the returned values, keep results small and handle the query errors.
+description: Use when checking schema metadata for a data-explorer design or when a question, step or review involves a project database. Follow the active role's read-only scope. For authorized queries, use the connection's dialect, keep results small and handle query errors.
 ---
 
 # Investigating data read-only
+
+## Project designer
+
+In a data-explorer chapter generation or revision, when the tools are available and the design needs schema verification, call `agent-workflow_db_list_connections` for linked connections and `agent-workflow_db_describe` with `{ connection, table? }` for the required table names, columns, keys or indexes. Record the connection and table names as schema evidence. Cite repository DDL and mapping lines separately for design graph evidence. If the tools, connection or schema metadata are unavailable, finish from the authorized repository material and identify the unverified structure. End the database work at metadata. The remaining query instructions apply only to roles with query access.
 
 Every query is checked to be one read-only statement (`SELECT`, and `SHOW` / `DESCRIBE` / `EXPLAIN` where the database has them) and runs in a read-only transaction. A query returns at most 200 rows and is stopped after 15 seconds.
 

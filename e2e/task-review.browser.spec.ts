@@ -48,7 +48,7 @@ test('J18 PR 审查意见 → 取回并勾选 → AI 按意见修改 → 推送�
     submitResult('改成了你好'),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-  await startTask(page, project, /修 Bug/, '问候语写错了');
+  await startTask(page, project, '修 Bug', '问候语写错了');
   const result = page.getByTestId('result-card');
   await result.getByRole('button', { name: '创建 PR' }).click({ timeout: TASK_RUN_TIMEOUT_MS });
   await page.getByRole('dialog', { name: '创建 PR' }).getByRole('button', { name: '推送并创建' }).click();

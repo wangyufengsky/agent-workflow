@@ -11,23 +11,37 @@ import {
   confirmAssistantCallOp,
   createConversationOp,
   createDeckOp,
+  createDesignOp,
   createProjectOp,
   createTaskOp,
+  DeckMaterialKind,
+  DesignSectionKind,
+  DesignStatus,
   ErrorCode,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
+  GitReviewTarget,
   generateDeckOp,
+  generateDesignOp,
+  getGitReviewOp,
   getProjectOp,
   getRequirementsOp,
   getSettingsOp,
+  incrementalUpdateDesignOp,
   listConfirmationsOp,
   MCP_SESSION_ARG,
+  McpToolName,
+  OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OperationRisk,
+  PermissionMode,
   RoleBaseAgent,
   ServerEventType,
   SlideLayout,
   sendAssistantMessageOp,
+  setConversationPermissionModeOp,
+  startGitReviewOp,
   type TranscriptPage,
+  updateDesignOutlineOp,
   updateSettingsOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -92,7 +106,78 @@ async function decide(confirmationId: string, decision: 'confirm' | 'cancel', al
   return res;
 }
 
+async function readyDesign(projectId: string, path: string) {
+  const design = await t.call(createDesignOp, { projectId: projectId, aiReviewEnabled: false });
+  expect(design.status).toBe(201);
+  const outline = await t.call(updateDesignOutlineOp, {
+    id: design.body.id,
+    sections: [{ kind: DesignSectionKind.Module, title: '订单', scopePaths: [path] }],
+  });
+  expect(outline.status).toBe(200);
+  const [section] = outline.body.sections;
+  if (section === undefined) throw new Error('Expected a design section');
+  t.fake.enqueue(
+    script().callTool(McpToolName.SubmitDesignSection, {
+      sectionId: section.id,
+      summary: '订单入口',
+      blocks: [{ type: 'markdown', markdown: '订单入口' }],
+      files: [{ relPath: path, responsibility: '订单入口', symbols: [] }],
+      diagrams: [],
+    }),
+    { agent: OPENCODE_AGENT_NAME.designer },
+  );
+  const ready = waitForEvent(
+    t.app.events,
+    ServerEventType.DesignUpdated,
+    ({ designId }) => designId === design.body.id && t.app.services.designs.get(designId).status === DesignStatus.Ready,
+  );
+  expect((await t.call(generateDesignOp, { id: design.body.id })).status).toBe(200);
+  await ready;
+  return { id: design.body.id, section };
+}
+
 describe('助手 MCP（/mcp/assistant，A-04）', () => {
+  it.each([PermissionMode.Full, PermissionMode.Ask])(
+    '%s：设计快查直接执行，Git 审查与设计增量更新逐次确认',
+    async (permissionMode) => {
+      const path = 'src/orders.ts';
+      const { project, repo } = await addProject(t, { files: { [path]: 'export const orders = 1;' } });
+      const design = await readyDesign(project.id, path);
+      const from = await repo.git('rev-parse', 'HEAD');
+      writeFileSync(join(repo.path, path), 'export const orders = 2;');
+      await repo.git('commit', '-am', 'Change orders');
+      const to = await repo.git('rev-parse', 'HEAD');
+      expect(
+        (
+          await t.call(updateSettingsOp, {
+            'ui.mode': 'pro',
+            'assistant.alwaysAllow': [startGitReviewOp.id, incrementalUpdateDesignOp.id],
+          })
+        ).status,
+      ).toBe(200);
+      expect((await t.call(setConversationPermissionModeOp, { id: conversationId, permissionMode })).status).toBe(200);
+      const sessionsBefore = t.fake.sessions.length;
+      const staleness = await call('designs_staleness', { id: design.id });
+      const impact = await call('designs_lookupImpact', { id: design.id, paths: [path] });
+      expect(staleness.body).toMatchObject({ state: 'stale' });
+      expect(impact.body).toMatchObject({ designId: design.id });
+      expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(0);
+
+      const calls = [
+        await call('gitReviews_start', { id: project.id, target: { kind: GitReviewTarget.Compare, from, to } }),
+        await call('gitReviews_start', { id: project.id, target: { kind: GitReviewTarget.Commit, sha: to } }),
+        await call('designs_incrementalUpdate', { id: design.id, sectionIds: [design.section.id] }),
+      ];
+      expect(calls.map(({ body }) => body.status)).toEqual(Array(3).fill('needs_confirmation'));
+      expect(t.fake.sessions).toHaveLength(sessionsBefore);
+      const confirmations = await t.call(listConfirmationsOp, { id: conversationId });
+      expect(confirmations.body.items.map(({ risk }) => risk)).toEqual(Array(3).fill(OperationRisk.Critical));
+      const [update] = confirmations.body.items;
+      if (update === undefined) throw new Error('Expected a confirmation');
+      expect((await t.call(confirmAssistantCallOp, { id: update.id, alwaysAllow: true })).status).toBe(400);
+    },
+  );
+
   it('令牌与执行 MCP 分开：执行 MCP 的令牌被拒绝（401）', async () => {
     await expect(connectMcp(t.assistantMcpUrl, t.app.mcpToken)).rejects.toMatchObject({ code: 401 });
   });
@@ -123,6 +208,11 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     );
     const schemas = JSON.stringify(tools.map((tool) => tool.inputSchema));
     expect(schemas).not.toMatch(/"(password|token)"/);
+    for (const name of ['designs_create', 'designs_update']) {
+      const designTool = tools.find((tool) => tool.name === name);
+      expect(designTool?.inputSchema.properties).toBeDefined();
+      expect(designTool?.inputSchema.properties).not.toHaveProperty('permissionMode');
+    }
     const settings = Object.keys(tools.find((tool) => tool.name === 'settings_update')?.inputSchema.properties ?? {});
     expect(settings).toContain('ui.theme');
     for (const omitted of [
@@ -171,6 +261,69 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     ]);
     expect((await t.call(getRequirementsOp, { id: task.id })).body.revision?.id).toBe(revision.id);
   });
+
+  it('助手将设计与对比报告一起作为 PPT 资料提交确认', async () => {
+    const input = {
+      brief: '发版评审',
+      materials: [
+        { kind: 'design', refId: 'design-id' },
+        { kind: 'git_review', refId: 'comparison-id' },
+      ],
+    };
+    expect(await call('decks_create', input)).toMatchObject({
+      isError: false,
+      body: { status: 'needs_confirmation' },
+    });
+    const cards = (await t.call(listConfirmationsOp, { id: conversationId })).body.items;
+    expect(cards).toMatchObject([{ operationId: 'decks.create', status: 'pending', input }]);
+  });
+
+  it.each([PermissionMode.Full, PermissionMode.Ask])(
+    '%s：含设计或审查资料的 PPT 逐次确认，普通资料仍可直接创建',
+    async (permissionMode) => {
+      const path = 'src/orders.ts';
+      const { project, repo } = await addProject(t, { files: { [path]: 'export const orders = 1;' } });
+      const design = await readyDesign(project.id, path);
+      writeFileSync(join(repo.path, path), 'export const orders = 2;');
+      await repo.git('commit', '-am', 'Change orders');
+      const sha = await repo.git('rev-parse', 'HEAD');
+      t.fake.enqueue(script().callTool(McpToolName.SubmitFindings, { summary: '发布审查', findings: [] }), {
+        agent: OPENCODE_AGENT_NAME.code_reviewer,
+      });
+      const review = await t.call(startGitReviewOp, { id: project.id, target: { kind: GitReviewTarget.Commit, sha } });
+      expect(review.status).toBe(201);
+      await t.fake.settled();
+      expect((await t.call(getGitReviewOp, { reviewId: review.body.id })).body.status).toBe('succeeded');
+
+      expect((await t.call(updateSettingsOp, { 'assistant.alwaysAllow': [createDeckOp.id] })).status).toBe(200);
+      expect((await t.call(setConversationPermissionModeOp, { id: conversationId, permissionMode })).status).toBe(200);
+      const before = t.fake.sessions.length;
+      const text = { kind: DeckMaterialKind.Text, content: '手工补充材料' };
+      const request = { brief: '发布评审汇报', projectId: project.id };
+      const calls = [
+        await call('decks_create', {
+          ...request,
+          materials: [text, { kind: DeckMaterialKind.Design, refId: design.id }],
+        }),
+        await call('decks_create', {
+          ...request,
+          materials: [text, { kind: DeckMaterialKind.GitReview, refId: review.body.id }],
+        }),
+      ];
+      expect(calls.map(({ body }) => body.status)).toEqual(['needs_confirmation', 'needs_confirmation']);
+      expect(t.fake.sessions).toHaveLength(before);
+      const cards = (await t.call(listConfirmationsOp, { id: conversationId })).body.items;
+      expect(cards.map(({ risk }) => risk)).toEqual([OperationRisk.Critical, OperationRisk.Critical]);
+      const [card] = cards;
+      if (card === undefined) throw new Error('Expected a confirmation');
+      expect((await t.call(confirmAssistantCallOp, { id: card.id, alwaysAllow: true })).status).toBe(400);
+
+      const ordinary = await call('decks_create', { ...request, materials: [text] });
+      expect(ordinary.isError).toBe(false);
+      expect(createDeckOp.output.parse(ordinary.body)).toMatchObject({ brief: request.brief });
+      expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(2);
+    },
+  );
 
   it('read：直接执行并返回结果', async () => {
     const { project } = await addProject(t);

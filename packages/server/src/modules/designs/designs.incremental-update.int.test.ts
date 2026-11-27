@@ -13,11 +13,13 @@ import {
   McpToolName,
   OPENCODE_AGENT_NAME,
   PermissionDecision,
+  PermissionMode,
   resolveInboxOp,
   restoreDesignSectionOp,
   ServerEventType,
   startGitReviewOp,
   stopDesignOp,
+  updateDesignOp,
   updateDesignOutlineOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
@@ -175,6 +177,29 @@ it.each(['部分勾选', '停止', '失败'])('%s只保留已成功章节与旧�
   });
   const restored = await t.call(restoreDesignSectionOp, { id, sectionId: orders.id });
   expect(restored.body.sections[0]).toMatchObject({ summary: 'orders', hasPrevious: false });
+});
+
+it('增量运行在章节提交前自动批准本次扫描发现的新文件，清单外操作继续询问', async () => {
+  const { id, repo, orders } = await fixture();
+  await t.call(updateDesignOp, { id, permissionMode: PermissionMode.Full });
+  await writeFile(join(repo.path, 'orders/new.ts'), 'export const added = true;\n');
+  const scanned = 'cksum orders/new.ts';
+  const outside = 'cksum orders/unscanned.ts';
+  t.fake.enqueue(
+    script()
+      .requestPermission('bash', [scanned], { command: scanned })
+      .requestPermission('bash', [outside], { command: outside })
+      .callTool(McpToolName.SubmitDesignSection, submission(orders.id, '已核对新文件', 'orders/new.ts')),
+    designer,
+  );
+  const waiting = inboxOpens(t, InboxKind.Permission);
+  expect((await t.call(incrementalUpdateDesignOp, { id, sectionIds: [orders.id] })).status).toBe(200);
+  const { item } = await waiting;
+  expect(item.payload).toMatchObject({ patterns: [outside] });
+  expect(t.fake.permissionReplies.map(({ reply }) => reply)).toEqual([PermissionDecision.Once]);
+  const done = finished(id, '已核对新文件');
+  await t.call(resolveInboxOp, { id: item.id, response: { decision: PermissionDecision.Once } });
+  await done;
 });
 
 it('运行期间 HEAD 前进和同文件再次编辑，全局只推进到启动时冻结的提交', async () => {

@@ -103,7 +103,7 @@ test('主页显式选中文字可修改后附上；开始任务模式不显示�
   await page.getByRole('button', { name: '查看 选中文字.txt' }).click();
   await expect(preview).toContainText('订单导出仍然丢失前导零');
   await preview.getByRole('button', { name: '关闭', exact: true }).click();
-  await pickWorkflow(page, /修 Bug/);
+  await pickWorkflow(page, '修 Bug');
   const add = page.getByRole('button', { name: '添加资料与上下文', exact: true });
   await add.click();
   await expect(page.getByRole('menuitem', { name: '项目文件…', exact: true })).toBeVisible();

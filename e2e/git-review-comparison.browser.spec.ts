@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { designSchema, GitReviewTarget, gitReviewSchema, McpToolName, OPENCODE_AGENT_NAME } from '@aw/shared';
+import { designSchema, GitReviewTarget, gitReviewSchema, McpToolName, OPENCODE_AGENT_NAME, ThemeId } from '@aw/shared';
 import { type APIRequestContext, type APIResponse, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -13,6 +13,7 @@ import {
   queueCodeReviewerTurn,
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
+import { createPptFromSource } from './ppt-source-journey.ts';
 
 const path = 'fee.ts';
 const compare = '直连双端点 · 非 merge-base';
@@ -132,6 +133,13 @@ test('从分支页打开分叉端点对比，查看冻结源码并离线阅读�
   expect(new URL(page.url()).searchParams.get('review')).not.toBe(id);
   await page.getByRole('combobox', { name: 'AI 审查' }).selectOption(review.id);
   await expect(view).toContainText(summary);
+  await page.getByRole('tab', { name: /回归建议/ }).click();
+  await page.getByRole('button', { name: '据此发起测试' }).click();
+  await expect(page.getByRole('group', { name: '功能测试范围' })).toBeVisible();
+  const requirement = await page.getByRole('textbox', { name: '需求', exact: true }).inputValue();
+  expect(requirement).toContain('验证跨版本退款读取原单的计费额度');
+  expect(requirement).toContain(from.slice(0, 7));
+  expect(requirement).toContain(to.slice(0, 7));
 });
 
 async function loadBody(response: APIResponse) {
@@ -222,7 +230,7 @@ async function buildDesign(request: APIRequestContext, project: E2EProject, ref:
   return draft.id;
 }
 
-test('真实双快照的架构与交易对齐在明暗主题下展示', async ({ request, page }) => {
+test('真实双快照的架构与交易对齐在明暗主题下展示', async ({ request, page }, info) => {
   test.setTimeout(60_000);
   await patchSettings(request, { 'ui.theme': 'default', 'ui.mode': 'pro' });
   await page.setViewportSize({ width: 1600, height: 1050 });
@@ -293,4 +301,13 @@ test('真实双快照的架构与交易对齐在明暗主题下展示', async ({
   await page.reload();
   await viewSource();
   await page.screenshot({ path: 'screenshots/phase3-comparison-light.png', animations: 'disabled' });
+
+  await patchSettings(request, { 'ui.theme': ThemeId.Default });
+  await createPptFromSource(page, request, info, project, {
+    kind: 'git_review',
+    refId: review.id,
+    title: review.label,
+    theme: ThemeId.Default,
+    brief: /双版本发版评审/,
+  });
 });

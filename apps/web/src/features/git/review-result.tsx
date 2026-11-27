@@ -1,4 +1,5 @@
 import {
+  DeckMaterialKind,
   DesignKnowledgeMatch,
   DesignStalenessState,
   DiffSide,
@@ -9,6 +10,7 @@ import {
   type GitImpactItemDTO,
   type GitReviewDTO,
   GitReviewTarget,
+  reviewRegressionChecks,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -22,6 +24,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { Tabs } from '../../components/tabs.tsx';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import { GIT_REVIEW_COPY as R } from '../../copy/git-review.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
 import { designQuery, designStalenessQuery } from '../designs/designs.queries.ts';
 import styles from './git.module.css';
 import { gitReviewQuery, useUpdateGitFindingStatus } from './git.queries.ts';
@@ -30,6 +33,7 @@ import { ReviewComparison } from './review-comparison.tsx';
 import { type EvidenceLocation, ReviewEvidenceDialog } from './review-evidence-dialog.tsx';
 import { ReviewExportDialog } from './review-export-dialog.tsx';
 import { ReviewImpacts } from './review-impacts.tsx';
+import { ReviewRegression } from './review-regression.tsx';
 import report from './review-result.module.css';
 
 const SEVERITIES = [FindingSeverity.Blocker, FindingSeverity.Major, FindingSeverity.Minor] as const;
@@ -231,9 +235,7 @@ export function ReviewResult({
   const [exportOpen, setExportOpen] = useState(false);
   const mutation = useUpdateGitFindingStatus(projectId, review.id);
   const findings = review.findings.toSorted(bySeverity);
-  const checks = [
-    ...new Set([...review.regressionChecks, ...review.impacts.flatMap((impact) => impact.suggestedChecks)]),
-  ];
+  const checks = reviewRegressionChecks(review);
   const isChosen = (f: GitFindingDTO) =>
     choices.get(f.id) ??
     (f.severity !== FindingSeverity.Minor &&
@@ -281,6 +283,14 @@ export function ReviewResult({
   return (
     <>
       <div className={report.toolbar}>
+        <Link
+          to={ROUTES.deckNew}
+          search={{ kind: DeckMaterialKind.GitReview, refId: review.id, projectId }}
+          className="btn sm"
+        >
+          <Icon name="slides" size="sm" />
+          {PPT_COPY.makeLinkedDeck}
+        </Link>
         <Button size="sm" onClick={() => setExportOpen(true)}>
           {exportTitle}
         </Button>
@@ -370,21 +380,7 @@ export function ReviewResult({
           {
             value: Tab.Regression,
             label: R.tabCount(R.regression, checks.length),
-            content: (
-              <div className={`card ${report.checks}`}>
-                {checks.length === 0 ? (
-                  <p className="hint">{R.noChecks}</p>
-                ) : (
-                  <ul>
-                    {checks.map((check) => (
-                      <li key={check}>
-                        <Markdown inline source={check} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ),
+            content: <ReviewRegression key={review.id} review={review} checks={checks} />,
           },
         ]}
       />

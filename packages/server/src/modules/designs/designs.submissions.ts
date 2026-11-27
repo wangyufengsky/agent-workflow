@@ -16,6 +16,7 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { DatabasesService } from '../databases/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import { replaceSectionContent, snapshotSection } from './designs.content.ts';
 import {
@@ -29,12 +30,14 @@ import { designFilePage, designScope } from './designs.planning.ts';
 import { readDesignSectionPage } from './designs.prompt-section.ts';
 import type { createDesignsRepo, DesignSection } from './designs.repo.ts';
 import type { DesignRuns } from './designs.runs.ts';
+import { isDataExplorerSectionRun } from './designs.templates.ts';
 import { validateDesignOutline, validateDesignReview, validateDesignSection } from './designs.validator.ts';
 
 type Dependencies = {
   repo: ReturnType<typeof createDesignsRepo>;
   attempts: Pick<AttemptsService, 'get' | 'markSubmitted' | 'projectOf'>;
   projects: Pick<ProjectsService, 'getRecord'>;
+  databases: Pick<DatabasesService, 'linkedIds' | 'forProject' | 'investigationGrant' | 'describeByLink'>;
   unit: UnitOfWork;
   clock: Clock;
   incrementalFor: DesignRuns['incrementalFor'];
@@ -44,7 +47,15 @@ function invalid(path: (string | number)[], message: string): never {
   throw new AppError(ErrorCode.ValidationFailed, 'Invalid project design submission', { issues: [{ path, message }] });
 }
 
-export function createDesignSubmissions({ repo, attempts, projects, unit, clock, incrementalFor }: Dependencies) {
+export function createDesignSubmissions({
+  repo,
+  attempts,
+  projects,
+  databases,
+  unit,
+  clock,
+  incrementalFor,
+}: Dependencies) {
   function activeRun(attempt: AttemptDTO) {
     if (attempts.get(attempt.id).status !== AttemptStatus.Running)
       throw new AppError(ErrorCode.McpAttemptUnresolved, 'This project design attempt has ended');
@@ -57,6 +68,24 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock,
     if (repo.listRuns(design.id).at(-1)?.attemptId !== attempt.id)
       throw new AppError(ErrorCode.McpAttemptUnresolved, 'A newer project design run is registered');
     return { run, design, projectId: design.projectId };
+  }
+
+  function databaseProject(attempt: AttemptDTO): string {
+    const { design, projectId } = activeRun(attempt);
+    if (!isDataExplorerSectionRun(attempt.kind, design))
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'Only a data explorer section run may read database metadata');
+    return projectId;
+  }
+
+  const noDatabase = () => new AppError(ErrorCode.McpToolNotAllowed, 'The design project has no linked database');
+  const inaccessible = (connection: string) =>
+    new AppError(ErrorCode.DbConnectionNotFound, 'No linked database connection', { connection });
+
+  function databaseGrant(projectId: string, connection: string) {
+    const grant = databases.investigationGrant(projectId, connection);
+    if (grant !== undefined) return grant;
+    if (databases.linkedIds(projectId).length === 0) throw noDatabase();
+    throw inaccessible(connection);
   }
 
   function publish(designId: string, now: number): void {
@@ -91,6 +120,20 @@ export function createDesignSubmissions({ repo, attempts, projects, unit, clock,
   }
 
   return {
+    dbConnections(attempt: AttemptDTO) {
+      const connections = databases.forProject(databaseProject(attempt));
+      if (connections.length === 0) throw noDatabase();
+      return { connections: connections.map(({ name, type, database }) => ({ name, type, database })) };
+    },
+    async dbDescribe(attempt: AttemptDTO, connection: string, table: string | undefined) {
+      const projectId = databaseProject(attempt);
+      const grant = databaseGrant(projectId, connection);
+      const result = await databases.describeByLink(projectId, grant.id, table);
+      // 读取期间可能解绑、替换连接，也可能结束设计会话。结果须再次通过原范围检查才可返回。
+      if (databaseGrant(databaseProject(attempt), connection).fingerprint !== grant.fingerprint)
+        throw inaccessible(connection);
+      return result;
+    },
     readSection(attempt: AttemptDTO, input: ReadDesignSectionInput) {
       const { design, run } = activeRun(attempt);
       if (attempt.kind !== AttemptKind.DesignOutline && !run.targetSectionIds.includes(input.sectionId))

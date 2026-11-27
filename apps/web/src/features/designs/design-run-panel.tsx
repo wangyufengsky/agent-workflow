@@ -1,9 +1,12 @@
 import { AttemptStatus, DESIGN_REVIEW_BATCH_SIZE, type DesignDTO, type DesignRunDTO, DesignRunKind } from '@aw/shared';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ATTEMPT_STATUS_LABEL } from '../../copy/attempts.ts';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
+import { DESIGNS_COPY } from '../../copy/designs.ts';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { progressSection } from './design-reading.ts';
 import styles from './design-workbench.module.css';
@@ -51,6 +54,11 @@ export function DesignRunPanel({
         <Button size="sm" variant="ghost" icon="chevRight" onClick={onClose} aria-label={C.hideAttempts} />
       </div>
       <div className={styles.activityBody}>
+        {active?.awaitingInput && (
+          <Link className="link" to={ROUTES.inbox}>
+            {DESIGNS_COPY.permissions}
+          </Link>
+        )}
         <div className={styles.progress}>
           <span>{isIncremental ? C.incrementalProgress(done, total) : C.progress(done, total)}</span>
           {!isIncremental && (

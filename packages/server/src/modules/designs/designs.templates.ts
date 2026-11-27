@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { BuiltinDesignTemplate } from '@aw/builtin';
 import {
   AppError,
+  type AttemptKind,
   type CreateDesignTemplateRequest,
+  DATA_EXPLORER_KEY,
+  DESIGN_DATABASE_METADATA_KINDS,
   type DesignTemplate,
   DesignTemplateKind,
   designTemplateSchema,
@@ -15,7 +18,12 @@ import type { Clock } from '../../core/clock.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import { inspectDesignProject } from './designs.features.ts';
-import type { createDesignsRepo } from './designs.repo.ts';
+import type { createDesignsRepo, ProjectDesign } from './designs.repo.ts';
+
+/** 内置键由应用注册，复制模板会分配新的键。 */
+export function isDataExplorerSectionRun(kind: AttemptKind, design: ProjectDesign): boolean {
+  return design.templateKey === DATA_EXPLORER_KEY && DESIGN_DATABASE_METADATA_KINDS.some((item) => item === kind);
+}
 
 export function syncBuiltinDesignTemplates(
   repo: ReturnType<typeof createDesignsRepo>,

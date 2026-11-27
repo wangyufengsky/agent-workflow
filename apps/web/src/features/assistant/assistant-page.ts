@@ -67,16 +67,20 @@ type Unreported =
   | typeof ROUTES.pptPlay
   | typeof ROUTES.pptPrint
   | typeof ROUTES.devComponents;
-type Unmapped = Exclude<RoutePath, (typeof PAGE_ROUTE)[AssistantPage] | Unreported>;
+const PAGE_ROUTE_ALIASES = { [ROUTES.deckNew]: AssistantPage.PptNew } as const satisfies Partial<
+  Record<RoutePath, AssistantPage>
+>;
+type Unmapped = Exclude<RoutePath, (typeof PAGE_ROUTE)[AssistantPage] | keyof typeof PAGE_ROUTE_ALIASES | Unreported>;
 // Fails to compile, naming the route, when a page is added without telling the assistant about it.
 const _everyRouteIsAPage: [Unmapped] extends [never] ? true : Unmapped = true;
 
 /** The preview tab shares the task page's route; its `view` tells them apart. */
-const PAGE_OF_ROUTE = new Map<string, AssistantPage>(
-  Object.values(AssistantPage)
+const PAGE_OF_ROUTE = new Map<string, AssistantPage>([
+  ...Object.values(AssistantPage)
     .filter((page) => page !== AssistantPage.TaskPreview)
-    .map((page) => [PAGE_ROUTE[page], page]),
-);
+    .map((page) => [PAGE_ROUTE[page], page] as const),
+  ...Object.entries(PAGE_ROUTE_ALIASES),
+]);
 
 /** The backend checked that the page has its params (`ASSISTANT_PAGE_PARAMS`). */
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {

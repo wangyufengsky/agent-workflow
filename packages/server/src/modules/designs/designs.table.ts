@@ -1,3 +1,4 @@
+import { PermissionMode } from '@aw/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { attemptsTable } from '../attempts/attempts.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
@@ -14,6 +15,7 @@ export const projectDesignsTable = sqliteTable(
     layoutStyle: text('layout_style').notNull(),
     theme: text('theme').notNull(),
     excludePatterns: text('exclude_patterns').notNull(),
+    permissionMode: text('permission_mode').$type<PermissionMode>().notNull().default(PermissionMode.Ask),
     aiReviewEnabled: integer('ai_review_enabled', { mode: 'boolean' }).notNull(),
     sourceSnapshot: text('source_snapshot').notNull(),
     outlineConfirmedAt: integer('outline_confirmed_at'),

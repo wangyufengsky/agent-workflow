@@ -88,6 +88,11 @@ export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; descri
     description: '梳理模块职责、输入输出和关键分支，将功能说明关联到源码证据。',
     trigger: '设计分析员拟定大纲、生成或重写模块章节、复审跨模块关系时。',
   },
+  'aw-design-git-review': {
+    title: '项目设计与 Git 审查',
+    description: '检查设计是否过期，初筛改动影响，发起 Git 审查或双版本对比。',
+    trigger: '用户询问设计过期、改动影响、Git 审查或双版本对比时。',
+  },
   'aw-functional-testing': {
     title: '功能测试',
     description: '编写或导入用例，准备环境，执行测试并根据记录提交报告。',

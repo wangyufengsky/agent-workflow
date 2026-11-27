@@ -18,7 +18,7 @@ test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 /** A bug-fix task (template plan: 定位根因 → 修复), optionally waiting for the plan to be confirmed. */
 async function startBugfix(page: Page, project: E2EProject, requirement: string, confirmPlan: boolean) {
   await page.goto(`/?projectId=${project.id}`);
-  await pickWorkflow(page, /修 Bug/);
+  await pickWorkflow(page, '修 Bug');
   await page.getByLabel('需求').fill(requirement);
   if (confirmPlan) {
     const more = page.getByRole('button', { name: '更多选项' });

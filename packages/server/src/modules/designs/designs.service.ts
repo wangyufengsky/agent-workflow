@@ -4,6 +4,8 @@ import {
   type CreateDesignRequest,
   DESIGN_TITLE_MAX_CHARS,
   DesignDepth,
+  type DesignImpactLookupDTO,
+  DesignKnowledgeMatch,
   DesignLayoutStyle,
   type DesignOutlineSection,
   DesignReviewState,
@@ -11,6 +13,8 @@ import {
   type ExportDesignRequest,
   type GenerateDesignRequest,
   type IncrementalUpdateDesignRequest,
+  type LookupDesignImpactRequest,
+  PermissionMode,
   type ReviewDesignRequest,
   type ReviseDesignOutlineRequest,
   type ReviseDesignSectionRequest,
@@ -27,7 +31,9 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { replaceSectionContent } from './designs.content.ts';
 import { exportDesignSite } from './designs.exporter.ts';
+import { screenDesignImpact } from './designs.impact.ts';
 import { restoreDesignUpdateSection } from './designs.incremental.ts';
+import { readProjectKnowledge } from './designs.knowledge.ts';
 import { initialDesignOutline } from './designs.outline.ts';
 import type { createDesignQueries } from './designs.queries.ts';
 import type { createDesignsRepo, DesignSection, ProjectDesign } from './designs.repo.ts';
@@ -114,10 +120,27 @@ export function createDesignsService({
   }
   return {
     ...queries,
-    staleness(id: string) {
+    staleness(id: string, commitSha?: string) {
       const design = designById(id);
       const repoPath = design.projectId === null ? null : projects.getRecord(design.projectId).repoPath;
-      return readDesignStaleness(repo, design, repoPath);
+      return readDesignStaleness(repo, design, repoPath, commitSha);
+    },
+    lookupImpact({ id, paths }: LookupDesignImpactRequest): DesignImpactLookupDTO {
+      const design = designById(id);
+      const knowledge = readProjectKnowledge(repo, design);
+      const { candidates, uncoveredPathSet, truncated } = screenDesignImpact(
+        { knowledge, match: DesignKnowledgeMatch.Reference, worktreeFresh: false },
+        paths.map((path) => ({ path })),
+      );
+      return {
+        designId: id,
+        snapshotSha: knowledge.sourceSnapshot.commitSha,
+        dirty: knowledge.sourceSnapshot.dirty,
+        coverage: knowledge.coverage,
+        candidates,
+        uncoveredPaths: [...uncoveredPathSet],
+        truncated,
+      };
     },
     async source(id: string, fileId: string) {
       const design = designById(id);
@@ -150,6 +173,7 @@ export function createDesignsService({
         templateSnapshot: { key, name, defaultSections, focusPrompt },
         theme: input.theme ?? (preference === ThemePreference.System ? SYSTEM_THEME_MAP.light : preference),
         layoutStyle: input.layoutStyle ?? DesignLayoutStyle.Arch,
+        permissionMode: input.permissionMode ?? PermissionMode.Ask,
         aiReviewEnabled: input.aiReviewEnabled ?? depth === DesignDepth.Deep,
         excludePatterns,
         sourceSnapshot: scan.snapshot,
@@ -178,12 +202,15 @@ export function createDesignsService({
       });
       return queries.get(id);
     },
-    update({ id, title, layoutStyle, theme, aiReviewEnabled }: UpdateDesignRequest) {
-      const readingOnly =
-        (layoutStyle !== undefined || theme !== undefined) && title === undefined && aiReviewEnabled === undefined;
-      writableDesign(id, { allowDuringRun: readingOnly });
+    update({ id, title, layoutStyle, theme, aiReviewEnabled, permissionMode }: UpdateDesignRequest) {
+      const allowDuringRun =
+        (layoutStyle !== undefined || theme !== undefined || permissionMode !== undefined) &&
+        title === undefined &&
+        aiReviewEnabled === undefined;
+      writableDesign(id, { allowDuringRun });
       return change(id, () =>
         repo.updateDesign(id, {
+          ...(permissionMode === undefined ? {} : { permissionMode }),
           ...(title === undefined ? {} : { title }),
           ...(layoutStyle === undefined ? {} : { layoutStyle }),
           ...(theme === undefined ? {} : { theme }),

@@ -18,7 +18,7 @@ test('对话与直接开始的任务分别保存权限，任务详情可以继�
   await page.reload();
   await expect(page.getByRole('button', { name: '对话权限 · 帮我批准' })).toBeVisible();
   await page.goto('/?projectId=' + project.id);
-  await pickWorkflow(page, /修 Bug/);
+  await pickWorkflow(page, '修 Bug');
   await page.getByRole('button', { name: '任务权限 · 始终询问' }).click();
   await page
     .getByRole('group', { name: '任务权限' })

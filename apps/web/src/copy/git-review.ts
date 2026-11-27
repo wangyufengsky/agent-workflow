@@ -13,6 +13,11 @@ export const GIT_REVIEW_COPY = {
   findings: siteCopy.findings,
   impacts: siteCopy.impacts,
   regression: siteCopy.regression,
+  startTest: '据此发起测试',
+  testRequirementLimit: (chars: number, limit: number) =>
+    `预填需求共 ${chars} 字符，任务上限为 ${limit}。请减少勾选的回归项。`,
+  testRequirement: (label: string) => `验证 Git 报告「${label}」中勾选的回归项。`,
+  affectedTransactions: '报告涉及的交易',
   tabCount: (label: string, count: number) => `${label} · ${count}`,
   match: siteCopy.match,
   newDesign: '去新建项目设计',

@@ -3,6 +3,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { DatabasesService } from '../databases/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -22,6 +23,7 @@ export function createDesignsModule(deps: {
   unit: UnitOfWork;
   attempts: AttemptsService;
   projects: ProjectsService;
+  databases: Pick<DatabasesService, 'linkedIds' | 'forProject' | 'investigationGrant' | 'describeByLink'>;
   inbox: InboxService;
   settings: SettingsService;
   prompts: Prompts;
@@ -33,19 +35,24 @@ export function createDesignsModule(deps: {
   const service = createDesignsService({ ...deps, queries, runs });
   return {
     service,
+    permissionPolicy: (attemptId: string) =>
+      deps.repo.permissionPolicy(attemptId, runs.incrementalFor(attemptId)?.frozen.targetHashes),
     knowledge: createProjectKnowledgeReader(deps.repo),
     operations: designsOperations(service),
     submissions: createDesignSubmissions({ ...deps, incrementalFor: runs.incrementalFor }),
   };
 }
 
+export { renderProjectDesignContext } from './designs.context.ts';
 export { designExclusion } from './designs.exclusions.ts';
 export { exportDesignSite } from './designs.exporter.ts';
+export { screenDesignImpact } from './designs.impact.ts';
 export {
   buildProjectKnowledgeIndex,
   createProjectKnowledgeReader,
   type ProjectKnowledgeIndex,
 } from './designs.knowledge.ts';
+export { createReadyDesignKnowledgeReader } from './designs.queries.ts';
 export {
   createDesignsRepo,
   type DesignDiagramRecord,

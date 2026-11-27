@@ -19,8 +19,9 @@ import {
   type DesignDiagramRecord,
   type DesignFile,
   type DesignSection,
+  screenDesignImpact,
 } from '../designs/index.ts';
-import { renderDesignImpact, screenDesignImpact } from './git-reviews.impact.ts';
+import { renderDesignImpact } from './git-reviews.impact.ts';
 
 const design = {
   id: 'design',

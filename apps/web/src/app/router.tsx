@@ -39,7 +39,7 @@ import { NodePage } from '../features/node-detail/node.page.tsx';
 import { EnvironmentPage, OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
 import { PptDeckPage } from '../features/ppt/ppt-deck.page.tsx';
 import { PptListPage } from '../features/ppt/ppt-list.page.tsx';
-import { PptNewPage } from '../features/ppt/ppt-new.page.tsx';
+import { newDeckSearchSchema, PptNewPage } from '../features/ppt/ppt-new.page.tsx';
 import { PptPlayPage } from '../features/ppt/ppt-play.page.tsx';
 import { PptPrintPage } from '../features/ppt/ppt-print.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
@@ -396,13 +396,20 @@ const designWorkbenchRoute = createRoute({
 const pptNewRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.pptNew,
-  validateSearch: z.object({
-    projectId: z.string().optional(),
-    taskId: z.string().optional(),
-    artifactVersionId: z.uuid().optional(),
-    knowledgeConversationId: z.string().optional(),
-  }),
-  component: PptNewPage,
+  validateSearch: newDeckSearchSchema,
+  remountDeps: ({ search }) => search,
+  component: function PptNewRoute() {
+    return <PptNewPage search={pptNewRoute.useSearch()} />;
+  },
+});
+const deckNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.deckNew,
+  validateSearch: newDeckSearchSchema,
+  remountDeps: ({ search }) => search,
+  component: function DeckNewRoute() {
+    return <PptNewPage search={deckNewRoute.useSearch()} />;
+  },
 });
 const pptDeckRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -459,6 +466,7 @@ const routeTree = rootRoute.addChildren([
     designWorkbenchRoute,
     page(ROUTES.ppt, PptListPage),
     pptNewRoute,
+    deckNewRoute,
     pptDeckRoute,
     page(ROUTES.assistantMemory, MemoryPage),
     page(ROUTES.skills, SkillLibraryPage),

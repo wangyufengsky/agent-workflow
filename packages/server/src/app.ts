@@ -10,10 +10,12 @@ import {
 } from '@aw/builtin';
 import {
   AppError,
+  AttemptKind,
   DB_QUERY_TIMEOUT_MS,
   ErrorCode,
   getAssistantContextOp,
   getAttemptContextOp,
+  isDesignAttemptKind,
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
@@ -67,8 +69,10 @@ import { createDeliveryModule } from './modules/delivery/index.ts';
 import {
   createDesignsModule,
   createDesignsRepo,
+  createReadyDesignKnowledgeReader,
   createReviewKnowledgeReader,
   type DesignsService,
+  renderProjectDesignContext,
   syncBuiltinDesignTemplates,
 } from './modules/designs/index.ts';
 import { createDocumentProcessor } from './modules/document-processor/index.ts';
@@ -105,7 +109,7 @@ import {
   registerContextRoutes,
   visibleRecallTool,
 } from './modules/opencode/index.ts';
-import { createPermissionReviewer } from './modules/permissions/index.ts';
+import { createPermissionReviewer, type ReadonlyPermissionPolicy } from './modules/permissions/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectModules, runIdeaAcceptance } from './modules/project-modules/index.ts';
@@ -446,7 +450,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     permissionReviewer,
     effortsForRole: (id) => modelEfforts(settings.service.getAll(), id ? roles.service.get(id) : undefined),
     taskPolicy: (id) => readTaskPermissionPolicy(database.db, id),
-    knowledgePolicy: (id) => readKnowledgePermissionPolicy(database.db, id),
+    readonlyPolicy: (kind, id): ReadonlyPermissionPolicy | undefined => {
+      if (isDesignAttemptKind(kind)) return designs.permissionPolicy(id);
+      if (kind === AttemptKind.Research) return readKnowledgePermissionPolicy(database.db, id);
+      return undefined;
+    },
     sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,
@@ -556,7 +564,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   server.addHook('onReady', () => projectModules.recover());
   server.addHook('preClose', () => projectModules.stopAll());
+  const readyDesignKnowledge = createReadyDesignKnowledgeReader(designsRepo, attempts.service);
+  const projectDesignContext = (projectId: string, targetSha: string | null) =>
+    renderProjectDesignContext(readyDesignKnowledge.read(projectId, targetSha), targetSha);
   const nodes = createNodesModule({
+    projectDesignContext,
     runIdeaCheck: (ctx, changedPaths, signal) =>
       runIdeaAcceptance({ worktreePath: ctx.directory, repoPath: ctx.repoPath, changedPaths, clock, env, signal }),
     runBrowserCase: (attempt, test, signal) => {
@@ -588,6 +600,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     locks,
   });
   const knowledge = createKnowledgeModule({
+    projectDesignContext: (projectId) => projectDesignContext(projectId, null),
     db: database.db,
     unit,
     clock,
@@ -644,6 +657,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     databases: databases.service,
     knowledge: knowledge.service,
     gitReviews: gitReviews.service,
+    readyDesignKnowledge,
     locks,
     dataDir: config.dataDir,
   });
@@ -694,6 +708,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     tasks: tasks.service,
   });
   const initiatives = createInitiativesModule({
+    projectDesignContext,
+    hasReadyDesign: readyDesignKnowledge.hasReadyDesign,
     db: database.db,
     unit,
     events,
@@ -710,20 +726,6 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   // Built-in composition templates of this app version, like the built-in workflows (34 §15.3).
   initiatives.service.templates.syncBuiltin(BUILTIN_INITIATIVE_TEMPLATES);
-  const decks = createDecksModule({
-    db: database.db,
-    unit,
-    clock,
-    attempts: attempts.service,
-    projects: projects.service,
-    tasks: tasks.service,
-    knowledge: knowledge.service,
-    browser: browser.service,
-    inbox: inbox.service,
-    settings: settings.service,
-    prompts,
-    dataDir: config.dataDir,
-  });
   const scheduler = createScheduler({
     tasks: tasks.service,
     nodes: nodes.service,
@@ -782,6 +784,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
   const designs = createDesignsModule({
     repo: designsRepo,
+    databases: databases.service,
     attempts: attempts.service,
     projects: projects.service,
     inbox: inbox.service,
@@ -794,6 +797,22 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     prompts,
   });
   server.addHook('preClose', async () => designs.service.close());
+  const decks = createDecksModule({
+    db: database.db,
+    unit,
+    clock,
+    attempts: attempts.service,
+    projects: projects.service,
+    tasks: tasks.service,
+    knowledge: knowledge.service,
+    design: designs.service.get,
+    gitReview: gitReviews.service.get,
+    browser: browser.service,
+    inbox: inbox.service,
+    settings: settings.service,
+    prompts,
+    dataDir: config.dataDir,
+  });
   const mcp = createMcpModule({
     databaseInvestigations,
     events,

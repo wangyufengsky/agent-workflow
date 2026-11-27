@@ -4,23 +4,36 @@ import {
   ATTEMPT_SUBMIT_TOOL,
   AttemptKind,
   AttemptStatus,
+  createDbConnectionOp,
+  createDesignOp,
+  createDesignTemplateOp,
+  DATA_EXPLORER_KEY,
+  DbTlsMode,
+  DbType,
   DesignDepth,
   DesignDiagramKind,
   DesignLayoutStyle,
   DesignReviewState,
   DesignSectionKind,
   ErrorCode,
+  generateDesignOp,
+  listDesignTemplatesOp,
   MCP_SESSION_ARG,
   MCP_TOOL_PREFIX,
   McpToolName,
+  OPENCODE_AGENT_NAME,
+  PermissionMode,
   ServerEventType,
   SessionAgent,
+  setProjectDbConnectionsOp,
+  stopDesignOp,
   submitDesignSectionInputSchema,
   ThemeId,
 } from '@aw/shared';
 import { expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp } from '../../../test/helpers/app.ts';
+import { testCipher } from '../../../test/helpers/cipher.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject } from '../../../test/helpers/tasks.ts';
@@ -53,6 +66,7 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
       layoutStyle: DesignLayoutStyle.Doc,
       theme: ThemeId.Default,
       excludePatterns: [],
+      permissionMode: PermissionMode.Ask,
       aiReviewEnabled: false,
       sourceSnapshot: {
         branch: 'main',
@@ -151,8 +165,15 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
         isError: false,
         body: { content: 'chapter evidence', offset: 0, totalLength: 16, nextOffset: null },
       });
-      for (const tool of [unrelated, McpToolName.AskUser, McpToolName.DbListConnections]) {
-        expect(await submit(tool, {})).toMatchObject({
+      const forbidden = [
+        { tool: unrelated, input: {} },
+        { tool: McpToolName.AskUser, input: {} },
+        { tool: McpToolName.DbListConnections, input: {} },
+        { tool: McpToolName.DbDescribe, input: { connection: 'orders' } },
+        { tool: McpToolName.DbQuery, input: { connection: 'orders', sql: 'SELECT 1' } },
+      ];
+      for (const { tool, input } of forbidden) {
+        expect(await submit(tool, input)).toMatchObject({
           isError: true,
           body: { code: ErrorCode.McpToolNotAllowed },
         });
@@ -319,6 +340,92 @@ it('设计提交经真实 MCP 落库，拒绝错误章节，保留重写前快�
   } finally {
     await mcp.close();
     db.close();
+    await t.close();
+  }
+});
+
+it('数据探索数据库元数据权限随连接撤销，并且复制模板不继承权限', async () => {
+  const t = await createTestApp({ cipher: testCipher });
+  const mcp = await connectMcp(t.mcpUrl, t.app.mcpToken);
+  try {
+    const { project, repo } = await addProject(t, { files: { 'schema.sql': 'CREATE TABLE orders (id INT);' } });
+    const connection = await t.call(createDbConnectionOp, {
+      name: 'orders',
+      type: DbType.Mysql,
+      host: '127.0.0.1',
+      port: 3306,
+      database: 'shop',
+      username: 'readonly',
+      password: '',
+      tlsMode: DbTlsMode.Off,
+    });
+    expect(connection.status).toBe(201);
+    const link = (connectionIds: string[]) => t.call(setProjectDbConnectionsOp, { id: project.id, connectionIds });
+    expect((await link([connection.body.id])).status).toBe(200);
+
+    const run = async (templateKey: string) => {
+      const design = await t.call(createDesignOp, { projectId: project.id, templateKey, aiReviewEnabled: false });
+      expect(design.status).toBe(201);
+      t.fake.enqueue(script().hang(), { agent: OPENCODE_AGENT_NAME.designer });
+      const started = await t.call(generateDesignOp, { id: design.body.id });
+      expect(started.status).toBe(200);
+      const attemptId = started.body.runs.at(-1)?.attempt.id;
+      if (attemptId === undefined) throw new Error('Expected a design attempt');
+      const { opencodeSessionId } = t.app.services.attempts.get(attemptId);
+      if (opencodeSessionId === null) throw new Error('Expected an active design session');
+      return {
+        id: design.body.id,
+        rules: await t.fake.sessionRules({ sessionId: opencodeSessionId, directory: repo.path }),
+        call: (tool: McpToolName, input: Record<string, unknown> = {}) =>
+          callTool(mcp, tool, { ...input, [MCP_SESSION_ARG]: opencodeSessionId }),
+      };
+    };
+
+    const granted = await run(DATA_EXPLORER_KEY);
+    expect(granted.rules).toContainEqual({
+      permission: `${MCP_TOOL_PREFIX}${McpToolName.DbDescribe}`,
+      action: 'allow',
+      pattern: '*',
+    });
+    expect(await granted.call(McpToolName.DbListConnections)).toEqual({
+      isError: false,
+      body: { connections: [{ name: 'orders', type: DbType.Mysql, database: 'shop' }] },
+    });
+    const denied = { isError: true, body: { code: ErrorCode.McpToolNotAllowed } };
+    expect((await link([])).status).toBe(200);
+    expect(await granted.call(McpToolName.DbListConnections)).toMatchObject(denied);
+    expect(await granted.call(McpToolName.DbDescribe, { connection: 'orders' })).toMatchObject(denied);
+    expect((await t.call(stopDesignOp, { id: granted.id })).status).toBe(200);
+
+    const sourceOnly = await run(DATA_EXPLORER_KEY);
+    expect(
+      sourceOnly.rules.some(({ permission }) => permission === `${MCP_TOOL_PREFIX}${McpToolName.DbDescribe}`),
+    ).toBe(false);
+    expect(await sourceOnly.call(McpToolName.DbListConnections)).toMatchObject(denied);
+    expect((await t.call(stopDesignOp, { id: sourceOnly.id })).status).toBe(200);
+
+    expect((await link([connection.body.id])).status).toBe(200);
+    const templates = (await t.call(listDesignTemplatesOp, {})).body.items;
+    const original = templates.find(({ key }) => key === DATA_EXPLORER_KEY);
+    if (original === undefined) throw new Error('Expected the built-in data explorer template');
+    const { name, description, defaultSections, focusPrompt } = original;
+    const clone = await t.call(createDesignTemplateOp, {
+      baseKey: original.key,
+      name,
+      description,
+      defaultSections,
+      focusPrompt,
+    });
+    expect(clone.status).toBe(201);
+    const copied = await run(clone.body.key);
+    expect(copied.rules.some(({ permission }) => permission === `${MCP_TOOL_PREFIX}${McpToolName.DbDescribe}`)).toBe(
+      false,
+    );
+    expect(await copied.call(McpToolName.DbListConnections)).toMatchObject(denied);
+    expect(await copied.call(McpToolName.DbDescribe, { connection: 'orders' })).toMatchObject(denied);
+    expect((await t.call(stopDesignOp, { id: copied.id })).status).toBe(200);
+  } finally {
+    await mcp.close();
     await t.close();
   }
 });

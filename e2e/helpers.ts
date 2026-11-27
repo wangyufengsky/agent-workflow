@@ -196,7 +196,12 @@ export async function pickWorkflow(page: Page, workflow: string | RegExp): Promi
  * Home page of the project (the select writes the same `?projectId=`), then a workflow under「直接开始」, which puts
  * the input in「开始任务」mode (D111), the requirement and start.
  */
-export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
+export async function startTask(
+  page: Page,
+  project: E2EProject,
+  workflow: string | RegExp,
+  requirement: string,
+): Promise<void> {
   await page.goto(`/?projectId=${project.id}`);
   await pickWorkflow(page, workflow);
   await expect(page.getByRole('button', { name: '项目', exact: true })).toHaveAccessibleDescription(project.name);

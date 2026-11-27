@@ -11,6 +11,7 @@ import {
   pageCheckWarningSchema,
   viewportPresetSchema,
 } from '../../enums/browser.ts';
+import { DesignKnowledgeMatch } from '../../enums/design.ts';
 import { worktreeStatusSchema } from '../../enums/git.ts';
 import { permissionModeSchema } from '../../enums/system.ts';
 import {
@@ -41,6 +42,7 @@ import {
   browserTestScopeSchema,
 } from './browser-cases.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
+import { designImpactLookupSchema } from './designs.ts';
 import { frontendRoundSchema } from './frontend.ts';
 import {
   functionalTestLaunchSchema,
@@ -52,6 +54,14 @@ import { projectModuleCompoundSelectionSchema } from './project-modules.ts';
 import { requirementItemsInputSchema } from './requirements.ts';
 import { skillRefSchema } from './skills.ts';
 import { taskCodeReviewReportSchema } from './task-code-review.ts';
+
+export const taskDesignImpactSchema = designImpactLookupSchema.extend({
+  match: z.enum([DesignKnowledgeMatch.Exact, DesignKnowledgeMatch.Reference]),
+  moduleCount: z.int().nonnegative(),
+  transactionCount: z.int().nonnegative(),
+  uncoveredPaths: z.array(z.string().min(1)),
+});
+export type TaskDesignImpactDTO = z.infer<typeof taskDesignImpactSchema>;
 
 /** Resolved once when the task is created (11 §5.1) and never changed afterwards. */
 export const checkpointsSchema = z.object({

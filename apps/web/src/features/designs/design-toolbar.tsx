@@ -1,4 +1,11 @@
-import { DESIGN_TITLE_MAX_CHARS, type DesignDTO, DesignStatus, designLayoutStyleSchema, StatusTone } from '@aw/shared';
+import {
+  DESIGN_TITLE_MAX_CHARS,
+  DeckMaterialKind,
+  type DesignDTO,
+  DesignStatus,
+  designLayoutStyleSchema,
+  StatusTone,
+} from '@aw/shared';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -9,6 +16,8 @@ import { StatusBadge } from '../../components/status-badge.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
 import { DESIGN_LAYOUT_LABEL, DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
+import { DesignPermissionPicker } from './design-permission-picker.tsx';
 import styles from './design-workbench.module.css';
 import { useUpdateDesign } from './designs.queries.ts';
 
@@ -171,6 +180,7 @@ export function DesignToolbar({
         </div>
       </div>
       <div className={styles.actions}>
+        <DesignPermissionPicker design={design} />
         <fieldset className={styles.segment} aria-label={C.mode}>
           <Button size="sm" variant="ghost" aria-pressed={follow} onClick={() => onFollow(true)}>
             {C.follow}
@@ -224,6 +234,16 @@ export function DesignToolbar({
             <Icon name="sliders" />
           </summary>
           <div className={styles.preferences}>
+            {design.doneSections > 0 && (
+              <Link
+                to={ROUTES.deckNew}
+                search={{ kind: DeckMaterialKind.Design, refId: design.id, projectId: design.projectId ?? undefined }}
+                className="btn sm"
+              >
+                <Icon name="slides" size="sm" />
+                {PPT_COPY.makeLinkedDeck}
+              </Link>
+            )}
             <label className="col">
               <span>{C.layout}</span>
               <select

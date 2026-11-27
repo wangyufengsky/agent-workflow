@@ -24,7 +24,8 @@ export default defineConfig({
           name: 'int',
           globalSetup: [TEMP_ROOT],
           include: [`${SOURCES}/*.int.test.ts`],
-          exclude: IGNORE,
+          exclude:
+            process.env.AW_TEST_WITHOUT_DB_CONTAINERS === '1' ? [...IGNORE, '**/databases.*int.test.ts'] : IGNORE,
           // Node 24 在 Office 源码 worker 退出时可能重复释放 WASM 包装器，导致整个测试进程崩溃。
           // https://github.com/nodejs/node/issues/66366；Node 24 纳入 #66376 的 V8 修复后移除。
           execArgv: process.versions.node.startsWith('24.') ? ['--no-wasm-code-gc'] : [],

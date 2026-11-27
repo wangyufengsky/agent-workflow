@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, type Page, test } from '@playwright/test';
+import { ThemeId } from '@aw/shared';
+import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
   createProject,
@@ -14,6 +15,7 @@ import {
   submitResult,
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
+import { readyModuleDesign } from './ready-design-fixture.ts';
 
 // Journeys J5 and J6 (07 §5): delivery from the result card, with FakeOpencode playing the AI sessions.
 
@@ -37,18 +39,54 @@ async function fixInReview(
     submitResult(`已修复：${requirement}`),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-  await startTask(page, project, /修 Bug/, requirement);
+  await startTask(page, project, '修 Bug', requirement);
   await expect(page.getByTestId('result-card').getByRole('button', { name: '合并到 main' })).toBeVisible({
     timeout: TASK_RUN_TIMEOUT_MS,
   });
   return page.url();
 }
 
-test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理、任务已完成', async ({ page, request }) => {
+const greetingModule = '问候语模块';
+
+async function greetingDesign(request: APIRequestContext, project: E2EProject) {
+  writeFileSync(join(project.repoPath, 'greet.ts'), 'export const greet = () => "您好";\n');
+  git(project.repoPath, 'add', 'greet.ts');
+  git(project.repoPath, 'commit', '-m', 'Add greeting');
+
+  return readyModuleDesign(request, project, {
+    path: 'greet.ts',
+    title: greetingModule,
+    summary: '供界面显示默认问候语。',
+  });
+}
+
+test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理、任务已完成', async ({ page, request }, info) => {
   const project = await createProject(request, null);
-  await fixInReview(page, request, project, '问候语写错了', 'export const greet = () => "你好";\n');
+  const design = await greetingDesign(request, project);
+  const initialRuns = (await design.read()).runs.map(({ id }) => id);
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  const taskUrl = await fixInReview(page, request, project, '问候语写错了', 'export const greet = () => "你好";\n');
   const result = page.getByTestId('result-card');
 
+  const impact = result.locator('summary').filter({ hasText: '设计影响初筛' });
+  await expect(impact).toHaveText('设计影响初筛：命中 1 个模块 / 0 条交易 · 精确匹配快照');
+  await impact.click();
+  const moduleLink = result.getByRole('link', { name: greetingModule, exact: true });
+  await expect(moduleLink).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', ThemeId.Codex);
+  await page.screenshot({ path: info.outputPath('delivery-design-impact-light.png'), animations: 'disabled' });
+  await moduleLink.click();
+  await expect(page).toHaveURL(new RegExp(`/designs/${design.id}\\?targetKind=section`));
+  await expect(
+    page.getByRole('region', { name: '设计正文' }).getByRole('heading', { name: greetingModule }),
+  ).toBeVisible();
+  await page.goto(taskUrl);
+
+  const stalenessUrl = `${API_BASE}/designs/${design.id}/staleness`;
+  const stalenessReads: string[] = [];
+  page.on('request', (request) => {
+    if (request.url() === stalenessUrl) stalenessReads.push(request.method());
+  });
   // The changes can be read line by line before merging.
   await result.getByRole('button', { name: '查看改动' }).click();
   const changes = page.getByRole('dialog', { name: '改动' });
@@ -56,10 +94,19 @@ test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理�
   await changes.getByRole('button', { name: '并排视图' }).click();
   await expect(changes.getByTestId('diff-view')).toBeVisible();
   await page.keyboard.press('Escape');
+  expect(stalenessReads).toEqual([]);
 
   await result.getByRole('button', { name: '合并到 main' }).click();
   await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(page.getByTestId('task-page').getByText('已完成', { exact: true }).first()).toBeVisible();
+  const staleness = result.getByRole('status').filter({ hasText: '项目设计有 1 个文件变动（影响 1 章）' });
+  await expect(staleness).toBeVisible();
+  expect(stalenessReads).toEqual(['GET']);
+  await patchSettings(request, { 'ui.theme': ThemeId.Default });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', ThemeId.Default);
+  await staleness.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('delivery-design-stale-dark.png'), animations: 'disabled' });
+  expect(stalenessReads).toEqual(['GET']);
 
   expect(git(project.repoPath, 'log', '-1', '--format=%s', 'main')).toMatch(/^问候语写错了 \(T-\d+\)$/);
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe('export const greet = () => "你好";');
@@ -76,6 +123,43 @@ test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理�
   const historical = page.getByRole('dialog', { name: '改动' });
   await expect(historical.getByTestId('diff-view')).toContainText('export const greet = () => "你好";');
   await expect(historical).not.toContainText('later.txt');
+  expect(stalenessReads).toEqual(['GET']);
+
+  await page.reload();
+  await expect(result.getByRole('status').filter({ hasText: '项目设计有 2 个文件变动' })).toBeVisible();
+  expect(stalenessReads).toEqual(['GET', 'GET']);
+  await result.getByRole('link', { name: '打开项目设计去增量更新' }).click();
+  await expect(page).toHaveURL(new RegExp(`/designs/${design.id}$`));
+  await expect(page.getByRole('button', { name: '按变更增量更新' })).toBeVisible();
+  expect((await design.read()).runs.map(({ id }) => id)).toEqual(initialRuns);
+});
+
+test('合入非默认分支时不检查项目设计过期', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.mode': 'pro' });
+  const project = await createProject(request, null);
+  const design = await greetingDesign(request, project);
+  git(project.repoPath, 'branch', 'release-preview');
+  await fixInReview(page, request, project, '先把问候语合入预览分支', 'export const greet = () => "你好";\n');
+  const result = page.getByTestId('result-card');
+  const stalenessUrl = `${API_BASE}/designs/${design.id}/staleness`;
+  const stalenessReads: string[] = [];
+  page.on('request', (request) => {
+    if (request.url() === stalenessUrl) stalenessReads.push(request.method());
+  });
+
+  await result.getByRole('button', { name: '合并选项…' }).click();
+  const options = page.getByRole('dialog', { name: '合并选项' });
+  await options.getByLabel('目标分支').fill('release-preview');
+  await options.getByRole('button', { name: '合并', exact: true }).click();
+  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 release-preview', {
+    timeout: TASK_RUN_TIMEOUT_MS,
+  });
+  expect(git(project.repoPath, 'show', 'release-preview:greet.ts')).toBe('export const greet = () => "你好";');
+  expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe('export const greet = () => "您好";');
+  await page.reload();
+  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 release-preview');
+  await expect(result.getByRole('link', { name: '打开项目设计去增量更新' })).toHaveCount(0);
+  expect(stalenessReads).toEqual([]);
 });
 
 test('无法运行的命令跳过后，从结果卡读取当次检查证据', async ({ page, request }) => {
@@ -86,7 +170,7 @@ test('无法运行的命令跳过后，从结果卡读取当次检查证据', as
     submitResult('已修复'),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-  await startTask(page, project, /修 Bug/, '检查不可运行的命令');
+  await startTask(page, project, '修 Bug', '检查不可运行的命令');
   const failure = page.getByTestId('failure-panel');
   await expect(failure.getByRole('button', { name: '跳过这项检查…' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await failure.getByRole('button', { name: '跳过这项检查…' }).click();
@@ -229,4 +313,45 @@ test('三个任务同时运行改同一文件：各自分支与工作区互不�
   await expect
     .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
     .toHaveLength(1);
+});
+
+test('根工作区留在 feature 时，默认分支交付按实际合入提交检查设计', async ({ page, request }, info) => {
+  const project = await createProject(request, null);
+  const design = await greetingDesign(request, project);
+  const initialRuns = (await design.read()).runs.map(({ id }) => id);
+  const baseline = git(project.repoPath, 'rev-parse', 'main');
+  git(project.repoPath, 'checkout', '-b', 'feature');
+  expect(git(project.repoPath, 'status', '--porcelain')).toBe('');
+
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await fixInReview(page, request, project, '合入主分支的问候语', 'export const greet = () => "你好";\n');
+  const result = page.getByTestId('result-card');
+  const stalenessUrl = new URL(`${API_BASE}/designs/${design.id}/staleness`).pathname;
+  const stalenessReads: { method: string; commitSha: string | null }[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === stalenessUrl) {
+      stalenessReads.push({ method: request.method(), commitSha: url.searchParams.get('commitSha') });
+    }
+  });
+
+  await result.getByRole('button', { name: '合并到 main' }).click();
+  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
+  const merge = git(project.repoPath, 'rev-parse', 'main');
+  expect(merge).not.toBe(baseline);
+  expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe('export const greet = () => "你好";');
+  expect(git(project.repoPath, 'branch', '--show-current')).toBe('feature');
+  expect(git(project.repoPath, 'rev-parse', 'HEAD')).toBe(baseline);
+  expect(git(project.repoPath, 'status', '--porcelain')).toBe('');
+
+  const notice = result.getByRole('status').filter({ hasText: '本次合入提交相对项目设计快照' });
+  await expect(notice).toContainText('有 1 个文件变动（影响 1 章）');
+  await expect(notice).toContainText('切换到 main 后再增量更新。');
+  expect(stalenessReads).toEqual([{ method: 'GET', commitSha: merge }]);
+  await notice.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('delivery-design-merge-commit-light.png'), animations: 'disabled' });
+  await notice.getByRole('link', { name: '打开项目设计', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/designs/${design.id}$`));
+  await expect(page.getByRole('region', { name: '设计正文' })).toBeVisible();
+  expect((await design.read()).runs.map(({ id }) => id)).toEqual(initialRuns);
 });

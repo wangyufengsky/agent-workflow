@@ -32,6 +32,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import type { DeliveriesService } from '../delivery/index.ts';
+import type { createReadyDesignKnowledgeReader } from '../designs/index.ts';
 import type { GitNetwork, RepoLocks } from '../git/index.ts';
 import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InboxService } from '../inbox/index.ts';
@@ -84,6 +85,7 @@ export type TasksServiceDeps = {
   databases: DatabasesService;
   knowledge: KnowledgeService;
   gitReviews: GitReviewsService;
+  readyDesignKnowledge: ReturnType<typeof createReadyDesignKnowledgeReader>;
   locks: RepoLocks;
   dataDir: string;
 };
@@ -236,6 +238,7 @@ export function createTaskState(deps: TasksServiceDeps) {
       projectId: task.projectId,
       taskKey: task.key,
       taskTitle: task.title,
+      workflowKey: task.workflowKey,
       browserTest: task.browserTest !== null,
       functionalTest: task.functionalTest !== null,
       ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),

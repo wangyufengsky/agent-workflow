@@ -9,6 +9,7 @@ import {
   DesignReviewState,
   DesignSectionKind,
   ErrorCode,
+  PermissionMode,
   ThemeId,
 } from '@aw/shared';
 import { THEMES } from '@aw/shared/theme';
@@ -36,6 +37,7 @@ function contents(projectRoot: string): DesignSiteContents {
       layoutStyle: DesignLayoutStyle.Doc,
       theme: ThemeId.Codex,
       excludePatterns: ['PRIVATE_PATTERN'],
+      permissionMode: PermissionMode.Ask,
       aiReviewEnabled: false,
       sourceSnapshot: {
         branch: 'main',

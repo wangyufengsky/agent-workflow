@@ -155,7 +155,13 @@ test('UX-02 长流程在待合并时可查看并交付', async ({ page, request 
       await page.setViewportSize(viewport);
       await page.reload();
       await expect(fold).toHaveAttribute('open', '');
-      await page.getByTestId('progress-canvas').getByTestId('step-step_7').click();
+      const canvas = page.getByTestId('progress-canvas');
+      const lastStep = canvas.getByTestId('step-step_7');
+      // 画布平移才能让后面的步骤进入视口，React Flow 会复位浏览器自动滚动产生的偏移。
+      await canvas.hover();
+      await page.mouse.wheel(1600, 0);
+      await expect(lastStep).toBeInViewport({ ratio: 1 });
+      await lastStep.click();
       await expect(page.getByRole('dialog')).toHaveAccessibleName('开发步骤 8');
       await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
       await expect(page.getByTestId('task-side')).toContainText('开发步骤 8');
@@ -188,7 +194,7 @@ test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → �
 
   // Asked rather than assumed, so the card shows the default assumption; the task keeps the setting it started with.
   await patchSettings(request, { 'ai.askOnUncertainty': true });
-  await startTask(page, project, /修 Bug/, '订单时间显示错了');
+  await startTask(page, project, '修 Bug', '订单时间显示错了');
   await patchSettings(request, { 'ai.askOnUncertainty': false });
   await expect(page.getByText('需要你处理', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: /需要你处理（\d+）/ }).click();
@@ -228,7 +234,7 @@ test('J3 权限请求 → 允许一次 → 继续；总是允许 → 记到项�
     ]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
-    await startTask(page, project, /修 Bug/, '构建产物残留导致测试失败');
+    await startTask(page, project, '修 Bug', '构建产物残留导致测试失败');
     const permission = page.getByTestId('inbox-permission');
     // The reminder bubble goes away with the request it is about, wherever that was answered (32 §3.5).
     const reminder = page.getByRole('region', { name: '有件事需要你处理' });

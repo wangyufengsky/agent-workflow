@@ -111,7 +111,8 @@ export function createToolRegistry(
   }
 
   function restriction(tool: McpToolDefinition, attempt: AttemptDTO): AppError | undefined {
-    if (isDesignAttemptKind(attempt.kind) && !designAttemptTools(attempt.kind).includes(tool.name))
+    // 这里只按尝试类型过滤；设计元数据工具的处理器再验证实际设计运行、模板和连接范围。
+    if (isDesignAttemptKind(attempt.kind) && !designAttemptTools(attempt.kind, true).includes(tool.name))
       return new AppError(ErrorCode.McpToolNotAllowed, 'This project design attempt can only use its declared tools');
     if (
       attempts.liveAgentOf(attempt.id) === OPENCODE_AGENT_NAME[SessionAgent.DatabaseAnalyst] &&

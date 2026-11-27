@@ -197,7 +197,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeckStatus` | `outlining` · `outline_ready` · `failed` · `generating` · `incomplete` · `ready` | PPT 的显示状态，由页面与最近一次 AI 工作的尝试状态推导（`deckStatusOf`，`shared/deck/status.ts`，23 §4.3），不存储 |
 | `DeckRunKind` | `outline` · `slides` | 一次 AI 工作做什么，由其尝试的 kind 推导（`deckRunKindOf`） |
 | `DeckExportFormat` | `pptx` · `pdf` | PPT 导出的文件（23 §6）；`pdf` 只在桌面应用；助手 `export_deck` 的 `format` |
-| `DeckMaterialKind` | `text` · `file` · `task` · `artifact` · `knowledge` · `web` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
+| `DeckMaterialKind` | `text` · `file` · `task` · `artifact` · `knowledge` · `web` · `design` · `git_review` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
 | `SlideLayout` | `cover` · `section` · `bullets` · `two_column` · `cards` · `steps` · `stats` · `table` · `code` · `quote` | 内置版式（23 §5.1，D93）；每种版式的字段与字数上限为 `slideContentSchema`（`shared/contracts/deck/slide.ts`） |
 
 `ServerEventType` 另有 `deck.updated` 与 `design.updated`（11 §11）。
@@ -703,7 +703,7 @@ class AppError extends Error {
 
 功能测试执行使用 `FunctionalTestStatus`。执行期间为 `running`，完成后由证据推导 `passed`、`failed` 或 `blocked`。尚未执行的用例在报告中标作 `not_run`。功能测试不改变任务状态机。
 
-权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。知识问答按对话保存该枚举，所有档位都适用研究员的只读角色与资料来源规则（[18](18-knowledge.md#研究员权限范围)）。助手原生 Bash 可按助手对话复用用户已记住的授权，任务尝试可按该任务或所属项目复用符合当前角色规则的授权；工作目录、完整命令、脚本入口或参数变化时重新判定。知识问答的 Bash 审批只处理本次，审批员也只能批准本次。
+权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。知识问答按对话保存该枚举，所有档位都适用研究员的只读角色与资料来源规则（[18](18-knowledge.md#研究员权限范围)）。助手原生 Bash 可按助手对话复用用户已记住的授权，任务尝试可按该任务或所属项目复用符合当前角色规则的授权；工作目录、完整命令、脚本入口或参数变化时重新判定。知识问答的 Bash 审批只处理本次，审批员也只能批准本次。项目设计按设计保存同一枚举，界面将 `full` 显示为「自动批准只读」。设计审批范围与运行中切换的行为见 [44 §7](44-project-design.md)。
 
 ### 模型思考强度
 
@@ -718,7 +718,7 @@ class AppError extends Error {
 | `GitImpactTargetKind` | `section` 章节或模块、`submodule` 子模块、`transaction` 交易、`file` 文件、`symbol` 符号 |
 | `GitReviewEvidenceState` | `available` 有对应版本源码、`changed` 工作区内容已变化、`unavailable` 证据无法读取或核对 |
 
-证据沿用 `DesignEvidenceClass`，设计版本匹配沿用 `DesignKnowledgeMatch`。程序初筛上限为 3 层（`DESIGN_IMPACT_MAX_DEPTH`）、60 个节点（`DESIGN_IMPACT_MAX_ITEMS`），注入上下文上限为 16 KiB（`DESIGN_IMPACT_PROMPT_MAX_BYTES`）。一次提交最多包含 60 项业务影响（`GIT_REVIEW_IMPACTS_MAX`）与 30 条回归建议（`GIT_REVIEW_REGRESSION_CHECKS_MAX`）。
+证据沿用 `DesignEvidenceClass`，设计版本匹配沿用 `DesignKnowledgeMatch`。设计快查一次接受最多 50 条项目相对路径。程序初筛上限为 3 层（`DESIGN_IMPACT_MAX_DEPTH`）、60 个节点（`DESIGN_IMPACT_MAX_ITEMS`），注入上下文上限为 16 KiB（`DESIGN_IMPACT_PROMPT_MAX_BYTES`）。需求拆解、内置详细设计流程与知识问答首轮的项目设计目录按 UTF-8 限制为 16 KiB（`PROJECT_DESIGN_CONTEXT_MAX_BYTES`，含基线、覆盖与截断标记）。一次提交最多包含 60 项业务影响（`GIT_REVIEW_IMPACTS_MAX`）与 30 条回归建议（`GIT_REVIEW_REGRESSION_CHECKS_MAX`）。
 
 ## 项目设计（44）
 
@@ -736,6 +736,8 @@ class AppError extends Error {
 
 `designer` 对应 `aw-designer`。`design_generate` 每章独占一个全新的会话，独立复审另开会话。四种尝试为 `design_outline`、`design_generate`、`design_revise`、
 `design_review`。实体类型为 `design`，设计更新事件为 `design.updated`。
+
+只读内置模板键为 `general`、`transaction-explorer` 和 `data-explorer`。`data-explorer` 的章节生成与修订可以使用已关联数据库的连接列表和表结构工具。越权调用 `db_query` 返回 `MCP_TOOL_NOT_ALLOWED`，指定未关联连接返回 `DB_CONNECTION_NOT_FOUND`。
 
 | 错误码 | HTTP | 含义 |
 | --- | --- | --- |

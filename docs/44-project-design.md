@@ -56,7 +56,7 @@
   - 状态覆盖：加载中、空状态、无匹配结果、错误态（`ErrorState`）；游标分页。
   - `opencode` 未就绪时仍可完整阅读、搜索与导出已有设计，仅发起新的 AI 生成/重写操作时提示原因。
 - **模板库**：
-  - 展示两套只读内置模板「架构探索」「交易链路探索」及用户自己的模板。每项展示章节蓝图与可展开的分析侧重。历史设计继续使用创建时保存的模板快照。
+  - 展示三套只读内置模板「架构探索」「交易链路探索」「数据模型与 SQL 链路探索」及用户自己的模板。每项展示章节蓝图与可展开的分析侧重。历史设计继续使用创建时保存的模板快照。
   - 支持「使用此模板新建」（跳转 `/designs/new?template=<key>`）、「复制为自定义模板」（内置模板只读，复制后可编辑名称、默认章节蓝图与分析侧重指引，同 [13 §5](13-builtin-workflows.md#5-自定义流程专业模式) 规则）；自定义模板支持编辑与删除。
 
 ### 2.3 新建页 `/designs/new`
@@ -164,6 +164,7 @@
 | layout_style | TEXT | `DesignLayoutStyle`：`doc`（技术文档）/ `arch`（架构图谱优先），随时切换零 AI 调用 |
 | theme | TEXT | 历史主题字段，保留既有接口；在线显示跟随应用，离线跟随系统 |
 | exclude_patterns | TEXT(JSON) | `string[]`：用户追加的排除 glob |
+| permission_mode | TEXT | 本设计的审批模式，默认 `ask`。新建、确认大纲前和运行中均可修改。 |
 | ai_review_enabled | INTEGER(bool) | 完成后是否运行独立 AI 复审（`deep` 默认 true，其余 false） |
 | source_snapshot | TEXT(JSON) | `DesignSourceSnapshot`：`{ branch, commitSha, dirty, scannedAt, analyzableCount, skippedCount, skippedReasons, techStack[] }` |
 | outline_confirmed_at | INTEGER NULL | 确认大纲的时间；只写一次，为空代表大纲阶段 |
@@ -246,11 +247,11 @@
 
 ### `design_templates`
 
-用户自定义分析模板表（两套内置模板由 `packages/builtin/` 随启动同步，只读不可改，同 `workflows` 约定）。
+用户自定义分析模板表（内置模板由 `packages/builtin/` 随启动同步，只读不可改，同 `workflows` 约定）。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
-| key | TEXT PK | 模板键（本期内置为 `general`，自定义由系统/用户生成） |
+| key | TEXT PK | 模板键（内置 `general`、`transaction-explorer`、`data-explorer`，自定义由系统生成） |
 | kind | TEXT | `builtin` / `custom` |
 | name | TEXT | 显示名称 |
 | description | TEXT | 适用范围一句说明 |
@@ -361,6 +362,7 @@
    - `transaction-explorer`（交易链路探索）从报文与路由建立交易档案，分别分析处理步骤、字段流转、异常出口和事务边界。侧栏目录随章节提交填充，可按名称、交易码、渠道、版本和场景组合筛选。同码交易保留各自的流程图与引用文件。
    - 工作台与离线报告共用节点标题和布局。主标题来自交易动作，副标题展示实际调用、符号或源码位置。节点按真实连接分层排布，异常分支、外部调用和推断关系各有标记。
    - 从「处理链路」选择节点可查看关联字段与后续步骤，也可从「字段流转」「事务边界」跳回节点。「源码索引」仅列本笔交易的引用。离线报告只展示已引用的源码片段，本机可继续打开完整源码。示例截图见[工作台](design/44-project-design/transaction-workbench.png)、[离线浅色](design/44-project-design/transaction-light.png)和[离线深色](design/44-project-design/transaction-dark.png)。
+   - `data-explorer`（数据模型与 SQL 链路探索）依次整理数据架构、实体与表结构、SQL 读写与映射、事务与迁移风险。已关联数据库的项目可以在章节生成和修订时核对表、列、主键和索引；项目内置数据库工具仅授权元数据。未关联时使用仓库中的迁移、DDL、实体和 SQL。关联使用带源码位置的既有图结构，供设计阅读器与 Git 影响初筛共同读取。
 2. **自定义模板**：从任一内置模板「复制为自定义」，仅可修改名称、预设章节蓝图与 `focus_prompt`（分析侧重文本），沿用同一只读工具权限与结构化 Schema 校验，不开放自定义执行节点或脚本。
 3. **阅读风格 × 主题**：`DesignLayoutStyle`（`doc` 技术文档 / `arch` 架构图谱优先）用同一份生成数据。在线跟随全局主题，离线使用系统主题。
 
@@ -428,7 +430,7 @@
 ```
 
 - 设置中「自己的 MCP 工具」列出的外部服务和普通开发节点一样，按当前项目合并后的 OpenCode 配置与权限使用。设计会话创建时从原生工具注册表收紧本地操作，保留源码读取、受控 bash、指定 Skill，也兼容插件原生注册的 `aicoding_story_start` 与 `aicoding_story_complete`。配置 `/aicoding start …` 和 `/aicoding complete` 后，每个成功提交的设计会话在原会话内分别调用开始和完成命令。
-- 会话级 bash 规则为 `readonlyBashRules()`；白名单外的命令走既有权限询问（「需要你处理」）。
+- 设计会话沿用 `readonlyBashRules()`。需要额外审批的 Bash 请求按设计当前档位处理。默认「始终询问」出人工卡；「帮我批准」由审批员核对受支持的只读命令；「自动批准只读」在本地核验后直接放行。自动审批只涵盖可识别的仓库元数据查询或扫描清单内的只读文件操作，未核验的请求交给「需要你处理」。新建表单、大纲页和工作台均显示「设计权限」。修改影响本设计之后的请求，覆盖大纲、生成、复审、重写、重试及增量更新。现有卡片保留，使用者处理后继续。
 - 会话工作目录为项目根目录（只读）；`opencode.dispatch.ts` 的 `SessionPurpose` 新增 `Design`。
 - `SessionAgent` 新增 `designer`（`OPENCODE_AGENT_NAME.designer = 'aw-designer'`）；`AttemptKind` 新增 `design_outline`、`design_generate`、`design_revise`、`design_review`。
 
@@ -463,8 +465,8 @@
 | `designs.list` | `GET /designs?projectId&query&limit&cursor` | read | 设计列表（`DesignSummaryDTO`），按 `updated_at` 倒序 |
 | `designs.get` | `GET /designs/:id` | read | 设计完整详情（含 `sourceSnapshot`、全部章节、文件详情、图、推导状态、活跃与历史 runs） |
 | `designs.source` | `GET /designs/:id/files/:fileId/source` | read | 仅本机阅读器，返回 available + content、changed 或 unavailable，按本设计的文件 ID、授权路径和扫描哈希读取，助手不可调用 |
-| `designs.create` | `POST /designs` `{ projectId, templateKey?, depth?, layoutStyle?, excludePatterns?, aiReviewEnabled?, theme? }` | write | 执行程序扫描并按所选模板生成默认章节大纲（201，零 AI 调用） |
-| `designs.update` | `PATCH /designs/:id` `{ title?, theme?, layoutStyle?, aiReviewEnabled? }` | write | 改名、换主题、切阅读风格、切换复审开关（不调用 AI） |
+| `designs.create` | `POST /designs` `{ projectId, templateKey?, depth?, layoutStyle?, excludePatterns?, aiReviewEnabled?, permissionMode?, theme? }` | write | 执行程序扫描并按所选模板生成默认章节大纲（201，零 AI 调用） |
+| `designs.update` | `PATCH /designs/:id` `{ title?, theme?, layoutStyle?, aiReviewEnabled?, permissionMode? }` | write | 改名、换主题、切换阅读风格、复审开关或审批模式。运行中可改主题、阅读风格和审批模式。保存设置不调用 AI。 |
 | `designs.listTemplates` | `GET /designs/templates?projectId` | read | 列出内置与自定义分析模板；传 `projectId` 时轻扫根目录特征文件返回识别到的技术栈与推荐模板（不递归全仓算哈希） |
 | `designs.createTemplate` | `POST /designs/templates` `{ baseKey?, name, description, defaultSections, focusPrompt }` | write | 新建或从内置模板复制自定义分析模板 |
 | `designs.updateTemplate` | `PATCH /designs/templates/:key` `{ name?, description?, defaultSections?, focusPrompt? }` | write | 修改自定义模板（内置模板返回 `DESIGN_TEMPLATE_READONLY`） |

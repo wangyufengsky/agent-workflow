@@ -92,7 +92,7 @@ export function transcriptEntries(
 
 /** SSE: lines of a stream someone has open are kept until its pages are read again. */
 export function appendTranscript(qc: QueryClient, source: TranscriptSource, entries: readonly TranscriptEntry[]): void {
-  if (qc.getQueryCache().find({ queryKey: source.key, exact: true }) === undefined) return;
+  if (qc.getQueryCache().find({ queryKey: source.key, exact: false }) === undefined) return;
   qc.setQueryData<TranscriptEntry[]>(source.liveKey, (old = []) => [...old, ...entries]);
 }
 

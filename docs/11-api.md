@@ -145,6 +145,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/delivery-status` | 刷新当前 PR / MR 状态并保存最近成功结果；失败保存错误，保留旧快照。仅查询配置仓库下的已记录 URL。 |
 | GET | `/initiatives/:id/items/:key/merge-readiness` | 对照平台合入提交与需求计划本地基础分支，返回远端、等待本地、证据不足或可确认状态；旧交付缺少 head 时不推测；GitLab 缺合入提交时仅在原交付 head 确实是本地基础分支祖先时确认；不自动确认。用户可在页面重新检查本地分支，Git 错误显示后可重试。 |
 | GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计。运行中可返回最近修改的文件名 `latestPath`，用于跟随工作区编辑。已交付且 worktree 不再可用时对比该次交付的 `diffBase` 与 `diffHead`；范围或提交不可用时返回 404 `NOT_FOUND`（UX-03） |
+| GET | `/tasks/:id/design-impact` | `tasks.designImpact`（read）。从当前任务 Diff（含重命名前的路径）初筛静态影响；无就绪设计返回 `null`。有设计时返回快照、覆盖、候选及截断信息，附相对 Diff 基线的 `match`（exact/reference）、命中模块数和交易数。查询在本地完成 |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
 ### 5.1 创建
@@ -449,7 +450,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- | --- | --- |
 | GET | `/knowledge/conversations?projectId&query&limit&cursor` | `knowledge.list` | read | `{ items: KnowledgeConversationSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配问题与回答 |
 | GET | `/knowledge/conversations/:id` | `knowledge.get` | read | `KnowledgeConversationDTO`（`permissionMode`、全部轮次、状态、回答、引用、`awaitingInput`） |
-| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources, model?, permissionMode? }`（界面省略权限时为 `ask`；`model`：`provider/model`；`null` 为 opencode 默认；省略为 `ai.defaultModel`，D67 ④） → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
+| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources, model?, permissionMode? }`（界面省略权限时为 `ask`；`model`：`provider/model`；`null` 为 opencode 默认；省略为 `ai.defaultModel`，D67 ④） → 201 详情。首轮在允许代码或文档来源且项目已有就绪设计时附带 16 KiB 以内的目录，并标明快照基线、覆盖及参考匹配。追问沿用已有上下文。opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
 | POST | `/knowledge/conversations/:id/turns` | `knowledge.followUp` | read | `{ question, model? }`（可换模型）；上一轮研究中 409 `KNOWLEDGE_CONVERSATION_BUSY` |
 | PATCH | `/knowledge/conversations/:id/permission-mode` | `knowledge.setPermissionMode` | critical | `{ permissionMode }` → 更新后的 `KnowledgeConversationDTO`；仅界面调用；可以在研究中修改，之后的新权限请求采用新档位，现有待审批项继续等待处理。研究员的只读限制与资料范围继续生效 |
 | POST | `/knowledge/conversations/:id/stop` | `knowledge.stop` | write | 中止研究中的一轮；已结束 409 `STATE_TRANSITION_INVALID` |
@@ -592,7 +593,7 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | --- | --- | --- | --- | --- |
 | GET | `/decks?projectId&query&limit&cursor` | `decks.list` | read | `{ items: DeckSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配标题 |
 | GET | `/decks/:id` | `decks.get` | read | `DeckDTO`（要求、资料、理解、全部页、AI 工作记录、显示状态）；404 `DECK_NOT_FOUND` |
-| POST | `/decks` | `decks.create` | write | `{ brief, projectId?, materials, slideCount?, theme?, model? }` → 201 `DeckDTO` 并开始写大纲；`materials` 的 `{ kind: web, url }` 由后端按网站规则只读打开并存正文快照（同 `browser.readUrl`）：不允许的地址 `BROWSER_SITE_NOT_ALLOWED`、要登录 `BROWSER_LOGIN_REQUIRED`、打不开、超时或页面本身返回 HTTP 错误（`details.status`；页面里的图片、脚本失败不算）`BROWSER_READ_FAILED`；资料来自多个项目、任务没有结果、对话没有回答、资料超过 `DECK_MATERIALS_MAX_CHARS` 为 400；`produces: deck` |
+| POST | `/decks` | `decks.create` | write | `{ brief, projectId?, materials, slideCount?, theme?, model? }` → 201 `DeckDTO` 并开始写大纲；`materials` 的 `{ kind: web, url }` 由后端按网站规则只读打开并存正文快照（同 `browser.readUrl`）：不允许的地址 `BROWSER_SITE_NOT_ALLOWED`、要登录 `BROWSER_LOGIN_REQUIRED`、打不开、超时或页面本身返回 HTTP 错误（`details.status`；页面里的图片、脚本失败不算）`BROWSER_READ_FAILED`；`{ kind: design, refId }` 冻结有已完成章节的设计，`{ kind: git_review, refId }` 冻结已成功的审查或对比报告。两者正文各按资料字符上限截断，后续修改来源不影响快照；资料来自多个项目、任务没有结果、对话没有回答、资料超过 `DECK_MATERIALS_MAX_CHARS` 为 400；`produces: deck` |
 | PATCH | `/decks/:id` | `decks.update` | write | `{ title?, theme? }`，不调用 AI |
 | POST | `/decks/:id/outline/revise` | `decks.reviseOutline` | write | `{ instruction?, model? }`：按意见重写大纲；不带意见为重新写（大纲失败后重试）；已确认大纲 409 `STATE_TRANSITION_INVALID` |
 | PUT | `/decks/:id/outline` | `decks.updateOutline` | write | `{ slides: [{ id?, layout, title, points }] }`：整体替换；已确认 409 |
@@ -777,11 +778,12 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | 操作 | 路径 | 请求与返回 |
 | --- | --- | --- |
 | designs.source | GET /designs/:id/files/:fileId/source | 仅本机阅读器可用。验证文件归属与扫描哈希，匹配返回 available 和全文；变化返回 changed，解绑或不可读返回 unavailable。此操作不暴露给助手 |
-| designs.staleness | GET /designs/:id/staleness | read，只读比较设计与当前工作区。返回 `state`、变更文件总数 `changedFilesCount`、按目录顺序排列的受影响已勾选章节 `affectedSectionIds` 与最多 20 条相对路径样例 `changedPathsSample`。基线或当前提交可用时附 `baseSha`、`headSha`。设计不存在返回 404 DESIGN_NOT_FOUND |
+| designs.lookupImpact | POST /designs/:id/lookup-impact | read，助手可直接调用。请求体 `{ paths: string[] }` 接受最多 50 条项目相对路径。按保存的设计索引返回 `designId`、`snapshotSha`、`dirty`、`coverage`、直接与间接 `candidates`、`uncoveredPaths` 和 `truncated`。结果仅表示快照中的静态关联，全程零模型调用 |
+| designs.staleness | GET /designs/:id/staleness | read，只读比较设计与当前工作区。可传 `commitSha`（完整提交 SHA）比较指定提交。返回 `state`、变更文件总数 `changedFilesCount`、按目录顺序排列的受影响已勾选章节 `affectedSectionIds` 与最多 20 条相对路径样例 `changedPathsSample`。基线或当前提交可用时附 `baseSha`、`headSha`。设计不存在返回 404 DESIGN_NOT_FOUND |
 | designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试。`handoffPending` 表示正在等候衔接下一章或自动复审，其间 `activeRunId` 为空，仍可停止 |
-| designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项 |
+| designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项。创建、更新均可传 `permissionMode`（`ask`、`assisted` 或 `full`），详情返回当前值，默认 `ask`。运行中可单独切档，此设计随后收到的权限请求使用新值，已打开的审批卡继续等待人工决定。助手工具不暴露此字段 |
 | designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
-| designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置架构探索及交易链路探索模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
+| designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置架构探索、交易链路探索及数据模型与 SQL 链路探索模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |
 | designs.updateOutline / reviseOutline | PUT /designs/:id/outline · POST /designs/:id/outline/revise | 保存章节勾选、范围、顺序；AI 规划只在确认前进行。POST 可传 generateAfterPlanning: true，全选草稿规划成功后自动逐章生成。省略时只保存新大纲 |
 | designs.generate | POST /designs/:id/generate | 首次省略 sectionId 确认大纲。未勾选任何章节返回 400 VALIDATION_FAILED。每个章节使用独立会话，依次释放模型槽再续下一章。确认后只补未生成的选中章，带 sectionId 仅重试其中一章。确认前指定章节、重试未选章或已生成章返回 409 STATE_TRANSITION_INVALID |
 | designs.incrementalUpdate | POST /designs/:id/incremental-update | write。显式启动勾选章节的增量更新，返回最新 `DesignDTO`。请求体为 `{ sectionIds: string[], instruction?: string }`，章节 ID 互异且至少一个，补充要求上限 8000 字 |
@@ -794,4 +796,4 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 
 每章提交时同时保存上一版、章节内容及相关文件哈希。覆盖启动时的全部受影响章节且全部成功后，在最后一章的同一事务中保存冻结快照并清理已删除文件。部分提交保留原全局快照，后续进入工作台仍会显示剩余受影响章节；更新期间的新增变动在下一次检测中反映。已生成的 Git 审查报告保留原内容。
 
-`designs.staleness` 的 `stale` 响应还提供 `changedFilesSample`，最多 20 条，按路径排列，每条含 `relPath` 和 `kind`（新增、删除或修改）。章节有独立哈希基线时逐章比对。其余设计在快照及当前 Git 工作区均干净且 HEAD 等于快照提交时直接返回 `fresh`。这条快速路径采用 Git 的干净状态，单独改动被 Git 忽略的文件不会触发扫描。其余可读目录（包括无 Git 的目录）使用设计创建时的排除规则重新扫描，与已保存的文件内容哈希比对。有差异返回 `stale`，文件内容一致返回 `fresh`。项目解绑或目录不可用时返回 `unknown`，`reason` 分别为 `project_unbound`、`directory_unavailable`。检测在本机完成，模型调用数为零。
+`designs.staleness` 的 `stale` 响应还提供 `changedFilesSample`，最多 20 条，按路径排列，每条含 `relPath` 和 `kind`（新增、删除或修改）。章节有独立哈希基线时逐章比对。其余设计在快照及当前 Git 工作区均干净且 HEAD 等于快照提交时直接返回 `fresh`。这条快速路径采用 Git 的干净状态，单独改动被 Git 忽略的文件不会触发扫描。其余可读目录（包括无 Git 的目录）使用设计创建时的排除规则重新扫描，与已保存的文件内容哈希比对。有差异返回 `stale`，文件内容一致返回 `fresh`。项目解绑或目录不可用时返回 `unknown`，`reason` 分别为 `project_unbound`、`directory_unavailable`。传入 `commitSha` 时使用独立临时索引和目录读取指定提交的文件，沿用相同扫描排除规则和章节哈希。保留 Git 的内置换行及编码转换，禁用外部过滤器和钩子。检查不会切换分支、改动项目索引或注册工作树。响应的 `headSha` 表示本次检测的目标提交；不存在或非提交对象返回 404 NOT_FOUND。检测在本机完成，模型调用数为零。

@@ -645,7 +645,7 @@ export function HomeComposer({
 
           {!initiativeMode && (
             <PermissionPicker
-              task={mode !== undefined}
+              scope={mode !== undefined ? 'task' : 'conversation'}
               value={mode === undefined ? chatMode : taskMode}
               disabled={changeMode.isPending}
               onChange={(permissionMode) => {

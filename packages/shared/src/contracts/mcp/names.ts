@@ -115,7 +115,12 @@ export function isDesignAttemptKind(kind: AttemptKind): kind is DesignAttemptKin
   return DESIGN_ATTEMPT_KINDS.some((candidate) => candidate === kind);
 }
 
-export function designAttemptTools(kind: DesignAttemptKind): readonly McpToolName[] {
+export const DESIGN_DATABASE_METADATA_KINDS: readonly DesignAttemptKind[] = [
+  AttemptKind.DesignGenerate,
+  AttemptKind.DesignRevise,
+];
+
+export function designAttemptTools(kind: DesignAttemptKind, databaseMetadata = false): readonly McpToolName[] {
   return [
     ATTEMPT_SUBMIT_TOOL[kind],
     ...(ATTEMPT_SUBMIT_TOOL[kind] === McpToolName.SubmitDesignSection ? [McpToolName.GetSubmissionGuide] : []),
@@ -123,6 +128,9 @@ export function designAttemptTools(kind: DesignAttemptKind): readonly McpToolNam
     McpToolName.ReadDesignSection,
     McpToolName.ReportProgress,
     McpToolName.Recall,
+    ...(databaseMetadata && DESIGN_DATABASE_METADATA_KINDS.includes(kind)
+      ? [McpToolName.DbListConnections, McpToolName.DbDescribe]
+      : []),
   ];
 }
 

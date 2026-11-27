@@ -14,6 +14,7 @@ import {
   DesignSectionKind,
   DesignStalenessState,
   DesignTemplateKind,
+  PermissionMode,
   ThemeId,
 } from '@aw/shared';
 import { eq } from 'drizzle-orm';
@@ -51,6 +52,7 @@ function design(id: string, projectId: string | null = null): ProjectDesign {
     layoutStyle: DesignLayoutStyle.Doc,
     theme: ThemeId.Default,
     excludePatterns: [],
+    permissionMode: PermissionMode.Ask,
     aiReviewEnabled: false,
     sourceSnapshot: {
       branch: null,
@@ -331,6 +333,7 @@ describe('项目设计的 SQLite 持久化', () => {
     });
     syncBuiltinDesignTemplates(repo, unit, systemClock, seeds);
     expect(repo.listTemplates().map(({ key, kind }) => ({ key, kind }))).toEqual([
+      { key: BuiltinDesignTemplateKey.DataExplorer, kind: DesignTemplateKind.Builtin },
       { key: BuiltinDesignTemplateKey.General, kind: DesignTemplateKind.Builtin },
       { key: BuiltinDesignTemplateKey.TransactionExplorer, kind: DesignTemplateKind.Builtin },
       { key: 'custom-test', kind: DesignTemplateKind.Custom },
