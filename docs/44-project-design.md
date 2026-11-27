@@ -431,6 +431,7 @@
 
 - 设置中「自己的 MCP 工具」列出的外部服务和普通开发节点一样，按当前项目合并后的 OpenCode 配置与权限使用。设计会话创建时从原生工具注册表收紧本地操作，保留源码读取、受控 bash、指定 Skill，也兼容插件原生注册的 `aicoding_story_start` 与 `aicoding_story_complete`。配置 `/aicoding start …` 和 `/aicoding complete` 后，每个成功提交的设计会话在原会话内分别调用开始和完成命令。
 - 设计会话沿用 `readonlyBashRules()`。需要额外审批的 Bash 请求按设计当前档位处理。默认「始终询问」出人工卡；「帮我批准」由审批员核对受支持的只读命令；「自动批准只读」在本地核验后直接放行。自动审批只涵盖可识别的仓库元数据查询或扫描清单内的只读文件操作，未核验的请求交给「需要你处理」。新建表单、大纲页和工作台均显示「设计权限」。修改影响本设计之后的请求，覆盖大纲、生成、复审、重写、重试及增量更新。现有卡片保留，使用者处理后继续。
+- 搜索命令触发 Bash 审批时，后端检查完整命令与管道里的每个输入文件。例如，对清单内的具体文件使用 `grep` 搜索并经 `sort -u` 去重，或用 `comm -23 - 名单文件` 比对，可按只读档位处理。管道中包含输出重定向、项目外临时文件、未列入清单的文件或无法识别的参数时，整次请求交给人工。
 - 会话工作目录为项目根目录（只读）；`opencode.dispatch.ts` 的 `SessionPurpose` 新增 `Design`。
 - `SessionAgent` 新增 `designer`（`OPENCODE_AGENT_NAME.designer = 'aw-designer'`）；`AttemptKind` 新增 `design_outline`、`design_generate`、`design_revise`、`design_review`。
 
