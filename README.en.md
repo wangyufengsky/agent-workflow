@@ -33,6 +33,10 @@ Each task gets its own branch and Git worktree. Tasks can run in parallel withou
 
 The app and its task data run locally. **Local-first does not mean offline inference:** model calls send relevant context to your configured provider. Optional hosting and network features contact their respective services.
 
+## Resume project design sessions (v1.8.5)
+
+After context compaction, the design session receives its chapter target and submission requirements again. It can retrieve the latest validation error and correct the chapter. If it still responds with text after one automatic reminder, the workbench lets you continue the same session or send more guidance. The choice survives a page refresh. Once the chapter is saved, generation moves on to the next chapter.
+
 ## Read-only Bash searches and comparisons (v1.8.4)
 
 Project designs can automatically approve supported pipelines such as `grep | sort -u | comm` over files in the design inventory. The app checks each stage and input file. Output redirection, files outside the project, and unrecognized commands still require your approval.
