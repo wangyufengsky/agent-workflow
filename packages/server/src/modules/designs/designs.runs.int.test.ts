@@ -697,3 +697,36 @@ it('设计权限可在开始前选择、运行中收紧或放宽，按设计贯�
   expect((await get(id)).permissionMode).toBe(PermissionMode.Full);
   expect(t.fake.permissionReplies.map(({ reply }) => reply)).toEqual(['once', 'once', 'once', 'once']);
 });
+
+it('设计只读审批核验整条搜索管道及每个输入文件，即使原生审批摘要相同', async () => {
+  const { id } = await createDraft(false, PermissionMode.Full);
+  const searches = [
+    String.raw`grep -rnoE "entry\.(READ|WRITE)" src/endpoint.ts | grep -oE '[A-Z]+' | sort -u | comm -23 - README.md`,
+    String.raw`grep -no 'entry\.' src/endpoint.ts | sed 's/entry\.//' | tr -d '(' | sort | uniq`,
+  ];
+  const manual = [
+    'grep -n endpoint src/endpoint.ts > result.txt',
+    'grep -n endpoint src/endpoint.ts | sort -o result.txt',
+    'grep -n endpoint src/endpoint.ts | comm -23 - /tmp/enumvals.txt',
+    'grep -n endpoint src/endpoint.ts .env',
+    'grep -rn endpoint src',
+    'grep -n endpoint src/endpoint.ts | grep -r endpoint',
+    'grep -n "$label" src/endpoint.ts',
+    'grep -n endpoint src/endpoint.ts; echo done',
+    "grep -n endpoint src/endpoint.ts | sed 'w result.txt'",
+  ];
+  const turn = script();
+  for (const command of [...searches, ...manual]) turn.requestPermission('bash', ['grep -n endpoint'], { command });
+  t.fake.enqueue(turn.callTool(McpToolName.SubmitDesignOutline, { sections: OUTLINE }), DESIGNER);
+  const finished = ended(AttemptKind.DesignOutline);
+  let pending = inboxOpens(t, InboxKind.Permission);
+  await t.call(reviseDesignOutlineOp, { id, instruction: '核对代码引用' });
+  for (const index of manual.keys()) {
+    const { item } = await pending;
+    expect(t.fake.permissionReplies).toHaveLength(searches.length + index);
+    if (index < manual.length - 1) pending = inboxOpens(t, InboxKind.Permission);
+    await t.call(resolveInboxOp, { id: item.id, response: { decision: 'once' } });
+  }
+  await finished;
+  expect(t.fake.permissionReplies).toHaveLength(searches.length + manual.length);
+});

@@ -28,6 +28,7 @@ import {
 } from '../opencode/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { readonlyBashFiles } from './readonly-bash.ts';
 
 export type TaskPermissionPolicy = { mode: PermissionMode; intent: string; checkCommand: string | null };
 export type ReadonlyPermissionPolicy = {
@@ -136,22 +137,7 @@ async function localBashCall(event: Asked, call: Call | undefined, root: string)
   return { directory, relativeDirectory: sub || '.', command, timeout: call.input.timeout };
 }
 
-const researchFileReaders = new Set(['cat', 'head', 'tail', 'wc', 'stat', 'file', 'cksum', 'shasum', 'sha256sum']);
-const relativeFileWord = /^[\p{L}\p{N}_.][\p{L}\p{N}\p{M}_./-]*$/u;
 const researchPathErrors = new Set(['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM', 'ELOOP']);
-
-// An exact grammar keeps shell expansion and program-specific options outside automated approval.
-function researchFiles(command: string): string[] | undefined {
-  const [program, ...args] = command.split(' ');
-  const reader = program?.replace(/^(?:\/usr\/bin\/|\/bin\/)/u, '');
-  if (!reader || !researchFileReaders.has(reader)) return undefined;
-  if ((reader === 'head' || reader === 'tail') && args[0] === '-n' && /^[1-9][0-9]{0,3}$/u.test(args[1] ?? '')) {
-    args.splice(0, 2);
-  }
-  if (reader === 'wc' && /^-[lwc]$/u.test(args[0] ?? '')) args.shift();
-  if (reader === 'shasum' && args[0] === '-a' && args[1] === '256') args.splice(0, 2);
-  if (args.length > 0 && args.every((word) => relativeFileWord.test(word))) return args;
-}
 
 async function readonlyQuery(
   event: Asked,
@@ -168,7 +154,9 @@ async function readonlyQuery(
     const { command, directory } = local;
     if (/^git --no-optional-locks rev-parse (?:HEAD|--show-toplevel|--is-inside-work-tree)$/u.test(command))
       return local;
-    const files = researchFiles(command);
+    const workdir = call?.input.workdir;
+    if (typeof workdir === 'string' && workdir.split(/[/\\]/u).includes('..')) return null;
+    const files = readonlyBashFiles(command);
     if (!files) return null;
     for (const file of files) {
       const requested = resolve(directory, file);

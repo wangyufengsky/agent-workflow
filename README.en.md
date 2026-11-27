@@ -33,6 +33,10 @@ Each task gets its own branch and Git worktree. Tasks can run in parallel withou
 
 The app and its task data run locally. **Local-first does not mean offline inference:** model calls send relevant context to your configured provider. Optional hosting and network features contact their respective services.
 
+## Read-only Bash searches and comparisons (v1.8.4)
+
+Project designs can automatically approve supported pipelines such as `grep | sort -u | comm` over files in the design inventory. The app checks each stage and input file. Output redirection, files outside the project, and unrecognized commands still require your approval.
+
 ## Approval settings for project designs (v1.8.3)
 
 Choose an approval mode when creating a design, or change it from the outline or the workbench during generation. The next permission request uses the new mode, including requests from later chapters, retries, and reviews. You can automatically approve verified read-only operations. Approval cards that are already open still require your decision.

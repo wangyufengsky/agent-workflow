@@ -72,6 +72,7 @@ const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
 const RESEARCH_PERMISSION_PROBE = 'VERIFY_RESEARCH_PERMISSION';
 const RESEARCH_CHECKSUM = 'cksum README.md';
+const DESIGN_SEARCH_PROBE = 'VERIFY_DESIGN_SEARCH_PIPELINE';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
 const DESIGN_MCP_PROBE = 'VERIFY_DESIGN_ACCOUNTING';
@@ -162,6 +163,23 @@ function scriptedModel(): Server {
       let replyText = 'done';
       if (prompt.startsWith('{"userRequest":"VERIFY_RESEARCH_PERMISSION')) {
         replyText = JSON.stringify({ decision: 'once', reason: 'Verified repository checksum' });
+      } else if (hasProbe(DESIGN_SEARCH_PROBE)) {
+        const output = messages.find((m) => m.role === 'tool');
+        calls = output
+          ? [
+              operation(McpToolName.SubmitDesignOutline, {
+                sections: [{ kind: 'module', title: textOf(output).trim(), scopePaths: ['README.md'] }],
+              }),
+            ]
+          : [
+              {
+                name: 'bash',
+                args: {
+                  command: "grep -oE 'ITEM_[A-Z]+' README.md | sort -u | comm -23 - known.txt",
+                  description: 'Compare references',
+                },
+              },
+            ];
       } else if (hasProbe(RESEARCH_PERMISSION_PROBE)) {
         calls = messages.some((m) => m.role === 'tool')
           ? [operation(McpToolName.SubmitAnswer, { answer: 'Repository checked.', citations: [] })]
@@ -476,6 +494,33 @@ it('知识研究的真实 Bash 询问按 Ask、Assisted、Full 独立审批', as
       else expect(review).not.toContain('Verified repository checksum');
     }
     expect(nativeRequests).toHaveLength(3);
+  } finally {
+    unsubscribe();
+  }
+});
+
+it('真实设计会话自动通过搜索管道的 Bash 请求，用比对输出提交大纲', async () => {
+  const { project } = await addProject(t, {
+    files: { 'README.md': 'ITEM_KEEP\nITEM_SHARED\n', 'known.txt': 'ITEM_SHARED\n' },
+  });
+  await t.call(updateSettingsOp, { 'ai.defaultModel': `${PROVIDER}/${MODEL}` });
+  const { body: design } = await t.call(createDesignOp, { projectId: project.id, permissionMode: PermissionMode.Full });
+  const patterns: string[] = [];
+  const unsubscribe = t.app.services.opencode.subscribe((event) => {
+    if (event.type === OpencodeEventType.PermissionAsked && event.permission === 'bash')
+      patterns.push(...event.patterns);
+  });
+  try {
+    const finished = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt }) => attempt.kind === AttemptKind.DesignOutline && attempt.status === AttemptStatus.Succeeded,
+    );
+    await t.call(reviseDesignOutlineOp, { id: design.id, instruction: DESIGN_SEARCH_PROBE });
+    await finished;
+    expect(patterns).toContain('comm -23 - known.txt');
+    const { body } = await t.call(getDesignOp, { id: design.id });
+    expect(body.sections.map((s) => s.title)).toEqual(['ITEM_KEEP']);
   } finally {
     unsubscribe();
   }
