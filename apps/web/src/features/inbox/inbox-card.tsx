@@ -40,23 +40,24 @@ type CardProps<K extends InboxItemDTO['kind']> = {
 
 function QuestionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Question>) {
   const [answer, setAnswer] = useState('');
+  const { question, options } = 'question' in item.payload ? item.payload : C.designContinuation;
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (answer.trim() !== '') resolve({ answer: answer.trim() });
   };
   return (
     <>
-      <Markdown source={item.payload.question} />
+      <Markdown source={question} />
       {item.payload.blocking && <span className="hint">{C.blocking}</span>}
-      {item.payload.defaultAssumption !== undefined && (
+      {'defaultAssumption' in item.payload && item.payload.defaultAssumption !== undefined && (
         <span className="hint">
           {C.defaultAssumption}
           <Markdown inline source={item.payload.defaultAssumption} />
         </span>
       )}
-      {item.payload.options !== undefined && (
+      {options !== undefined && (
         <div className={styles.options}>
-          {item.payload.options.map((option) => (
+          {options.map((option) => (
             <Button key={option} size="sm" disabled={pending} onClick={() => resolve({ answer: option })}>
               <Markdown inline source={option} />
             </Button>

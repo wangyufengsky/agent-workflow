@@ -364,7 +364,8 @@ it('压缩后章节仍未交付时保留原会话，用户选择继续后保存�
   if (!question) throw new Error('Missing continuation question');
   expect(question).toMatchObject({
     attemptId: current.attempt.id,
-    payload: { blocking: true, options: ['继续当前会话'] },
+    title: design.title,
+    payload: { blocking: true, continueDesign: true },
   });
   expect(design.doneSections).toBe(0);
   const generating = t.fake.prompts.at(-1);

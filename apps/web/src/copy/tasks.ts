@@ -316,6 +316,10 @@ export const INBOX_COPY = {
     [InboxKind.ScheduleFailure]: '定时任务没能开始',
   },
   blocking: 'AI 在等这个答案',
+  designContinuation: {
+    question: '本轮设计还没有提交成功。可以让 AI 在原会话继续，也可以补充说明后继续。',
+    options: ['继续当前会话'],
+  },
   defaultAssumption: '不回答时 AI 会假设：',
   answerPlaceholder: '输入你的回答……',
   submit: '提交',

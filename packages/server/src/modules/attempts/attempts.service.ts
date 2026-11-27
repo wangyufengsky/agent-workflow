@@ -53,6 +53,7 @@ import {
   type AttemptSignal,
   type AttemptStateDeps,
   createAttemptState,
+  type DesignContinuation,
   errorOf,
   hasPendingEndCommand,
   type LiveSession,
@@ -109,7 +110,7 @@ export type StartAttemptInput = {
   browserTestSubmit?: BrowserTestSubmitTool;
   functionalTestNode?: FunctionalTestNode;
   designDatabaseMetadata?: boolean;
-  designContinuation?: string;
+  designContinuation?: DesignContinuation;
   delegation?: { parentAttemptId: string; commit: string };
 };
 

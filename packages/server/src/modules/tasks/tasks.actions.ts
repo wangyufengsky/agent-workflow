@@ -81,7 +81,9 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           inbox.resolve(item, { answer });
           await attempts.deliverAnswer(
             attemptId,
-            renderTemplate(prompts[PromptName.StartAnswer], { question: item.payload.question, answer }),
+            'question' in item.payload
+              ? renderTemplate(prompts[PromptName.StartAnswer], { question: item.payload.question, answer })
+              : answer,
             () => {
               const roleId = attempts.roleIdOf(attemptId);
               if (roleId === null) throw new Error(`Attempt ${attemptId} has no role`);

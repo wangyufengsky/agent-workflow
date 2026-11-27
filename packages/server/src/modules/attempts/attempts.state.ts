@@ -31,6 +31,8 @@ import type { SessionView } from './attempts.session-view.ts';
 import type { NewTranscriptEntry, TranscriptStore } from './attempts.transcript.ts';
 
 /** In-memory state of a session we created, kept until it goes quiet so trailing events still reach the transcript. */
+export type DesignContinuation = { title: string; prompt: string };
+
 export type LiveSession = {
   permissionStop: AbortController;
   deciding: Map<string, AbortController>;
@@ -64,7 +66,7 @@ export type LiveSession = {
   finishingCommand: boolean;
   submitTool: McpToolName | null;
   /** 设计续作时保留本轮目标，不必重发完整扫描清单。 */
-  designContinuation?: string | undefined;
+  designContinuation?: DesignContinuation | undefined;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */
   parked: boolean;
   browserWaiting: boolean;

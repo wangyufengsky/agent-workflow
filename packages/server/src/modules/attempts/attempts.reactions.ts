@@ -122,7 +122,7 @@ export function watchSessions(
       stall.continued = true;
     }
     const messages = session.pendingAnswers.splice(0);
-    if (messages.length > 0 && session.designContinuation) messages.push(session.designContinuation);
+    if (messages.length > 0 && session.designContinuation) messages.push(session.designContinuation.prompt);
     if (stall !== null) messages.unshift(deps.prompts[PromptName.ModelStalled]);
     if (messages.length > 0) {
       await send(attempt, session, messages.join('\n\n'));
@@ -130,14 +130,13 @@ export function watchSessions(
     }
     if (attempt.nudges >= ATTEMPT_MAX_NUDGES) {
       if (session.designContinuation) {
-        const question = '本轮设计还没有提交成功。可以让 AI 在原会话继续，也可以补充说明后继续。';
         state.inbox.create({
           kind: InboxKind.Question,
           attemptId: attempt.id,
           nodeId: null,
           taskId: null,
-          title: '项目设计等待继续',
-          payload: { question, options: ['继续当前会话'], blocking: true },
+          title: session.designContinuation.title,
+          payload: { continueDesign: true, blocking: true },
         });
         state.park(session, attempt);
         return;
@@ -156,7 +155,7 @@ export function watchSessions(
     await send(
       attempt,
       session,
-      session.designContinuation ??
+      session.designContinuation?.prompt ??
         renderTemplate(deps.prompts[PromptName.Nudge], {
           submitTool:
             session.submitTool === null
@@ -393,7 +392,7 @@ export function watchSessions(
       session.recovery.phase = 'resuming';
       session.contextOverflow = null;
       const continuation = [
-        session.designContinuation ?? 'Continue the original task from the compacted context.',
+        session.designContinuation?.prompt ?? 'Continue the original task from the compacted context.',
         ...session.pendingAnswers.splice(0),
       ];
       await state.send(session, continuation.join('\n\n'), messageId);

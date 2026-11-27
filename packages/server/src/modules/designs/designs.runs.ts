@@ -198,10 +198,13 @@ export function createDesignRuns({
       title: `Project Design · ${design.title}`,
       model: work.model,
       prompt: work.prompt,
-      designContinuation: renderTemplate(prompts[PromptName.DesignContinue], {
-        targets: JSON.stringify(work.targets.map(({ id, title }) => ({ id, title }))),
-        submitTool: MCP_TOOL_PREFIX + ATTEMPT_SUBMIT_TOOL[work.kind],
-      }),
+      designContinuation: {
+        title: design.title,
+        prompt: renderTemplate(prompts[PromptName.DesignContinue], {
+          targets: JSON.stringify(work.targets.map(({ id, title }) => ({ id, title }))),
+          submitTool: MCP_TOOL_PREFIX + ATTEMPT_SUBMIT_TOOL[work.kind],
+        }),
+      },
     } as const;
 
     return unit.transact(() => {
