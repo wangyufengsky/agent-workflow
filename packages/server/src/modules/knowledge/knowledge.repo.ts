@@ -1,6 +1,7 @@
 import {
   type CitationDTO,
   citationSchema,
+  classifySource,
   type KnowledgeSources,
   knowledgeSourcesSchema,
   type PermissionMode,
@@ -8,7 +9,7 @@ import {
 import { and, asc, desc, eq, exists, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
-import type { KnowledgePermissionPolicy } from '../permissions/index.ts';
+import type { ReadonlyPermissionPolicy } from '../permissions/index.ts';
 import { knowledgeConversationsTable, knowledgeTurnsTable } from './knowledge.table.ts';
 
 type ConversationRow = typeof knowledgeConversationsTable.$inferSelect;
@@ -32,10 +33,7 @@ const toTurn = ({ citations, ...row }: TurnRow): Turn => ({
 /** `%`, `_` and the escape character itself match literally in a LIKE pattern. */
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
-export function readKnowledgePermissionPolicy(
-  db: DbExecutor,
-  attemptId: string,
-): KnowledgePermissionPolicy | undefined {
+export function readKnowledgePermissionPolicy(db: DbExecutor, attemptId: string): ReadonlyPermissionPolicy | undefined {
   const row = db
     .select({
       mode: knowledgeConversationsTable.permissionMode,
@@ -46,7 +44,13 @@ export function readKnowledgePermissionPolicy(
     .innerJoin(knowledgeConversationsTable, eq(knowledgeTurnsTable.conversationId, knowledgeConversationsTable.id))
     .where(eq(knowledgeTurnsTable.attemptId, attemptId))
     .get();
-  return row && { ...row, sources: knowledgeSourcesSchema.parse(JSON.parse(row.sources)) };
+  if (!row) return undefined;
+  const sources = knowledgeSourcesSchema.parse(JSON.parse(row.sources));
+  return {
+    mode: row.mode,
+    intent: row.intent,
+    canReadFile: sources.code || sources.docs ? (path) => sources[classifySource(path)] : null,
+  };
 }
 
 export function createKnowledgeRepo(db: DbExecutor) {

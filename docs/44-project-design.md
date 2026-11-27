@@ -164,6 +164,7 @@
 | layout_style | TEXT | `DesignLayoutStyle`：`doc`（技术文档）/ `arch`（架构图谱优先），随时切换零 AI 调用 |
 | theme | TEXT | 历史主题字段，保留既有接口；在线显示跟随应用，离线跟随系统 |
 | exclude_patterns | TEXT(JSON) | `string[]`：用户追加的排除 glob |
+| permission_mode | TEXT | 本设计的审批模式，默认 `ask`。新建、确认大纲前和运行中均可修改。 |
 | ai_review_enabled | INTEGER(bool) | 完成后是否运行独立 AI 复审（`deep` 默认 true，其余 false） |
 | source_snapshot | TEXT(JSON) | `DesignSourceSnapshot`：`{ branch, commitSha, dirty, scannedAt, analyzableCount, skippedCount, skippedReasons, techStack[] }` |
 | outline_confirmed_at | INTEGER NULL | 确认大纲的时间；只写一次，为空代表大纲阶段 |
@@ -429,7 +430,7 @@
 ```
 
 - 设置中「自己的 MCP 工具」列出的外部服务和普通开发节点一样，按当前项目合并后的 OpenCode 配置与权限使用。设计会话创建时从原生工具注册表收紧本地操作，保留源码读取、受控 bash、指定 Skill，也兼容插件原生注册的 `aicoding_story_start` 与 `aicoding_story_complete`。配置 `/aicoding start …` 和 `/aicoding complete` 后，每个成功提交的设计会话在原会话内分别调用开始和完成命令。
-- 会话级 bash 规则为 `readonlyBashRules()`；白名单外的命令走既有权限询问（「需要你处理」）。
+- 设计会话沿用 `readonlyBashRules()`。需要额外审批的 Bash 请求按设计当前档位处理。默认「始终询问」出人工卡；「帮我批准」由审批员核对受支持的只读命令；「自动批准只读」在本地核验后直接放行。自动审批只涵盖可识别的仓库元数据查询或扫描清单内的只读文件操作，未核验的请求交给「需要你处理」。新建表单、大纲页和工作台均显示「设计权限」。修改影响本设计之后的请求，覆盖大纲、生成、复审、重写、重试及增量更新。现有卡片保留，使用者处理后继续。
 - 会话工作目录为项目根目录（只读）；`opencode.dispatch.ts` 的 `SessionPurpose` 新增 `Design`。
 - `SessionAgent` 新增 `designer`（`OPENCODE_AGENT_NAME.designer = 'aw-designer'`）；`AttemptKind` 新增 `design_outline`、`design_generate`、`design_revise`、`design_review`。
 
@@ -464,8 +465,8 @@
 | `designs.list` | `GET /designs?projectId&query&limit&cursor` | read | 设计列表（`DesignSummaryDTO`），按 `updated_at` 倒序 |
 | `designs.get` | `GET /designs/:id` | read | 设计完整详情（含 `sourceSnapshot`、全部章节、文件详情、图、推导状态、活跃与历史 runs） |
 | `designs.source` | `GET /designs/:id/files/:fileId/source` | read | 仅本机阅读器，返回 available + content、changed 或 unavailable，按本设计的文件 ID、授权路径和扫描哈希读取，助手不可调用 |
-| `designs.create` | `POST /designs` `{ projectId, templateKey?, depth?, layoutStyle?, excludePatterns?, aiReviewEnabled?, theme? }` | write | 执行程序扫描并按所选模板生成默认章节大纲（201，零 AI 调用） |
-| `designs.update` | `PATCH /designs/:id` `{ title?, theme?, layoutStyle?, aiReviewEnabled? }` | write | 改名、换主题、切阅读风格、切换复审开关（不调用 AI） |
+| `designs.create` | `POST /designs` `{ projectId, templateKey?, depth?, layoutStyle?, excludePatterns?, aiReviewEnabled?, permissionMode?, theme? }` | write | 执行程序扫描并按所选模板生成默认章节大纲（201，零 AI 调用） |
+| `designs.update` | `PATCH /designs/:id` `{ title?, theme?, layoutStyle?, aiReviewEnabled?, permissionMode? }` | write | 改名、换主题、切换阅读风格、复审开关或审批模式。运行中可改主题、阅读风格和审批模式。保存设置不调用 AI。 |
 | `designs.listTemplates` | `GET /designs/templates?projectId` | read | 列出内置与自定义分析模板；传 `projectId` 时轻扫根目录特征文件返回识别到的技术栈与推荐模板（不递归全仓算哈希） |
 | `designs.createTemplate` | `POST /designs/templates` `{ baseKey?, name, description, defaultSections, focusPrompt }` | write | 新建或从内置模板复制自定义分析模板 |
 | `designs.updateTemplate` | `PATCH /designs/templates/:key` `{ name?, description?, defaultSections?, focusPrompt? }` | write | 修改自定义模板（内置模板返回 `DESIGN_TEMPLATE_READONLY`） |

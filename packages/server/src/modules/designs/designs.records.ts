@@ -25,6 +25,7 @@ import {
   designSymbolSchema,
   designTemplateSchema,
   designTemplateSnapshotSchema,
+  permissionModeSchema,
   type ThemeId,
   themeIdSchema,
 } from '@aw/shared';
@@ -91,6 +92,7 @@ const nullableStringify = (value: object | null): string | null => (value === nu
 export const toDesign = (row: DesignRow): ProjectDesign => ({
   ...row,
   depth: designDepthSchema.parse(row.depth),
+  permissionMode: permissionModeSchema.parse(row.permissionMode),
   layoutStyle: designLayoutStyleSchema.parse(row.layoutStyle),
   theme: themeIdSchema.parse(row.theme),
   excludePatterns: json(stringsSchema, row.excludePatterns),

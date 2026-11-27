@@ -1,4 +1,4 @@
-import { DesignDepth, DesignLayoutStyle, GENERAL_DESIGN_TEMPLATE_KEY } from '@aw/shared';
+import { DesignDepth, DesignLayoutStyle, GENERAL_DESIGN_TEMPLATE_KEY, PermissionMode } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
@@ -8,6 +8,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DESIGNS_COPY as C, DESIGN_DEPTH_COPY, DESIGN_LAYOUT_LABEL } from '../../copy/designs.ts';
 import { ModelPicker } from '../knowledge/model-picker.tsx';
+import { PermissionPicker } from '../permissions/permission-picker.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import styles from './designs.module.css';
@@ -23,6 +24,7 @@ function NewDesignForm({ initialProject, initialTemplate }: { initialProject: st
   const [explicitTemplate, setExplicitTemplate] = useState(initialTemplate);
   const [depth, setDepth] = useState<DesignDepth>(DesignDepth.Standard);
   const [layoutStyle, setLayout] = useState<DesignLayoutStyle>(DesignLayoutStyle.Arch);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(PermissionMode.Ask);
   const [exclude, setExclude] = useState('');
   const [reviewOverride, setReviewOverride] = useState<boolean>();
   const [model, setModel] = useState(settings['ai.defaultModel']);
@@ -48,6 +50,7 @@ function NewDesignForm({ initialProject, initialTemplate }: { initialProject: st
         depth,
         layoutStyle,
         aiReviewEnabled: review,
+        permissionMode,
         excludePatterns: exclude
           .split(',')
           .map((value) => value.trim())
@@ -180,6 +183,12 @@ function NewDesignForm({ initialProject, initialTemplate }: { initialProject: st
         <div className={`row wrap ${styles.formFooter}`}>
           <span className="hint">{C.model}</span>
           <ModelPicker value={model} projectId={validProject ? projectId : null} onChange={setModel} />
+          <PermissionPicker
+            scope="design"
+            value={permissionMode}
+            onChange={setPermissionMode}
+            disabled={create.isPending}
+          />
           <span className="grow" />
           <Button type="submit" variant="primary" icon="sparkle" pending={create.isPending} disabled={!canScan}>
             {C.scan}

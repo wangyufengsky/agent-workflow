@@ -8,14 +8,12 @@ import styles from './permission-picker.module.css';
 export function PermissionPicker({
   value,
   onChange,
-  task = false,
-  knowledge = false,
+  scope = 'conversation',
   disabled = false,
 }: {
   value: PermissionMode;
   onChange(mode: PermissionMode): void;
-  task?: boolean;
-  knowledge?: boolean;
+  scope?: 'conversation' | 'task' | 'knowledge' | 'design';
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false),
@@ -57,7 +55,10 @@ export function PermissionPicker({
       window.removeEventListener('scroll', place, true);
     };
   }, [open]);
-  const label = knowledge ? C.knowledge.label : task ? C.task : C.conversation;
+  const readonlyCopy = scope === 'knowledge' || scope === 'design' ? C[scope] : undefined;
+  const label = scope === 'task' || scope === 'conversation' ? C[scope] : C[scope].label;
+  const name = (mode: PermissionMode) =>
+    scope === 'design' && mode === PermissionMode.Full ? C.design.fullName : C[mode].name;
   return (
     <>
       <button
@@ -68,16 +69,16 @@ export function PermissionPicker({
         disabled={disabled}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={`${label} · ${C[value].name}`}
+        aria-label={`${label} · ${name(value)}`}
         onClick={() => setOpen(!open)}
       >
-        {task ? `${label} · ` : ''}
-        {C[value].name}
+        {scope === 'task' || scope === 'design' ? `${label} · ` : ''}
+        {name(value)}
       </button>
       {open &&
         createPortal(
           <fieldset id={id} ref={panel} className={styles.panel} style={position} aria-label={label}>
-            <span className="hint">{C.question}</span>
+            <span className="hint">{scope === 'design' ? C.design.hint : C.question}</span>
             {Object.values(PermissionMode).map((m) => (
               <button
                 key={m}
@@ -93,8 +94,8 @@ export function PermissionPicker({
               >
                 <Icon name={m === PermissionMode.Full ? 'alert' : 'shield'} size="sm" />
                 <span>
-                  <strong>{C[m].name}</strong>
-                  <small>{knowledge ? C.knowledge[m] : C[m].description}</small>
+                  <strong>{name(m)}</strong>
+                  <small>{readonlyCopy ? readonlyCopy[m] : C[m].description}</small>
                 </span>
                 {m === value && <Icon name="check" size="sm" />}
               </button>

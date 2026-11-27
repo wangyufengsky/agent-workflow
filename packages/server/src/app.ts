@@ -10,10 +10,12 @@ import {
 } from '@aw/builtin';
 import {
   AppError,
+  AttemptKind,
   DB_QUERY_TIMEOUT_MS,
   ErrorCode,
   getAssistantContextOp,
   getAttemptContextOp,
+  isDesignAttemptKind,
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
@@ -107,7 +109,7 @@ import {
   registerContextRoutes,
   visibleRecallTool,
 } from './modules/opencode/index.ts';
-import { createPermissionReviewer } from './modules/permissions/index.ts';
+import { createPermissionReviewer, type ReadonlyPermissionPolicy } from './modules/permissions/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectModules, runIdeaAcceptance } from './modules/project-modules/index.ts';
@@ -448,7 +450,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     permissionReviewer,
     effortsForRole: (id) => modelEfforts(settings.service.getAll(), id ? roles.service.get(id) : undefined),
     taskPolicy: (id) => readTaskPermissionPolicy(database.db, id),
-    knowledgePolicy: (id) => readKnowledgePermissionPolicy(database.db, id),
+    readonlyPolicy: (kind, id): ReadonlyPermissionPolicy | undefined => {
+      if (isDesignAttemptKind(kind)) return designs.permissionPolicy(id);
+      if (kind === AttemptKind.Research) return readKnowledgePermissionPolicy(database.db, id);
+      return undefined;
+    },
     sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,

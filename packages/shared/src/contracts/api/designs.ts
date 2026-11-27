@@ -19,6 +19,7 @@ import {
   designStatusSchema,
 } from '../../enums/design.ts';
 import { GitImpactClassification, gitImpactTargetKindSchema } from '../../enums/git.ts';
+import { permissionModeSchema } from '../../enums/system.ts';
 import { themeIdSchema } from '../../enums/ui.ts';
 import { designBlockSchema, designRelativePathSchema, designTitleSchema } from '../design/block.ts';
 import { designDiagramSchema } from '../design/diagram.ts';
@@ -140,6 +141,7 @@ export const designSchema = designSummarySchema.extend({
   theme: themeIdSchema,
   excludePatterns: z.array(z.string()),
   aiReviewEnabled: z.boolean(),
+  permissionMode: permissionModeSchema,
   templateSnapshot: designTemplateSnapshotSchema,
   sourceSnapshot: designSourceSnapshotSchema,
   outlineConfirmedAt: z.number().nullable(),
@@ -178,6 +180,7 @@ export const createDesignRequestSchema = z.object({
   layoutStyle: designLayoutStyleSchema.optional(),
   excludePatterns: z.array(z.string().trim().min(1)).optional(),
   aiReviewEnabled: z.boolean().optional(),
+  permissionMode: permissionModeSchema.optional(),
   theme: themeIdSchema.optional(),
 });
 export type CreateDesignRequest = z.infer<typeof createDesignRequestSchema>;
@@ -185,6 +188,7 @@ export const updateDesignRequestSchema = byId.extend({
   title: designTitleSchema.optional(),
   layoutStyle: designLayoutStyleSchema.optional(),
   aiReviewEnabled: z.boolean().optional(),
+  permissionMode: permissionModeSchema.optional(),
   theme: themeIdSchema.optional(),
 });
 export type UpdateDesignRequest = z.infer<typeof updateDesignRequestSchema>;

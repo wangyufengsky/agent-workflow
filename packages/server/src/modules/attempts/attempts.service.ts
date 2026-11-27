@@ -63,8 +63,8 @@ const SESSION_COMMAND_CLEANUP_TIMEOUT_MS = 5_000;
 
 import {
   grantKey,
-  type KnowledgePermissionPolicy,
   type PermissionReviewer,
+  type ReadonlyPermissionPolicy,
   scopedRules,
   type TaskPermissionPolicy,
 } from '../permissions/index.ts';
@@ -72,7 +72,7 @@ export type AttemptsServiceDeps = AttemptStateDeps & {
   permissionReviewer: PermissionReviewer;
   effortsForRole(id: string | null): ModelEffort[];
   taskPolicy(id: string): TaskPermissionPolicy;
-  knowledgePolicy(id: string): KnowledgePermissionPolicy | undefined;
+  readonlyPolicy(kind: AttemptKind, id: string): ReadonlyPermissionPolicy | undefined;
   taskSkills(taskId: string): SkillSnapshot[];
   settings: SettingsService;
   prompts: Prompts;
@@ -799,7 +799,12 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       scope?: 'task' | 'project',
     ): Promise<void> {
       const attempt = mustFind(attemptId);
-      if (attempt.kind === AttemptKind.Research && reply === PermissionDecision.Always) reply = PermissionDecision.Once;
+      if (
+        (attempt.kind === AttemptKind.Research ||
+          (isDesignAttemptKind(attempt.kind) && payload.permission === BASH_PERMISSION)) &&
+        reply === PermissionDecision.Always
+      )
+        reply = PermissionDecision.Once;
       const scoped = attempt.permissionBaseline !== null || payload.bashGrant !== undefined;
       if (
         scope &&

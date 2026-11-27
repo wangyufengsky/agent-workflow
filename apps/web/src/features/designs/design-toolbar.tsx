@@ -17,6 +17,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { DESIGN_WORKBENCH_COPY as C } from '../../copy/design-workbench.ts';
 import { DESIGN_LAYOUT_LABEL, DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
+import { DesignPermissionPicker } from './design-permission-picker.tsx';
 import styles from './design-workbench.module.css';
 import { useUpdateDesign } from './designs.queries.ts';
 
@@ -179,6 +180,7 @@ export function DesignToolbar({
         </div>
       </div>
       <div className={styles.actions}>
+        <DesignPermissionPicker design={design} />
         <fieldset className={styles.segment} aria-label={C.mode}>
           <Button size="sm" variant="ghost" aria-pressed={follow} onClick={() => onFollow(true)}>
             {C.follow}

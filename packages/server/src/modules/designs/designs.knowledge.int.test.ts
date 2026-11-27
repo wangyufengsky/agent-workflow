@@ -9,6 +9,7 @@ import {
   DesignLayoutStyle,
   DesignReviewState,
   DesignSectionKind,
+  PermissionMode,
   ThemeId,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
@@ -43,6 +44,7 @@ function design(id: string, updatedAt: number, dirty = false, commitSha: string 
     layoutStyle: DesignLayoutStyle.Doc,
     theme: ThemeId.Default,
     excludePatterns: [],
+    permissionMode: PermissionMode.Ask,
     aiReviewEnabled: false,
     sourceSnapshot: {
       branch: 'main',

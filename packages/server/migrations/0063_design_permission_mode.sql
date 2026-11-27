@@ -1,0 +1,1 @@
+ALTER TABLE `project_designs` ADD `permission_mode` text DEFAULT 'ask' NOT NULL;

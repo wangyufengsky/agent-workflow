@@ -208,6 +208,11 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     );
     const schemas = JSON.stringify(tools.map((tool) => tool.inputSchema));
     expect(schemas).not.toMatch(/"(password|token)"/);
+    for (const name of ['designs_create', 'designs_update']) {
+      const designTool = tools.find((tool) => tool.name === name);
+      expect(designTool?.inputSchema.properties).toBeDefined();
+      expect(designTool?.inputSchema.properties).not.toHaveProperty('permissionMode');
+    }
     const settings = Object.keys(tools.find((tool) => tool.name === 'settings_update')?.inputSchema.properties ?? {});
     expect(settings).toContain('ui.theme');
     for (const omitted of [

@@ -20,13 +20,16 @@ import {
   MCP_TOOL_PREFIX,
   McpToolName,
   OPENCODE_AGENT_NAME,
+  PermissionMode,
   readonlyBashRules,
+  resolveInboxOp,
   restoreDesignSectionOp,
   reviewDesignOp,
   reviseDesignOutlineOp,
   reviseDesignSectionOp,
   ServerEventType,
   stopDesignOp,
+  updateDesignOp,
   updateDesignOutlineOp,
   updateSettingsOp,
 } from '@aw/shared';
@@ -71,11 +74,11 @@ const ended = (kind: AttemptKind, status: AttemptStatus = AttemptStatus.Succeede
   );
 const get = async (id: string) => (await t.call(getDesignOp, { id })).body;
 
-async function createDraft(aiReviewEnabled: boolean) {
+async function createDraft(aiReviewEnabled: boolean, permissionMode?: PermissionMode) {
   const { project, repo } = await addProject(t, {
     files: { 'src/endpoint.ts': 'export const endpoint = 1;\n', '.env': 'DEMO_SECRET=excluded\n' },
   });
-  const created = await t.call(createDesignOp, { projectId: project.id, aiReviewEnabled });
+  const created = await t.call(createDesignOp, { projectId: project.id, aiReviewEnabled, permissionMode });
   expect(created.status).toBe(201);
   expect(created.body).toMatchObject({ status: DesignStatus.OutlineReady, outlineConfirmedAt: null, runs: [] });
   expect(created.body.files.map(({ relPath }) => relPath)).toEqual(['README.md', 'src/endpoint.ts']);
@@ -645,4 +648,52 @@ it('万文件扫描索引的总览首轮有界，章节能查询样本外路径�
   } finally {
     db.close();
   }
+});
+
+it('设计权限可在开始前选择、运行中收紧或放宽，按设计贯穿后续章节', async () => {
+  const { id } = await createDraft(false, PermissionMode.Full);
+  expect((await get(id)).permissionMode).toBe(PermissionMode.Full);
+  const { overview, endpoint, flow } = await optimize(id);
+  const safe = { command: 'cksum src/endpoint.ts' };
+  const excluded = { command: 'cksum .env' };
+  t.fake.enqueue(
+    script()
+      .requestPermission('bash', [safe.command], safe)
+      .requestPermission('bash', [excluded.command], excluded)
+      .callTool(McpToolName.SubmitDesignSection, section(overview.id, '目录完成')),
+    DESIGNER,
+  );
+  for (const next of [endpoint, flow]) {
+    t.fake.enqueue(
+      script()
+        .requestPermission('bash', [safe.command], safe)
+        .callTool(McpToolName.SubmitDesignSection, section(next.id, '章节完成')),
+      DESIGNER,
+    );
+  }
+  const blocked = inboxOpens(t, InboxKind.Permission);
+  await t.call(generateDesignOp, { id });
+  const { item: first } = await blocked;
+  expect(first.payload).toMatchObject({ patterns: [excluded.command] });
+  expect(t.fake.permissionReplies.map(({ reply }) => reply)).toEqual(['once']);
+
+  const tightened = await t.call(updateDesignOp, { id, permissionMode: PermissionMode.Ask });
+  expect(tightened.status).toBe(200);
+  expect(tightened.body.runs.at(-1)?.awaitingInput).toBe(true);
+  const nextCard = inboxOpens(t, InboxKind.Permission);
+  await t.call(resolveInboxOp, { id: first.id, response: { decision: 'once' } });
+  const { item: second } = await nextCard;
+  expect(second.payload).toMatchObject({ patterns: [safe.command] });
+  expect((await get(id)).doneSections).toBe(1);
+  const changed = await t.call(updateDesignOp, { id, permissionMode: PermissionMode.Full });
+  expect(changed.body.runs.at(-1)?.awaitingInput).toBe(true);
+  const finished = waitForEvent(
+    t.app.events,
+    ServerEventType.DesignUpdated,
+    ({ designId }) => designId === id && t.app.services.designs.get(id).doneSections === 3,
+  );
+  await t.call(resolveInboxOp, { id: second.id, response: { decision: 'once' } });
+  await finished;
+  expect((await get(id)).permissionMode).toBe(PermissionMode.Full);
+  expect(t.fake.permissionReplies.map(({ reply }) => reply)).toEqual(['once', 'once', 'once', 'once']);
 });
