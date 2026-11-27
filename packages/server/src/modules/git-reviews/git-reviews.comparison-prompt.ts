@@ -7,7 +7,10 @@ export function renderGitComparison(comparison: GitComparisonDTO, maxBytes = DES
     JSON.stringify(endpoints),
     summary,
     '仅双端均为 exact 时提供设计初筛。reference 只能参考，missing 须从源码分析，设计覆盖以外的变更也需检查。',
-    '核实 uncertain 的改名与覆盖缺口；可补充带冻结 Git 端点源码路径的结论。只有 exact 初筛项允许引用设计节点 ID。提交 comparison 时原样保留端点匹配度、设计 ID 以及引用已有候选的条目 ID 与路径。',
+    '提交 comparison 时原样复制上方端点元数据。只有 exact 初筛项允许引用设计节点 ID：复制该行的 fromId、toId 和路径。下方业务影响候选的 targetId 仅供 impacts 使用。',
+    '从源码核实的 sections 和 transactions 条目只填变更文件在对应端点的路径，省略 fromId 和 toId。modified / unchanged 填 fromPath 和 toPath（改名用旧名和新名）；added 只填 toPath，removed 只填 fromPath，uncertain 至少填一侧。',
+    '同一路径发生修改时的格式示例（提交时替换为核实的标题和实际路径）：',
+    '{"status":"modified","title":"模块行为变化","fromPath":"src/example.ts","toPath":"src/example.ts"}',
   ].join('\n');
   const omitted = '\n部分设计初筛超出提示词预算，仍需核查 Git Diff。';
   let remaining = maxBytes - Buffer.byteLength(header + omitted);

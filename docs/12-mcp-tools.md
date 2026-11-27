@@ -401,6 +401,8 @@ type HandoffOutput = {
 | `regression_checks` | 最多 30 项非空的测试或联调检查。即使 findings 为空也可以提交业务影响与检查清单 |
 | `comparison` | 仅供 compare。传 `{ fromDesignId?, toDesignId?, fromMatch, toMatch, sections, transactions, summary }`。两组条目均为 `{ status, title, fromId?, toId?, fromPath?, toPath?, detail? }`。匹配态、设计 ID 与节点引用须与审查启动时的基线一致。纯源码条目须引用本次 Diff 相应端点的可读、未排除文件。省略整个 comparison 时，报告保留初筛条目并以审查结论作为业务摘要。 |
 
+源码对比条目使用冻结提交上的仓库相对路径。`modified` 和 `unchanged` 同时给出 `fromPath`、`toPath`，重命名分别用旧名和新名。`added` 只给新侧，`removed` 只给旧侧，`uncertain` 至少给一侧。只有引用双端精确对齐初筛行时才复制其节点 ID；业务影响候选的 `targetId` 用于 `impacts`。
+
 越界对比引用、非法对比结构、违规影响证据或无效关联返回 `VALIDATION_FAILED` 和定位到字段的 `issues`，本次提交不落库，模型可在原会话修正并重提。
 
 输出：`{ accepted: true }`

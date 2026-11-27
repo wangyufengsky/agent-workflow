@@ -250,10 +250,20 @@ export const gitReviewImpactsSchema = z.array(gitImpactItemSchema).max(GIT_REVIE
 export const gitReviewRegressionChecksSchema = z.array(gitReviewCheckSchema).max(GIT_REVIEW_REGRESSION_CHECKS_MAX);
 
 export const gitComparisonItemSchema = z.strictObject({
-  status: gitComparisonStatusSchema,
+  status: gitComparisonStatusSchema.describe(
+    'Name the sides with fromPath and toPath for source changes. added: new only; removed: old only; modified/unchanged: both; uncertain: at least one.',
+  ),
   title: designTitleSchema,
-  fromId: z.string().min(1).optional(),
-  toId: z.string().min(1).optional(),
+  fromId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Copy only from the exact comparison row. Omit for source-only evidence, including reference designs.'),
+  toId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Copy only from the exact comparison row. Impact candidate targetId belongs to impacts.'),
   fromPath: designRelativePathSchema.optional(),
   toPath: designRelativePathSchema.optional(),
   detail: gitReviewCheckSchema.optional(),

@@ -14,19 +14,27 @@ type Issue = { path: Array<string | number>; message: string };
 const entityKey = ({ fromId, toId }: GitComparisonItemDTO) => JSON.stringify([fromId, toId]);
 const hasDesignId = ({ fromId, toId }: GitComparisonItemDTO) => fromId !== undefined || toId !== undefined;
 
-function validSides(item: GitComparisonItemDTO) {
+function sideIssue(item: GitComparisonItemDTO): string | undefined {
   const hasOlder = item.fromId !== undefined || item.fromPath !== undefined;
   const hasNewer = item.toId !== undefined || item.toPath !== undefined;
   switch (item.status) {
     case GitComparisonStatus.Added:
-      return !hasOlder && hasNewer;
+      return !hasOlder && hasNewer
+        ? undefined
+        : 'An added item needs only the new side. For source evidence, supply toPath only.';
     case GitComparisonStatus.Removed:
-      return hasOlder && !hasNewer;
+      return hasOlder && !hasNewer
+        ? undefined
+        : 'A removed item needs only the old side. For source evidence, supply fromPath only.';
     case GitComparisonStatus.Modified:
     case GitComparisonStatus.Unchanged:
-      return hasOlder && hasNewer;
+      return hasOlder && hasNewer
+        ? undefined
+        : `A ${item.status} item needs both sides. For source evidence, supply fromPath and toPath.`;
     case GitComparisonStatus.Uncertain:
-      return hasOlder || hasNewer;
+      return hasOlder || hasNewer
+        ? undefined
+        : 'An uncertain item still needs evidence on at least one side. Supply fromPath or toPath for source evidence.';
   }
 }
 
@@ -42,8 +50,9 @@ function mergeItems(
   const sourceKeys = new Set<string>();
   for (const [index, item] of proposed.entries()) {
     const path = ['comparison', kind, index];
-    if (!validSides(item)) {
-      issues.push({ path, message: 'Status must agree with the sides named by the item' });
+    const message = sideIssue(item);
+    if (message !== undefined) {
+      issues.push({ path, message });
       continue;
     }
     if (!hasDesignId(item)) {
@@ -56,7 +65,11 @@ function mergeItems(
 
     const original = known.get(entityKey(item));
     if (original === undefined || original.fromPath !== item.fromPath || original.toPath !== item.toPath) {
-      issues.push({ path, message: 'Design item IDs and paths must match a single exact alignment candidate' });
+      issues.push({
+        path,
+        message:
+          'Copy IDs and paths from one exact comparison candidate. For source evidence, omit fromId and toId and use verified endpoint paths.',
+      });
     } else if (updates.has(original)) {
       issues.push({ path, message: 'Duplicate design comparison item' });
     } else if (item.status !== original.status && item.detail === undefined) {
