@@ -61,7 +61,10 @@ function knowledgeDesigns(db: DbExecutor, projectId: string, targetSha?: string)
 
 export function createDesignsRepo(db: DbExecutor) {
   return {
-    permissionPolicy(attemptId: string): ReadonlyPermissionPolicy | undefined {
+    permissionPolicy(
+      attemptId: string,
+      frozenHashes: ReadonlyMap<string, string> | undefined,
+    ): ReadonlyPermissionPolicy | undefined {
       const row = db
         .select({ id: designs.id, mode: designs.permissionMode, intent: designs.title })
         .from(runs)
@@ -72,12 +75,16 @@ export function createDesignsRepo(db: DbExecutor) {
       return {
         mode: row.mode,
         intent: row.intent,
-        canReadFile: (relPath) =>
-          db
-            .select({ id: files.id })
-            .from(files)
-            .where(and(eq(files.designId, row.id), eq(files.relPath, relPath)))
-            .get() !== undefined,
+        canReadFile: (relPath) => {
+          if (frozenHashes !== undefined) return frozenHashes.has(relPath);
+          return (
+            db
+              .select({ id: files.id })
+              .from(files)
+              .where(and(eq(files.designId, row.id), eq(files.relPath, relPath)))
+              .get() !== undefined
+          );
+        },
       };
     },
     insertDesign(design: ProjectDesign): void {

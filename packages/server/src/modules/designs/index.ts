@@ -35,6 +35,8 @@ export function createDesignsModule(deps: {
   const service = createDesignsService({ ...deps, queries, runs });
   return {
     service,
+    permissionPolicy: (attemptId: string) =>
+      deps.repo.permissionPolicy(attemptId, runs.incrementalFor(attemptId)?.frozen.targetHashes),
     knowledge: createProjectKnowledgeReader(deps.repo),
     operations: designsOperations(service),
     submissions: createDesignSubmissions({ ...deps, incrementalFor: runs.incrementalFor }),
