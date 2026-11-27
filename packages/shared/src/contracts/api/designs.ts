@@ -27,6 +27,7 @@ import { designSymbolSchema } from '../design/file.ts';
 import { designReviewNoteSchema, designSourceSnapshotSchema } from '../design/snapshot.ts';
 import { designOutlineSectionSchema, designTemplateSchema, designTemplateSnapshotSchema } from '../design/template.ts';
 import { attemptSummarySchema } from './attempts.ts';
+import { inboxQuestionSchema } from './inbox.ts';
 import { modelChoiceSchema } from './knowledge.ts';
 
 const id = z.string().min(1);
@@ -153,6 +154,7 @@ export const designSchema = designSummarySchema.extend({
   diagrams: z.array(designDiagramDtoSchema),
   runs: z.array(designRunSchema),
   activeRunId: id.nullable(),
+  continuationQuestion: inboxQuestionSchema.nullable(),
   handoffPending: z.boolean(),
 });
 export type DesignDTO = z.infer<typeof designSchema>;

@@ -63,6 +63,8 @@ export type LiveSession = {
   endCommand: string | null;
   finishingCommand: boolean;
   submitTool: McpToolName | null;
+  /** 设计续作时保留本轮目标，不必重发完整扫描清单。 */
+  designContinuation?: string | undefined;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */
   parked: boolean;
   browserWaiting: boolean;

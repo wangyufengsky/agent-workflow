@@ -319,6 +319,105 @@ it('扫描、优化、确认、增量提交、停止、单章重试、续作、�
   }
 });
 
+it('压缩后章节仍未交付时保留原会话，用户选择继续后保存本章并生成后续章节', async () => {
+  const { id } = await createDraft(false);
+  const { overview, endpoint, flow } = await optimize(id);
+  const source = 'src/endpoint.ts';
+  const bad = {
+    ...section(overview.id, '尚未保存'),
+    blocks: [
+      { type: 'markdown', markdown: '职责' },
+      { type: 'markdown', markdown: '入口' },
+      {
+        type: 'submodule',
+        id: 'endpoint',
+        title: '端点',
+        summary: '提供入口',
+        files: [source],
+        behaviors: [
+          {
+            title: '导出端点',
+            markdown: '导出端点常量。',
+            evidence: [{ evidenceClass: 'static', relPath: source, lineStart: 1, lineEnd: 1 }],
+          },
+        ],
+      },
+    ],
+  };
+  t.fake.enqueue(
+    script().callTool(McpToolName.SubmitDesignSection, bad).compacted().text('我可以继续修正。'),
+    DESIGNER,
+  );
+  t.fake.enqueue(script().callTool(McpToolName.GetSubmissionGuide, {}).text('是否继续本章？'), DESIGNER);
+  const paused = waitForEvent(t.app.events, ServerEventType.DesignUpdated, ({ designId }) => {
+    if (designId !== id) return false;
+    const run = t.app.services.designs.get(id).runs.at(-1);
+    return run?.awaitingInput === true || run?.attempt.status === AttemptStatus.Failed;
+  });
+  await t.call(generateDesignOp, { id });
+  await paused;
+  const design = await get(id);
+  const current = design.runs.at(-1);
+  expect(current).toMatchObject({ awaitingInput: true, attempt: { status: AttemptStatus.Running } });
+  if (!current) throw new Error('Missing chapter run');
+  const question = design.continuationQuestion;
+  if (!question) throw new Error('Missing continuation question');
+  expect(question).toMatchObject({
+    attemptId: current.attempt.id,
+    payload: { blocking: true, options: ['继续当前会话'] },
+  });
+  expect(design.doneSections).toBe(0);
+  const generating = t.fake.prompts.at(-1);
+  expect(generating?.text).toContain('get_submission_guide');
+  expect(generating?.text).toContain(overview.id);
+  expect(t.fake.toolCalls.find(({ name }) => name === McpToolName.GetSubmissionGuide)?.result).toMatchObject({
+    lastRejection: { fields: ['blocks.2.files.0'] },
+  });
+  t.fake.enqueue(
+    script().callTool(McpToolName.SubmitDesignSection, {
+      ...bad,
+      summary: '已修正文件归属',
+      files: [{ relPath: source, responsibility: '导出端点', symbols: [] }],
+    }),
+    DESIGNER,
+  );
+  for (const target of [endpoint, flow]) {
+    t.fake.enqueue(script().callTool(McpToolName.SubmitDesignSection, section(target.id, target.title)), DESIGNER);
+  }
+  const done = waitForEvent(
+    t.app.events,
+    ServerEventType.DesignUpdated,
+    () => t.app.services.designs.get(id).doneSections === 3,
+  );
+  const response = { id: question.id, response: { answer: '继续，保留已核准的文件归属。' } };
+  expect((await t.call(resolveInboxOp, response)).status).toBe(200);
+  expect((await t.call(resolveInboxOp, response)).status).toBe(409);
+  await done;
+  const sameSession = t.fake.prompts.filter((p) => p.sessionId === generating?.sessionId);
+  expect(sameSession).toHaveLength(3);
+  expect(sameSession[2]?.text).toContain(response.response.answer);
+  const completed = await get(id);
+  expect(completed.continuationQuestion).toBeNull();
+  expect(completed.runs.find((r) => r.id === current.id)?.attempt.status).toBe(AttemptStatus.Succeeded);
+});
+
+it.each(['停止', '运行时退出'])('等待续作中%s关闭提问且不再调用模型', async (action) => {
+  const { id } = await createDraft(false);
+  t.fake.enqueue(script().text('稍后可以继续。'), DESIGNER);
+  t.fake.enqueue(script().text('需要继续吗？'), DESIGNER);
+  const waiting = inboxOpens(t, InboxKind.Question);
+  expect((await t.call(reviseDesignOutlineOp, { id, instruction: '整理大纲' })).status).toBe(200);
+  const { item } = await waiting;
+  const status = action === '停止' ? AttemptStatus.Aborted : AttemptStatus.Interrupted;
+  const finished = ended(AttemptKind.DesignOutline, status);
+  if (action === '停止') expect((await t.call(stopDesignOp, { id })).status).toBe(200);
+  else t.fake.crash();
+  await finished;
+  expect(await get(id)).toMatchObject({ activeRunId: null, continuationQuestion: null });
+  expect((await t.call(resolveInboxOp, { id: item.id, response: { answer: '继续' } })).status).toBe(409);
+  expect(t.fake.prompts).toHaveLength(2);
+});
+
 it('单章失败保留前章，停止本次队列，定向重试后仍保留未选为目标的章节', async () => {
   const { id } = await createDraft(false);
   const { overview, endpoint, flow } = await optimize(id);

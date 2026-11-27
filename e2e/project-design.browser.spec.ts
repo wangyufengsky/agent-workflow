@@ -972,6 +972,44 @@ test('交易模板按渠道和版本筛选同码交易，在工作台和离线�
   }
 });
 
+test('章节仅回复文字时在工作台直接继续原会话，刷新仍可回答', async ({ page, request }) => {
+  const project = await fixtureProject(request);
+  const created = await request.post(`${API_BASE}/designs`, {
+    headers: AUTH,
+    data: { projectId: project.id, aiReviewEnabled: false },
+  });
+  expect(created.ok(), await created.text()).toBe(true);
+  const { id } = (await created.json()) as DesignDTO;
+  const outline = await request.put(`${API_BASE}/designs/${id}/outline`, {
+    headers: AUTH,
+    data: { sections: [{ kind: DesignSectionKind.Module, title: CALLS, scopePaths: ['src'], selected: true }] },
+  });
+  expect(outline.ok(), await outline.text()).toBe(true);
+  const [section] = (await design(request, id)).sections;
+  if (!section) throw new Error('Missing chapter');
+  await queueDesign(request, project, [{ type: 'text', text: '可以继续修正。' }]);
+  await queueDesign(request, project, [{ type: 'text', text: '是否继续本章？' }]);
+  await page.goto(`/designs/${id}`);
+  await page.getByRole('button', { name: '确认大纲，开始生成' }).click();
+  const resume = page.getByRole('button', { name: '继续当前会话' });
+  await expect(resume).toBeVisible();
+  const waiting = await design(request, id);
+  await page.reload();
+  await expect(resume).toBeVisible();
+  for (const theme of [ThemeId.Default, ThemeId.Codex]) {
+    await patchSettings(request, { 'ui.theme': theme });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.screenshot({ path: test.info().outputPath(`continue-session-${theme}.png`), animations: 'disabled' });
+  }
+  await queueDesign(request, project, [chapter(section.id, '续作后已保存', DesignDiagramKind.CallGraph, CALLS, true)]);
+  await resume.click();
+  await expect(page.getByText('续作后已保存', { exact: true }).first()).toBeVisible();
+  await expect(resume).toHaveCount(0);
+  const completed = await design(request, id);
+  expect(completed).toMatchObject({ doneSections: 1, continuationQuestion: null });
+  expect(completed.runs.map((run) => run.id)).toEqual(waiting.runs.map((run) => run.id));
+});
+
 test('AI 规划并生成直接从规划转入第一章', async ({ page, request }) => {
   const project = await fixtureProject(request);
   await page.goto(`/designs/new?projectId=${project.id}`);

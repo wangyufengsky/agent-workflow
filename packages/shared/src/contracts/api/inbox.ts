@@ -90,9 +90,11 @@ const base = {
 const item = <K extends InboxKind, P extends z.ZodType, R extends z.ZodType>(kind: K, payload: P, response: R) =>
   z.object({ ...base, kind: z.literal(kind), payload, response: response.nullable() });
 
+export const inboxQuestionSchema = item(InboxKind.Question, questionPayloadSchema, questionResponseSchema);
+
 /** `InboxItemDTO` (11 §7). */
 export const inboxItemSchema = z.discriminatedUnion('kind', [
-  item(InboxKind.Question, questionPayloadSchema, questionResponseSchema),
+  inboxQuestionSchema,
   item(InboxKind.Permission, permissionPayloadSchema, permissionResponseSchema),
   item(InboxKind.Acceptance, acceptancePayloadSchema, acceptanceResponseSchema),
   item(InboxKind.Plan, planPayloadSchema, planResponseSchema),

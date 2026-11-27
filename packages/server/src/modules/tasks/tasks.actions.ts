@@ -79,16 +79,18 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           // The answer goes to the session right away when it waits for it: that needs opencode.
           if (!attempts.isReady()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
           inbox.resolve(item, { answer });
-          const roleId = attempts.roleIdOf(attemptId);
-          if (roleId === null) throw new Error(`Attempt ${attemptId} has no role`);
-          const role = roles.get(roleId);
           await attempts.deliverAnswer(
             attemptId,
             renderTemplate(prompts[PromptName.StartAnswer], { question: item.payload.question, answer }),
-            {
-              agent: role.baseAgent,
-              system: role.prompt,
-              functionalTest: state.get(taskOf(item)).functionalTest !== null,
+            () => {
+              const roleId = attempts.roleIdOf(attemptId);
+              if (roleId === null) throw new Error(`Attempt ${attemptId} has no role`);
+              const role = roles.get(roleId);
+              return {
+                agent: role.baseAgent,
+                system: role.prompt,
+                functionalTest: state.get(taskOf(item)).functionalTest !== null,
+              };
             },
           );
           break;

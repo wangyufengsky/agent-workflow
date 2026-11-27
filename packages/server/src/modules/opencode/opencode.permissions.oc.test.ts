@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -73,6 +73,8 @@ const RUN = 'RUN: ';
 const RESEARCH_PERMISSION_PROBE = 'VERIFY_RESEARCH_PERMISSION';
 const RESEARCH_CHECKSUM = 'cksum README.md';
 const DESIGN_SEARCH_PROBE = 'VERIFY_DESIGN_SEARCH_PIPELINE';
+const DESIGN_COMPACTION_PROBE = 'VERIFY_DESIGN_COMPACTION';
+let designNeedsCompaction = false;
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
 const DESIGN_MCP_PROBE = 'VERIFY_DESIGN_ACCOUNTING';
@@ -130,6 +132,19 @@ async function recordCommand(req: IncomingMessage) {
   const data: Buffer[] = [];
   for await (const chunk of req) data.push(chunk as Buffer);
   transportTrace.push(JSON.parse(Buffer.concat(data).toString('utf8')));
+}
+
+function contextOverflow(res: ServerResponse) {
+  res.writeHead(400, { 'content-type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      error: {
+        message: "This model's maximum context length is 32000 tokens. Please reduce your input.",
+        code: 'context_length_exceeded',
+        type: 'invalid_request_error',
+      },
+    }),
+  );
 }
 
 function scriptedModel(): Server {
@@ -193,6 +208,31 @@ function scriptedModel(): Server {
         } else {
           replyText = 'Summarized the supplied work.';
         }
+      } else if (designNeedsCompaction && names.length === 0) {
+        designNeedsCompaction = false;
+        replyText = 'The chapter was not saved. Ask whether to continue.';
+      } else if (hasProbe(DESIGN_COMPACTION_PROBE)) {
+        const target = /"id":"([\w-]+)","title":"VERIFY_DESIGN_COMPACTION"/.exec(prompt);
+        if (
+          target &&
+          prompt.includes(MCP_TOOL_PREFIX + McpToolName.SubmitDesignSection) &&
+          prompt.includes('get_submission_guide')
+        ) {
+          calls = [
+            operation(McpToolName.SubmitDesignSection, {
+              sectionId: target[1],
+              summary: '压缩后完成',
+              blocks: [{ type: 'markdown', markdown: '压缩后完成' }],
+              files: [],
+              diagrams: [],
+            }),
+          ];
+        } else if (last?.role === 'tool') {
+          designNeedsCompaction = true;
+          return contextOverflow(res);
+        } else {
+          calls = [{ name: 'read', args: { filePath: 'README.md' } }];
+        }
       } else if (overflowStage === 2 && names.length === 0) {
         overflowStage = 3;
         replyText = `${SUMMARY_PROBE} Continue the task using new evidence.`;
@@ -202,17 +242,7 @@ function scriptedModel(): Server {
           calls = [{ name: 'read', args: { filePath: 'latest.txt' } }];
         } else if (overflowStage === 1) {
           overflowStage = 2;
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              error: {
-                message: "This model's maximum context length is 32000 tokens. Please reduce your input.",
-                code: 'context_length_exceeded',
-                type: 'invalid_request_error',
-              },
-            }),
-          );
-          return;
+          return contextOverflow(res);
         } else {
           contextRequests.push(messages);
           const count = messages.filter((m) => m.role === 'tool').length;
@@ -985,6 +1015,59 @@ it.each([
   },
   90_000,
 );
+
+it('真实 OpenCode 压缩后从恢复消息取回目标并直接提交本章', async () => {
+  const spec = providerFor(model);
+  const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
+  const { project } = await addProject(t, {
+    files: {
+      'opencode.json': JSON.stringify({
+        model: projectModel,
+        compaction: { tail_turns: 0 },
+        provider: {
+          [PROJECT_PROVIDER]: {
+            ...spec,
+            models: { [MODEL]: { ...spec.models[MODEL], limit: { context: 30000, output: 1024 } } },
+          },
+        },
+      }),
+    },
+  });
+  await t.call(updateSettingsOp, { 'ai.contextEngine': true });
+  try {
+    const { body: design } = await t.call(createDesignOp, { projectId: project.id, aiReviewEnabled: false });
+    const outline = await t.call(updateDesignOutlineOp, {
+      id: design.id,
+      sections: [
+        { kind: DesignSectionKind.Module, title: DESIGN_COMPACTION_PROBE, scopePaths: ['README.md'], selected: true },
+      ],
+    });
+    expect(outline.status).toBe(200);
+    const ended = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt }) => attempt.kind === AttemptKind.DesignGenerate && attempt.endedAt !== null,
+      30000,
+    );
+    const [started, terminal] = await Promise.all([
+      t.call(generateDesignOp, { id: design.id, model: projectModel }),
+      ended,
+    ]);
+    expect(started.status).toBe(200);
+    expect(terminal.attempt.error).toBeNull();
+    expect((await t.call(getAttemptContextOp, { id: terminal.attempt.id })).body).toMatchObject({
+      compactionRequests: 1,
+      compactions: 1,
+    });
+    const completed = (await t.call(getDesignOp, { id: design.id })).body;
+    expect(completed.sections[0]?.summary).toBe('压缩后完成');
+    expect(completed.runs).toHaveLength(1);
+    expect(t.app.services.attempts.get(terminal.attempt.id).nudges).toBe(0);
+  } finally {
+    designNeedsCompaction = false;
+    await t.call(updateSettingsOp, { 'ai.contextEngine': false });
+  }
+}, 60_000);
 
 it('M3 真实溢出压缩恢复后，主请求在途时生成无工具摘要，同一 Session 下一请求带新证据并完成', async () => {
   contextRequests.length = 0;

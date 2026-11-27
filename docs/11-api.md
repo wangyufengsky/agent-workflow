@@ -780,7 +780,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | designs.source | GET /designs/:id/files/:fileId/source | 仅本机阅读器可用。验证文件归属与扫描哈希，匹配返回 available 和全文；变化返回 changed，解绑或不可读返回 unavailable。此操作不暴露给助手 |
 | designs.lookupImpact | POST /designs/:id/lookup-impact | read，助手可直接调用。请求体 `{ paths: string[] }` 接受最多 50 条项目相对路径。按保存的设计索引返回 `designId`、`snapshotSha`、`dirty`、`coverage`、直接与间接 `candidates`、`uncoveredPaths` 和 `truncated`。结果仅表示快照中的静态关联，全程零模型调用 |
 | designs.staleness | GET /designs/:id/staleness | read，只读比较设计与当前工作区。可传 `commitSha`（完整提交 SHA）比较指定提交。返回 `state`、变更文件总数 `changedFilesCount`、按目录顺序排列的受影响已勾选章节 `affectedSectionIds` 与最多 20 条相对路径样例 `changedPathsSample`。基线或当前提交可用时附 `baseSha`、`headSha`。设计不存在返回 404 DESIGN_NOT_FOUND |
-| designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试。`handoffPending` 表示正在等候衔接下一章或自动复审，其间 `activeRunId` 为空，仍可停止 |
+| designs.list / get | GET /designs · GET /designs/:id | 列表按更新时间游标分页，详情含选中章节进度、已扫描文件、图和尝试。`continuationQuestion` 返回当前等待续作的收件箱提问或 `null`，通过现有收件箱回答接口继续原会话。`handoffPending` 表示正在等候衔接下一章或自动复审，其间 `activeRunId` 为空，仍可停止 |
 | designs.create / update | POST /designs · PATCH /designs/:id | 创建执行只读扫描并固定模板快照；更新标题、主题、阅读风格或复审选项。创建、更新均可传 `permissionMode`（`ask`、`assisted` 或 `full`），详情返回当前值，默认 `ask`。运行中可单独切档，此设计随后收到的权限请求使用新值，已打开的审批卡继续等待人工决定。助手工具不暴露此字段 |
 | designs.listTemplates | GET /designs/templates | 可传 projectId，仅探测根目录并返回技术栈和推荐模板 |
 | designs.createTemplate / updateTemplate / deleteTemplate | POST /designs/templates · PATCH 或 DELETE /designs/templates/:key | 复制或新建自定义模板，内置架构探索、交易链路探索及数据模型与 SQL 链路探索模板更新与删除均返回 DESIGN_TEMPLATE_READONLY |

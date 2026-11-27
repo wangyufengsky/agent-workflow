@@ -128,7 +128,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | 调用 `submit_plan` / `submit_result` / `submit_review` / `browser_submit_report` 成功 | 尝试 `succeeded`；后端随后中止会话的后续生成（若仍在生成） |
 | `session.idle` 且有未回答的阻塞问题（或待处理的权限请求） | 尝试保持 `running` 但停止计时，节点 `waiting_input`；全部回答后 `prompt_async` 发送答案（`start-answer.md`，多个答案合成一条），节点回到 `running`，重新计时（D46） |
 | `session.idle` 且有已回答但未送达的答案 | 发送答案（会话忙时回答的问题，在下一次空闲时送达） |
-| `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
+| `session.idle` 且未提交、无问题 | 提醒提交并将 `nudges` 加一。项目设计使用与压缩恢复相同的续作消息，携带目标章节与指定提交工具。达到 `ATTEMPT_MAX_NUDGES` 后仍空闲时，项目设计生成阻塞提问卡，用户回答后继续同一会话；其他尝试进入 `failed / ATTEMPT_NO_RESULT` |
 | `session.status` 为 `retry`（模型服务连不上、5xx、限流，opencode 自己一直重试） | 尝试继续等待，超时暂停并记下剩余时间；会话再次发出请求（`busy`）或有进展时按剩余时间继续计时（D163）。会话流记「模型请求失败，opencode 稍后重试」与原因，同一原因连续重试只记一次 |
 | `session.status` 为 `retry` 且原因为 `SSE read timed out`（模型服务一次回复中途超过 opencode 的 `chunkTimeout` 没有数据，适配层报为 `stalled`） | 会话流记 `model_stalled`；中止这次输出，中止返回且会话空闲后在同一会话发送 `model-stalled.md` 要它分段继续（续写的 `busy` 之前，被中止那一轮的 `MessageAbortedError` 与迟到的空闲都不算），不计提醒次数；超时照常计时（D217） |
 | `session.error` 为 `ContextOverflowError` | 记录上下文超限提示，保留原尝试和超时计时。OpenCode 发送 `session.compacted` 后恢复通常的空闲处理；若还未压缩成功就空闲，以原始错误结束尝试，再按步骤重试预算调度。 |

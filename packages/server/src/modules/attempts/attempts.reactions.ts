@@ -122,12 +122,26 @@ export function watchSessions(
       stall.continued = true;
     }
     const messages = session.pendingAnswers.splice(0);
+    if (messages.length > 0 && session.designContinuation) messages.push(session.designContinuation);
     if (stall !== null) messages.unshift(deps.prompts[PromptName.ModelStalled]);
     if (messages.length > 0) {
       await send(attempt, session, messages.join('\n\n'));
       return;
     }
     if (attempt.nudges >= ATTEMPT_MAX_NUDGES) {
+      if (session.designContinuation) {
+        const question = '本轮设计还没有提交成功。可以让 AI 在原会话继续，也可以补充说明后继续。';
+        state.inbox.create({
+          kind: InboxKind.Question,
+          attemptId: attempt.id,
+          nodeId: null,
+          taskId: null,
+          title: '项目设计等待继续',
+          payload: { question, options: ['继续当前会话'], blocking: true },
+        });
+        state.park(session, attempt);
+        return;
+      }
       move(attempt, AttemptEvent.NoResult, {
         code: ErrorCode.AttemptNoResult,
         message: 'Session went idle without submitting a result',
@@ -142,12 +156,13 @@ export function watchSessions(
     await send(
       attempt,
       session,
-      renderTemplate(deps.prompts[PromptName.Nudge], {
-        submitTool:
-          session.submitTool === null
-            ? 'the submission tool named in your instructions'
-            : `\`${MCP_TOOL_PREFIX}${session.submitTool}\``,
-      }),
+      session.designContinuation ??
+        renderTemplate(deps.prompts[PromptName.Nudge], {
+          submitTool:
+            session.submitTool === null
+              ? 'the submission tool named in your instructions'
+              : `\`${MCP_TOOL_PREFIX}${session.submitTool}\``,
+        }),
     );
   }
 
@@ -332,7 +347,13 @@ export function watchSessions(
   function interruptActive(runtimeLost = false): void {
     for (const attempt of repo.listByStatus(ACTIVE_ATTEMPT_STATUSES)) {
       if (runtimeLost && isLocal(attempt.id)) continue;
-      if (attempt.status === AttemptStatus.Running && state.waitsForAnswer(attempt.id)) continue;
+      // 设计队列与增量工作区由当前运行持有；重启后按已保存章节恢复。
+      if (
+        attempt.status === AttemptStatus.Running &&
+        !isDesignAttemptKind(attempt.kind) &&
+        state.waitsForAnswer(attempt.id)
+      )
+        continue;
       record(attempt, [systemEntry(TranscriptSystemEvent.RuntimeLost)]);
       move(attempt, AttemptEvent.RuntimeLost);
     }
@@ -372,7 +393,7 @@ export function watchSessions(
       session.recovery.phase = 'resuming';
       session.contextOverflow = null;
       const continuation = [
-        'Continue the original task from the compacted context.',
+        session.designContinuation ?? 'Continue the original task from the compacted context.',
         ...session.pendingAnswers.splice(0),
       ];
       await state.send(session, continuation.join('\n\n'), messageId);

@@ -17,6 +17,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { DESIGN_WORKBENCH_COPY } from '../../copy/design-workbench.ts';
 import { DESIGNS_COPY as C, DESIGN_SECTION_LABEL, DESIGN_STATUS_LABEL } from '../../copy/designs.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
+import { InboxCard } from '../inbox/inbox-card.tsx';
 import { DesignPermissionPicker } from './design-permission-picker.tsx';
 import { DeleteDesignDialog } from './design-workbench-dialogs.tsx';
 import styles from './designs.module.css';
@@ -274,7 +275,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
           {active && (
             <div className="banner" role="status">
               <span className="grow">{DESIGN_STATUS_LABEL[design.status]}</span>
-              {latest.awaitingInput && (
+              {latest.awaitingInput && !design.continuationQuestion && (
                 <Link className="link" to={ROUTES.inbox}>
                   {C.permissions}
                 </Link>
@@ -284,6 +285,7 @@ export function DesignOutline({ design, model }: { design: DesignDTO; model: str
               </Button>
             </div>
           )}
+          {design.continuationQuestion && <InboxCard item={design.continuationQuestion} />}
           <AttemptView attemptId={latest.attempt.id} canAbort={false} foldOnEnd />
         </div>
       )}
