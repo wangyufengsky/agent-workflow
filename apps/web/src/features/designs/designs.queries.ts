@@ -64,7 +64,8 @@ function useDesignMutation<I extends z.ZodObject>(operation: OperationContract<I
     mutationFn: (input: z.input<I>) => callOperation(operation, input),
     onSuccess: (design: DesignDTO) => {
       client.setQueryData(queryKeys.design(design.id), design);
-      return client.invalidateQueries({ queryKey: queryKeys.designs });
+      // 写请求已返回保存后的设计，后台刷新不应继续锁住工作台上的操作。
+      void client.invalidateQueries({ queryKey: queryKeys.designs });
     },
   });
 }

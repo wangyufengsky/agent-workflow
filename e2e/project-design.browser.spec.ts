@@ -326,10 +326,25 @@ test('项目设计从项目页新建，逐章跟随与自由阅读，搜索下�
   const scrollBefore = await scrollArea.evaluate((element) => element.scrollTop);
   await page.getByRole('button', { name: '设计权限 · 始终询问' }).click();
   await page.screenshot({ path: test.info().outputPath('design-permissions-running.png'), animations: 'disabled' });
-  await page
-    .getByRole('group', { name: '设计权限' })
-    .getByRole('button', { name: /^帮我批准/ })
-    .click();
+  // 模拟大项目详情刷新尚未返回；两次权限写入均由真实后端处理。
+  const detailUrl = `**/api/v1/designs/${id}`;
+  const releaseReads = Promise.withResolvers<void>();
+  await page.route(detailUrl, async (route) => {
+    if (route.request().method() === 'GET') await releaseReads.promise;
+    await route.continue();
+  });
+  try {
+    const menu = page.getByRole('group', { name: '设计权限' });
+    await menu.getByRole('button', { name: /^自动批准只读/ }).click();
+    const saved = page.getByRole('button', { name: '设计权限 · 自动批准只读' });
+    await expect(saved).toBeEnabled();
+    await saved.click();
+    await menu.getByRole('button', { name: /^帮我批准/ }).click();
+    await expect(page.getByRole('button', { name: '设计权限 · 帮我批准' })).toBeEnabled();
+  } finally {
+    releaseReads.resolve();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
   await expect(page.getByRole('button', { name: '设计权限 · 帮我批准' })).toBeVisible();
   expect((await design(request, id)).permissionMode).toBe('assisted');
   await releaseGate(request, GATES[0]);
